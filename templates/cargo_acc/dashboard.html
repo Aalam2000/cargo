@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Дашбоард{% endblock %}
+
+{% block content %}
+    <h1>Дашбоард</h1>
+
+    <!-- Компании -->
+    <h2>Компании</h2>
+    <table id="company-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Наименование</th>
+            <th>Регистрация</th>
+            <th>Описание</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Клиенты -->
+    <div class="table-header-container">
+        <h2>Клиенты</h2>
+        <div class="table-header-buttons">
+            <button class="add-button">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="client-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Код Клиента</th>
+            <th>Компания</th>
+            <th>Описание</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Модальное окно настроек таблицы -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <h3>Настройки колонок</h3>
+            <ul id="settings-list" class="settings-list">
+                <!-- Здесь будут динамически добавлены строки настроек -->
+            </ul>
+        </div>
+    </div>
+
+
+
+    <!-- Склады -->
+    <h2>Склады</h2>
+    <table id="warehouse-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Наименование</th>
+            <th>Адрес</th>
+            <th>Компания</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Товары -->
+    <h2>Товары</h2>
+    <table id="product-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Код Товара</th>
+            <th>Код Клиента</th>
+            <th>Компания</th>
+            <th>Склад</th>
+            <th>Тип Груза</th>
+            <th>Вес</th>
+            <th>Объем</th>
+            <th>Стоимость</th>
+            <th>Дата Отправки</th>
+            <th>Дата Доставки</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Грузы -->
+    <h2>Грузы</h2>
+    <table id="cargo-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Код Груза</th>
+            <th>Код Клиента</th>
+            <th>Вес</th>
+            <th>Объем</th>
+            <th>Стоимость</th>
+            <th>Дата Отправки</th>
+            <th>Дата Доставки</th>
+            <th>Статус</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Автомобили -->
+    <h2>Автомобили</h2>
+    <table id="vehicle-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Номерной Знак</th>
+            <th>Модель</th>
+            <th>Компания Перевозчик</th>
+            <th>Текущий Статус</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Транспортные Накладные -->
+    <h2>Транспортные Накладные</h2>
+    <table id="transport-bill-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Код Накладной</th>
+            <th>Место Отправления</th>
+            <th>Место Назначения</th>
+            <th>Дата Отправления</th>
+            <th>Дата Прибытия</th>
+            <th>Компания Перевозчик</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Перемещения грузов -->
+    <h2>Перемещения Грузов</h2>
+    <table id="cargo-movement-table" class="table">
+        <thead>
+        <tr class="table-header">
+            <th>Груз</th>
+            <th>Из Транспортной Накладной</th>
+            <th>В Транспортную Накладную</th>
+            <th>Место Перемещения</th>
+            <th>Дата Перемещения</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'js/dashboard.js' %}"></script>
+{% endblock %}
