@@ -8,6 +8,9 @@ test/
 venv/
 env/
 
+# Мануалы для софта
+manuals/
+
 # Файлы и папки IDE
 .idea/
 .vscode/

@@ -12,17 +12,29 @@
     <!-- Таблица Товары -->
     <div class="table-header-container">
         <h2>Товары</h2>
+        <div class="filter-container">
+            <label for="client-filter">Найти товар:</label>
+            <input type="text" id="client-filter" placeholder="Введите код товара">
+        </div>
         <div class="table-header-buttons">
-            <button id="add-row-product" class="add-button" data-modal="product-modal" data-table="product-table">Добавить</button>
+            <button id="add-row-product" class="add-button" data-modal="product-modal" data-table="product-table">
+                Добавить
+            </button>
             <button class="settings-button">
                 <i class="fa fa-cog"></i> <!-- Шестеренка -->
             </button>
         </div>
     </div>
-    <table id="product-table" class="table">
-        <thead></thead> <!-- Заполняется динамически -->
-        <tbody></tbody> <!-- Заполняется динамически -->
-    </table>
+    <div class="table-container">
+        <table id="product-table-h" class="table">
+            <thead></thead> <!-- Заголовок заполняется динамически -->
+        </table>
+        <table id="product-table-r" class="table-body">
+            <tbody></tbody> <!-- Тело таблицы заполняется динамически -->
+        </table>
+    </div>
+
+
 {% endblock %}
 
 {% block scripts %}
@@ -92,5 +104,5 @@
         </div>
     </div>
 
-    <script src="{% static 'js/debugging_code.js' %}"></script>
+    <script src="{% static 'js/load_product_table.js' %}"></script>
 {% endblock %}

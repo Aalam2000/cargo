@@ -1,0 +1,50 @@
+Проект Cargo
+Структура проекта
+PyCharm (2023.2.1 (Professional Edition))
+Python (3.12)
+Django (4.2)
+Postgres (16.4)
+Приложения:
+cargodb - основное приложение
+accounts - Пользователи проекта
+cargo_acc - таблицы проекта
+
+templates/base.html - основной шаблон проекта
+templates/cargo_acc/orders.html - файл с таблицами
+static/css/debugging_code.css - стили
+static/cargo_acc/js/debugging_code.js - скрипты страницы
+
+Работу с SQL делаем через AJAX и Django REST Framework (DRF),
+
+Правила для ответов:
+Отвечать по русски.
+Всегда сохраняй тот код, который не относится и не мешает работе текущего вопроса.
+Прошу в ответе сохранять всегда понятный формат:
+Указываешь куда вставляем. Конкретно место чтоб я его узнал по коду а не по смыслу.
+Указываешь что удаляем. Если ни чего удалять не надо так и пиши "Ничего не удаляем". Если заменяем весь текст так и пиши "Стираем все."
+Указываешь что нужно оставить. Если ничего не стираем так и пиши "Оставляем все!". Если все стираем так и пиши "Ничего не оставляем."
+
+Вот блок, который открывает таблицу на странице: templates/cargo_acc/orders.html
+{% block content %}
+    <!-- Поле для фильтров -->
+    <div style="height: 2cm; border-bottom: 1px solid #ccc; margin-bottom: 10px;">
+        <!-- Здесь будет размещение фильтров -->
+    </div>
+
+    <!-- Таблица Товары -->
+    <div class="table-header-container">
+        <h2>Товары</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-product" class="add-button" data-modal="product-modal" data-table="product-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="product-table" class="table">
+        <thead></thead> <!-- Заполняется динамически -->
+        <tbody></tbody> <!-- Заполняется динамически -->
+    </table>
+{% endblock %}
+
+Вот функция в файле , которая должна заполнять эту таблицу

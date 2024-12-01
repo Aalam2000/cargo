@@ -1,0 +1,132 @@
+{
+    "structure": {
+        "templates": {
+            "templates\\base.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\base.html",
+                "linked_js": [
+                    "https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"
+                ],
+                "id_elements": []
+            },
+            "templates\\index.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\index.html",
+                "linked_js": [],
+                "id_elements": []
+            },
+            "templates\\accounts\\profile.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\accounts\\profile.html",
+                "linked_js": [],
+                "id_elements": []
+            },
+            "templates\\cargo_acc\\client_table.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\cargo_acc\\client_table.html",
+                "linked_js": [
+                    "{% static 'js/client_table.js' %}"
+                ],
+                "id_elements": [
+                    "client-table"
+                ]
+            },
+            "templates\\cargo_acc\\dashboard.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\cargo_acc\\dashboard.html",
+                "linked_js": [
+                    "{% static 'js/dashboard.js' %}"
+                ],
+                "id_elements": [
+                    "company-table",
+                    "client-table",
+                    "warehouse-table",
+                    "product-table",
+                    "cargo-table",
+                    "vehicle-table",
+                    "transport-bill-table",
+                    "cargo-movement-table"
+                ]
+            },
+            "templates\\cargo_acc\\debugging_code.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\cargo_acc\\debugging_code.html",
+                "linked_js": [
+                    "{% static 'js/debugging_code.js' %}"
+                ],
+                "id_elements": [
+                    "client-table",
+                    "company-table",
+                    "warehouse-table",
+                    "cargo-type-table",
+                    "cargo-status-table",
+                    "packaging-type-table",
+                    "image-table"
+                ]
+            },
+            "templates\\cargo_acc\\orders.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\cargo_acc\\orders.html",
+                "linked_js": [
+                    "{% static 'js/load_product_table.js' %}"
+                ],
+                "id_elements": [
+                    "product-table-h",
+                    "product-table-r"
+                ]
+            },
+            "templates\\chatgpt_ui\\dialog.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\chatgpt_ui\\dialog.html",
+                "linked_js": [
+                    "{% static 'chatgpt_ui/js/dialog.js' %}"
+                ],
+                "id_elements": []
+            },
+            "templates\\registration\\login.html": {
+                "type": "HTML",
+                "description": "HTML файл: templates\\registration\\login.html",
+                "linked_js": [],
+                "id_elements": []
+            }
+        }
+    },
+    "details": {
+        "templates\\base.html": {
+            "excerpt": "{% load static %}\n\n<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>{% block title %}Welcome{% e",
+            "lines": 63
+        },
+        "templates\\index.html": {
+            "excerpt": "{% extends \"base.html\" %}\n{% block content %}\n<h1>Добро пожаловать в Базу Данных</h1>\n<p>Здесь будет отображаться основная информация.</p>\n{% endblock %}",
+            "lines": 5
+        },
+        "templates\\accounts\\profile.html": {
+            "excerpt": "{% extends 'base.html' %}\n\n{% block title %}Профиль пользователя{% endblock %}\n\n{% block content %}\n    <h1>Профиль пользователя</h1>\n\n    <!-- Отладочная информация -->\n    <p><strong>Email:</strong>",
+            "lines": 85
+        },
+        "templates\\cargo_acc\\client_table.html": {
+            "excerpt": "{% extends 'base.html' %}\n{% load static %}\n\n{% block title %}Таблица клиентов{% endblock %}\n\n{% block content %}\n    <!-- Клиенты -->\n    <div class=\"table-header-container\">\n        <h2>Клиенты</h2>",
+            "lines": 81
+        },
+        "templates\\cargo_acc\\dashboard.html": {
+            "excerpt": "{% extends 'base.html' %}\n{% load static %}\n\n{% block title %}Дашбоард{% endblock %}\n\n{% block content %}\n    <h1>Дашбоард</h1>\n\n    <!-- Компании -->\n    <h2>Компании</h2>\n    <table id=\"company-tabl",
+            "lines": 155
+        },
+        "templates\\cargo_acc\\debugging_code.html": {
+            "excerpt": "{% extends 'base.html' %}\n{% load static %}\n\n{% block title %}Клиенты{% endblock %}\n\n{% block content %}\n    <h1>Настройки</h1>\n    <!-- Клиенты -->\n    <div class=\"table-header-container\">\n        <h",
+            "lines": 182
+        },
+        "templates\\cargo_acc\\orders.html": {
+            "excerpt": "{% extends 'base.html' %}\n{% load static %}\n\n{% block title %}Товары{% endblock %}\n\n{% block content %}\n    <!-- Поле для фильтров -->\n    <div style=\"height: 2cm; border-bottom: 1px solid #ccc; margi",
+            "lines": 108
+        },
+        "templates\\chatgpt_ui\\dialog.html": {
+            "excerpt": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>ChatGPT UI</title>\n    {% load static %}\n    <l",
+            "lines": 24
+        },
+        "templates\\registration\\login.html": {
+            "excerpt": "{% extends 'base.html' %}\n{% block content %}\n<!-- Здесь ничего нет, так как поля для логина и пароля отображаются только в левой части -->\n{% if form.errors %}\n{% endif %}\n{% endblock %}\n",
+            "lines": 6
+        }
+    }
+}

@@ -1,14 +1,26 @@
 /* Контейнер таблицы */
 .table-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    /*white-space: nowrap; !* Отключаем перенос строк в ячейках за пределы контейнера *!;*/
+    width: 200%; /* Позволяем расширение вправо */
     height: 400px;
-    overflow-y: auto;
     border: 1px solid #ccc;
     border-radius: 5px;
     margin-top: 20px;
 }
 
+.table-header, .table-body {
+    min-width: max-content; /* Задает минимальную ширину по контенту, чтобы контейнер расширялся вправо */
+    width: auto;
+    table-layout: auto; /* Позволяет таблице расширяться по мере добавления колонок */
+}
+
 /* Таблица */
 .table {
+    min-width: 100%; /* Позволяем таблице занимать минимум всю ширину контейнера */
+    /*white-space: nowrap; !* Отключаем перенос текста внутри ячеек *!*/
+    display: table; /* Позволяет таблице занимать всю доступную ширину */
     width: 100%;
     border-collapse: collapse;
     table-layout: auto; /* Автоматическое распределение ширины */
@@ -20,6 +32,8 @@
     border: 1px solid #ddd;
     text-align: center;
     vertical-align: middle;
+    box-sizing: border-box;
+    width: auto; /* Устанавливает ширину автоматически */
 }
 
 /* Стили для заголовка таблицы */
@@ -34,8 +48,8 @@
 }
 
 .table thead tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 50px;
+    display: table;
+    /*grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) 50px;*/
 }
 
 /* Заголовок и строки таблицы */
@@ -44,15 +58,15 @@
     border: 1px solid #ddd;
     text-align: center;
     vertical-align: middle;
-    white-space: nowrap; /* Предотвращаем перенос текста */
+    /*white-space: nowrap; !* Предотвращаем перенос текста *!*/
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 /* Строки таблицы */
 .table-row {
-    display: grid; /* Используем Grid Layout для контроля ширины */
-    grid-template-columns: 1fr 1fr 1fr 50px; /* Остальные колонки + кнопка удаления */
+    display: table-row; /* Используем Grid Layout для контроля ширины */
+    /*grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) 50px;*/
 }
 
 /* Зебра-эффект для строк */
@@ -71,11 +85,6 @@
 }
 
 /* Контейнеры для шапки и тела таблицы */
-.table-header-container {
-    overflow: hidden;
-    border-bottom: 1px solid #ddd;
-}
-
 .table-body-container {
     height: 400px;
     overflow-y: auto;
@@ -83,6 +92,8 @@
 
 /* Контейнер заголовка с кнопками */
 .table-header-container {
+    overflow: hidden;
+    border-bottom: 1px solid #ddd;
     display: flex;
     justify-content: space-between;
     align-items: center;

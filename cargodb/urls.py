@@ -20,6 +20,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('orders/', views.orders_view, name='orders'),
     path('cargo_acc/', include('cargo_acc.urls')),  # Подключаем все маршруты для приложения cargo_acc
+    path('chatgpt_ui/', include('chatgpt_ui.urls')),
 ]
 
 if settings.DEBUG:

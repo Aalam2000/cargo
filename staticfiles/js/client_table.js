@@ -2,7 +2,7 @@ let currentPage = 1;
 const pageSize = 15;
 let loading = false;
 
-async function loadClientTable() {
+async function loadTable() {
     try {
         const response = await fetch(`/cargo_acc/client_table/data/`);
         if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
@@ -60,7 +60,7 @@ function setupCancelButtons() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadClientTable();  // Загрузка всей таблицы при открытии страницы
+    loadTable();  // Загрузка всей таблицы при открытии страницы
 
     const filterInput = document.getElementById('client-filter');
     filterInput.addEventListener('input', () => {

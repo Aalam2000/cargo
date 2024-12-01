@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'accounts',
     'home',
     'cargo_acc',
+    'chatgpt_ui',
 ]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
@@ -66,8 +67,8 @@ WSGI_APPLICATION = 'cargodb.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'cargo_db'),
-        'USER': os.getenv('DB_USER', 'webmaster'),
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('IP_POSTGRES'),
         'PORT': os.getenv('DB_PORT', '5432'),
@@ -143,5 +144,5 @@ LOGGING = {
 
 # LOGIN_URL = 'login'  # Убедитесь, что этот путь соответствует вашему URL для входа
 
-LOGIN_REDIRECT_URL = 'dashboard'  # Или 'profile'
+LOGIN_REDIRECT_URL = 'profile'  # Или 'dashboard'
 LOGOUT_REDIRECT_URL = '/'
