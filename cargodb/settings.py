@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-TEMPLATES_DIR = [os.path.join(BASE_DIR, 'templates')]
+TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Для сборки статики на сервере
 
 # Добавим определение окружения
@@ -20,16 +20,12 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # Загружаем переменные окружения из файла .env
 load_dotenv()
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
 
 # DEBUG setting: включаем или выключаем режим отладки в зависимости от окружения
 DEBUG = True  # DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # ALLOWED_HOSTS: список хостов, которые могут обращаться к серверу
-ALLOWED_HOSTS = ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '78.188.215.218']
-
-if ENVIRONMENT == 'production':
-    ALLOWED_HOSTS.append('78.188.215.218')  # IP адрес сервера
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '78.188.215.218']
 
 # Application definition
 INSTALLED_APPS = [
@@ -123,24 +119,24 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': 'debug.log',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
-}
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'handlers': {
+#         'file': {
+#             'level': 'DEBUG',
+#             'class': 'logging.FileHandler',
+#             'filename': 'debug.log',
+#         },
+#     },
+#     'loggers': {
+#         'django': {
+#             'handlers': ['file'],
+#             'level': 'DEBUG',
+#             'propagate': True,
+#         },
+#     },
+# }
 
 # LOGIN_URL = 'login'  # Убедитесь, что этот путь соответствует вашему URL для входа
 
