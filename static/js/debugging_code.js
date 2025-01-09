@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const table = document.getElementById(tableData.tableId);
         if (table) {
             generateTableHeader(tableData); // Генерируем шапку таблицы
-            //loadTableData(tableData); // Загружаем данные таблицы
+            loadTableData(tableData); // Загружаем данные таблицы
         }
     });
 

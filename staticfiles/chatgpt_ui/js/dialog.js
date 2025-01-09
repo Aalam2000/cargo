@@ -1,9 +1,27 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('chat-form');
     const output = document.getElementById('chat-output');
     const loadingIndicator = document.getElementById('loading-indicator');
     const submitButton = document.getElementById('submit-btn');
 
+    // Получение MAC-адреса клиента
+    try {
+        const macResponse = await fetch('/chatgpt_ui/get_mac/');
+        const macData = await macResponse.json();
+
+        if (macData.mac) {
+            const macDiv = document.createElement('div');
+            macDiv.className = 'mac-message';
+            macDiv.textContent = `Ваш MAC: ${macData.mac}`;
+            document.body.insertBefore(macDiv, document.body.firstChild);
+        } else if (macData.error) {
+            console.error('Ошибка при получении MAC:', macData.error);
+        }
+    } catch (error) {
+        console.error('Ошибка при запросе MAC-адреса:', error);
+    }
+
+    // Обработчик отправки формы
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
 

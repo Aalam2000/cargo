@@ -5,77 +5,37 @@
 
 {% block content %}
     <!-- Клиенты -->
-    <div class="table-header-container">
-        <h2>Клиенты</h2>
-        <div class="filter-container">
-            <label for="client-filter">Найти клиента:</label>
-            <input type="text" id="client-filter" placeholder="Введите код клиента">
-        </div>
-        <div class="table-header-buttons">
-            <button class="add-button">Добавить</button>
-            <button class="settings-button">
-                <i class="fa fa-cog"></i> <!-- Шестеренка -->
-            </button>
-        </div>
-    </div>
-    <div class="table-wrapper">
+    <div class="table-container" data-table="client-table">
         <div class="table-header-container">
-            <table class="table">
-                <thead>
-                <tr>
-                    <th>Код Клиента</th>
-                    <th>Компания</th>
-                    <th>Описание</th>
-                    <th class="delete-header">
-                        <i class="fa fa-trash"></i> <!-- Иконка удаления в заголовке -->
-                    </th>
-                </tr>
-                </thead>
-            </table>
+            <h2>Клиенты</h2>
+            <div class="filter-container">
+                <label for="client-filter">Найти клиента:</label>
+                <input type="text" id="client-filter" placeholder="Введите код клиента">
+            </div>
+            <div class="table-header-buttons">
+                <button class="add-button">Добавить</button>
+                <button class="settings-button">
+                    <i class="fa fa-cog"></i> <!-- Шестеренка -->
+                </button>
+            </div>
         </div>
-        <div class="table-body-container">
-            <table id="client-table" class="table">
-                <tbody></tbody>
-            </table>
-        </div>
+        <table id="client-table" class="table">
+            <thead>
+            <tr class="table-header">
+                <th>Код Клиента</th>
+                <th>Компания</th>
+                <th>Описание</th>
+                <th class="delete-header">
+                    <i class="fa fa-trash"></i> <!-- Иконка удаления в заголовке -->
+                </th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
+
 {% endblock %}
 
 {% block scripts %}
-    <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Подтверждение удаления</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Закрыть">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p class="modal-message"></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-cancel">Отмена</button>
-                    <button type="button" id="confirmDeleteButton" class="btn btn-danger">Удалить</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="{% static 'js/client_table.js' %}"></script>
-    <script>
-        // Синхронизация ширины колонок и полосы прокрутки
-        document.addEventListener('DOMContentLoaded', () => {
-            const headerContainer = document.querySelector('.table-header-container');
-            const bodyContainer = document.querySelector('.table-body-container');
-
-            function adjustHeaderWidth() {
-                const scrollBarWidth = bodyContainer.offsetWidth - bodyContainer.clientWidth;
-                headerContainer.style.marginRight = `${scrollBarWidth}px`;
-            }
-
-            adjustHeaderWidth(); // Применяем при загрузке
-            window.addEventListener('resize', adjustHeaderWidth); // Применяем при изменении размера окна
-        });
-    </script>
 {% endblock %}

@@ -1,21 +1,35 @@
-import os
-import transliterate
 import json
+import os
+import time
+
+import transliterate
 from django.apps import apps
-from rest_framework import status
-from rest_framework.views import APIView
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage
 from django.http import JsonResponse
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
 from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 
-from .models import Company, Client, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
+from .models import Client
+from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
     CarrierCompany, Vehicle, TransportBill, CargoMovement
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, ProductSerializer, CargoSerializer, \
     CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
+
+
+def settings_modal(request):
+    return render(request, 'cargo_acc/settings_modal.html')
 
 
 def client_table_page(request):
@@ -23,16 +37,162 @@ def client_table_page(request):
     return render(request, 'cargo_acc/client_table.html')
 
 
+def mod_addrow_view(request):
+    return render(request, 'cargo_acc/mod_addrow.html')
+
+def mod_delrow_view(request):
+    return render(request, 'cargo_acc/mod_delrow.html')
+
+
 def client_table_data(request):
-    """API для выгрузки всей таблицы клиентов."""
+    """API для выгрузки таблицы клиентов с фильтрацией и пагинацией."""
     try:
-        clients = Client.objects.select_related('company').order_by('id')
-        serializer = ClientSerializer(clients, many=True)
-        return JsonResponse({'results': serializer.data})
+        # Фильтрация по параметру 'search' из GET-запроса
+        search_query = request.GET.get('search', '').lower()
+        clients = Client.objects.filter(client_code__icontains=search_query).select_related('company')
+
+        # Пагинация
+        paginator = Paginator(clients, 10)  # 10 записей на страницу
+        page = request.GET.get('page', 1)
+        try:
+            clients_page = paginator.page(page)
+        except EmptyPage:
+            return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+        # Формирование результата
+        result = [
+            {'id': client.id, 'client_code': client.client_code, 'company': client.company.name}
+            for client in clients_page
+        ]
+        return JsonResponse({
+            'results': result,
+            'page': page,
+            'total_pages': paginator.num_pages,
+        })
 
     except Exception as e:
-        print(f"Ошибка: {e}")
+        # Логирование ошибки вместо print
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Ошибка: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def get_clients(request):
+    search_query = request.GET.get('search', '').lower()
+    page = int(request.GET.get('page', 1))  # Параметр страницы
+    page_size = int(request.GET.get('page_size', 7))  # Лимит записей
+
+    clients = Client.objects.filter(client_code__icontains=search_query)
+    paginator = Paginator(clients, page_size)
+
+    try:
+        clients_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'error': 'Страница не существует'}, status=404)
+
+    result = [{'id': c.id, 'client_code': c.client_code} for c in clients_page]
+    return JsonResponse({
+        'results': result,
+        'page': page,
+        'total_pages': paginator.num_pages,
+    })
+
+
+def get_warehouses(request):
+    search_query = request.GET.get('search', '').lower()
+    warehouses = Warehouse.objects.filter(name__icontains=search_query).select_related('company')
+
+    # Пагинация
+    paginator = Paginator(warehouses, 10)
+    page = request.GET.get('page', 1)
+    try:
+        warehouses_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+    result = [
+        {'id': warehouse.id, 'name': warehouse.name, 'address': warehouse.address, 'company': warehouse.company.name}
+        for warehouse in warehouses_page
+    ]
+    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
+
+
+def get_companies(request):
+    search_query = request.GET.get('search', '').lower()
+    companies = Company.objects.filter(name__icontains=search_query)
+
+    # Пагинация
+    paginator = Paginator(companies, 10)
+    page = request.GET.get('page', 1)
+    try:
+        companies_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+    result = [
+        {'id': company.id, 'name': company.name, 'registration': company.registration,
+         'description': company.description}
+        for company in companies_page
+    ]
+    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
+
+
+def get_cargo_types(request):
+    search_query = request.GET.get('search', '').lower()
+    cargo_types = CargoType.objects.filter(name__icontains=search_query)
+
+    # Пагинация
+    paginator = Paginator(cargo_types, 10)
+    page = request.GET.get('page', 1)
+    try:
+        cargo_types_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+    result = [
+        {'id': cargo_type.id, 'name': cargo_type.name, 'description': cargo_type.description}
+        for cargo_type in cargo_types_page
+    ]
+    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
+
+
+def get_cargo_statuses(request):
+    search_query = request.GET.get('search', '').lower()
+    cargo_statuses = CargoStatus.objects.filter(name__icontains=search_query)
+
+    # Пагинация
+    paginator = Paginator(cargo_statuses, 10)
+    page = request.GET.get('page', 1)
+    try:
+        cargo_statuses_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+    result = [
+        {'id': cargo_status.id, 'name': cargo_status.name, 'description': cargo_status.description}
+        for cargo_status in cargo_statuses_page
+    ]
+    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
+
+
+def get_packaging_types(request):
+    search_query = request.GET.get('search', '').lower()
+    packaging_types = PackagingType.objects.filter(name__icontains=search_query)
+
+    # Пагинация
+    paginator = Paginator(packaging_types, 10)
+    page = request.GET.get('page', 1)
+    try:
+        packaging_types_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
+
+    result = [
+        {'id': packaging_type.id, 'name': packaging_type.name, 'description': packaging_type.description}
+        for packaging_type in packaging_types_page
+    ]
+    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
 
 def add_image_to_product(request, product_id):
@@ -153,6 +313,9 @@ def save_table_settings(request):
 
 
 class UniversalDeleteView(APIView):
+    permission_classes = [AllowAny]  # Доступ для всех
+
+    @method_decorator(csrf_exempt, name='dispatch')
     def delete(self, request, model_name, pk):
         try:
             # Динамически получаем модель по имени
@@ -245,15 +408,28 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 
 # ViewSet для Товаров
-class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
+class ProductPagination(PageNumberPagination):
+    page_size = 20  # Количество записей на странице
+    page_size_query_param = 'page_size'
 
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by',
-                                                'product_code')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+
+class ProductViewSet(ModelViewSet):
+    queryset = Product.objects.select_related(
+        'client', 'company', 'warehouse', 'cargo_type', 'cargo_status', 'packaging_type'
+    ).prefetch_related('images')
+    serializer_class = ProductSerializer
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
+
+    def list(self, request, *args, **kwargs):
+        # Возвращаем QuerySet без использования values()
+        queryset = self.queryset.all()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 # ViewSet для Грузов
@@ -309,3 +485,24 @@ class CargoMovementViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
         sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
         return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+
+
+last_update_timestamp = time.time()
+
+
+def mark_clients_changed():
+    global last_update_timestamp
+    last_update_timestamp = time.time()
+
+
+def sse_clients_stream(request):
+    def event_stream():
+        local_ts = 0
+        while True:
+            if last_update_timestamp > local_ts:
+                data = list(Client.objects.values('id', 'client_code', 'description'))
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                local_ts = last_update_timestamp
+            time.sleep(2)
+
+    return StreamingHttpResponse(event_stream(), content_type='text/event-stream')

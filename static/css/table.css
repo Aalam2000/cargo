@@ -1,42 +1,25 @@
 /* Контейнер таблицы */
 .table-container {
-    overflow-x: auto;
-    overflow-y: hidden;
-    /*white-space: nowrap; !* Отключаем перенос строк в ячейках за пределы контейнера *!;*/
-    width: 200%; /* Позволяем расширение вправо */
-    height: 400px;
+    /*overflow-x: auto; !* Горизонтальная прокрутка *!*/
+    /*overflow-y: auto; !* Вертикальная прокрутка *!*/
+    /*height: 400px;*/
     border: 1px solid #ccc;
     border-radius: 5px;
     margin-top: 20px;
 }
 
-.table-header, .table-body {
-    min-width: max-content; /* Задает минимальную ширину по контенту, чтобы контейнер расширялся вправо */
-    width: auto;
-    table-layout: auto; /* Позволяет таблице расширяться по мере добавления колонок */
-}
-
-/* Таблица */
+/* Основная таблица */
 .table {
-    min-width: 100%; /* Позволяем таблице занимать минимум всю ширину контейнера */
-    /*white-space: nowrap; !* Отключаем перенос текста внутри ячеек *!*/
-    display: table; /* Позволяет таблице занимать всю доступную ширину */
+    display: block;
+    overflow-x: auto; /* Горизонтальная прокрутка */
+    overflow-y: auto; /* Вертикальная прокрутка */
+    height: 400px;
     width: 100%;
+    table-layout: fixed; /* Фиксированная ширина столбцов */
     border-collapse: collapse;
-    table-layout: auto; /* Автоматическое распределение ширины */
 }
 
-/* Заголовки и ячейки таблицы */
-.table th, .table td {
-    padding: 10px;
-    border: 1px solid #ddd;
-    text-align: center;
-    vertical-align: middle;
-    box-sizing: border-box;
-    width: auto; /* Устанавливает ширину автоматически */
-}
-
-/* Стили для заголовка таблицы */
+/* Заголовки таблицы */
 .table thead th {
     background-color: #007BFF;
     color: white;
@@ -44,50 +27,43 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); /* Тень для отделения заголовка от строк */
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+    text-align: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Добавляем троеточие для длинного текста */
+    white-space: nowrap; /* Отключаем перенос текста */
+    /* Минимальная ширина столбца (при необходимости) */
+    min-width: 50px;
 }
 
-.table thead tr {
-    display: table;
-    /*grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) 50px;*/
-}
-
-/* Заголовок и строки таблицы */
-.table thead th, .table tbody td {
+/* Ячейки таблицы */
+.table tbody td {
     padding: 10px;
     border: 1px solid #ddd;
     text-align: center;
     vertical-align: middle;
-    /*white-space: nowrap; !* Предотвращаем перенос текста *!*/
+    box-sizing: border-box;
     overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Строки таблицы */
-.table-row {
-    display: table-row; /* Используем Grid Layout для контроля ширины */
-    /*grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) 50px;*/
+    text-overflow: ellipsis; /* Добавляем троеточие для длинного текста */
+    white-space: nowrap; /* Отключаем перенос текста */
 }
 
 /* Зебра-эффект для строк */
-.table-row:nth-child(even) {
+.table tbody tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
-.table-row:nth-child(odd) {
+.table tbody tr:nth-child(odd) {
     background-color: #ffffff;
 }
 
 /* Эффект при наведении на строку */
-.table-row:hover {
+.table tbody tr:hover {
     background-color: #f1f1f1;
     cursor: pointer;
-}
-
-/* Контейнеры для шапки и тела таблицы */
-.table-body-container {
-    height: 400px;
-    overflow-y: auto;
 }
 
 /* Контейнер заголовка с кнопками */
@@ -162,9 +138,30 @@
     font-size: 1em;
 }
 
+.table thead th.delete-cell {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+}
+
+.table thead th.delete-header {
+    width: 1%;
+    white-space: nowrap;
+    padding: 0;
+    text-align: center;
+}
+
+.delete-header {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    padding: 0;
+    text-align: center;
+    white-space: nowrap;
+}
 
 /* Ячейка для удаления */
-.delete-cell, .delete-header {
+.delete-cell {
     width: 50px; /* Фиксированная ширина */
     min-width: 50px; /* Предотвращаем сжатие */
     max-width: 50px; /* Предотвращаем растяжение */
@@ -177,18 +174,19 @@
 }
 
 /* Иконка внутри ячейки */
-.delete-cell i, .delete-header i {
+.delete-cell i {
     font-size: 18px; /* Оптимальный размер иконки */
-    color: red;
+    color: #5d1010;
     transition: transform 0.2s;
 }
 
 /* Эффект при наведении на иконку */
-.delete-cell i:hover, .delete-header i:hover {
+.delete-cell i:hover {
     transform: scale(1.2);
 }
 
-#deleteModal {
+/* Стиль для delete-modal */
+#delete-modal {
     display: none; /* По умолчанию скрыто */
     position: fixed;
     top: 50%;
@@ -196,6 +194,158 @@
     transform: translate(-50%, -50%);
     z-index: 1050;
     background-color: white;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-    border-radius: 5px;
+    width: 400px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+
+/* Стиль для product-modal */
+#product-modal, #settings-modal {
+    height: auto; /* Убираем фиксированную высоту */
+    display: none;
+    position: fixed;
+    top: 20%; /* Поднимаем выше */
+    left: 50%;
+    transform: translate(-50%, -20%);
+    z-index: 1050;
+    background-color: white;
+    width: 400px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+
+/* Заголовки модальных окон */
+#delete-modal-header, #product-modal-header, #settings-modal-header {
+    background-color: #007BFF;
+    color: white;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 10px 10px 0 0;
+}
+
+/* Тело модальных окон */
+#delete-modal-body, #product-modal-body {
+    padding: 20px;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* Подвал модальных окон */
+#delete-modal-footer, #product-modal-footer, #settings-modal-footer {
+    padding: 10px;
+    display: flex;
+    justify-content: space-around;
+}
+
+/* Кнопки закрытия */
+#delete-close-modal, #product-close-modal {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+#delete-close-modal:hover, #product-close-modal:hover, #settings-modal-modal:hover {
+    color: red;
+}
+
+/*Модальные окна*/
+.modal-open {
+    overflow: hidden; /* Отключаем прокрутку */
+}
+
+.modal-open::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5); /* Полупрозрачный черный фон */
+    z-index: 1040; /* Значение z-index выше, чем у модального окна */
+}
+
+.modal {
+    max-width: 700px;
+    width: 90%;
+}
+
+.d-flex {
+    display: flex;
+}
+
+.gap-3 {
+    gap: 1rem;
+}
+
+.flex-grow-1 {
+    flex-grow: 1;
+}
+
+/*Список клиентов*/
+.dropdown-menu {
+    position: absolute;
+    max-height: 200px; /* Ограничение высоты */
+    overflow-y: auto; /* Скроллинг, если слишком много элементов */
+    border: 1px solid #ccc;
+    background-color: white;
+    box-shadow: 0 4px 6px rgb(11, 43, 252);
+    z-index: 1050;
+    width: 100%;
+    left: 0;
+    padding: 0; /* Убираем лишние отступы */
+    margin: 0; /* Убираем отступы */
+    font-size: small;
+}
+
+
+.dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+.dropdown-item:hover {
+    background-color: #f0f0f0;
+}
+
+/* Сетка для динамического расположения полей */
+.d-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Две колонки одинаковой ширины */
+    gap: 1rem; /* Отступы между элементами */
+    align-items: start; /* Поля выравниваются по верхнему краю */
+}
+
+/* Модальное окно динамически подстраивается */
+.modal {
+    max-width: 700px; /* Ограничиваем максимальную ширину */
+    width: 90%; /* Автоматическая ширина */
+    height: auto; /* Высота под содержимое */
+    max-height: 90vh; /* Ограничиваем максимальную высоту */
+    overflow-y: auto; /* Добавляем прокрутку при необходимости */
+    position: relative; /* Сохраняем относительное позиционирование */
+    padding: 1rem; /* Внутренние отступы */
+    background: #fff; /* Белый фон для модального окна */
+    border-radius: 8px; /* Скругленные углы */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Легкая тень */
+}
+
+
+/*******/
+#client-dropdown {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    max-height: 150px;
+    overflow-y: auto;
+    width: 100%;
+    z-index: 1050;
+}
+#client::placeholder {
+    color: #a4a4a4;
+    font-style: italic;
+}
+

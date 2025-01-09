@@ -1,14 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+
 from . import views
 
-'''(
-    CompanyViewSet, ClientViewSet, WarehouseViewSet, CargoTypeViewSet, CargoStatusViewSet,
-    PackagingTypeViewSet, ImageViewSet, ProductViewSet, CargoViewSet, CarrierCompanyViewSet,
-    VehicleViewSet, TransportBillViewSet, CargoMovementViewSet, get_table_settings, save_table_settings,
-    check_client_code_unique
-)
-'''
 # Создаем router для автоматической генерации путей
 router = DefaultRouter()
 router.register(r'companies', views.CompanyViewSet)
@@ -39,6 +33,15 @@ urlpatterns = [
     path('products/<int:product_id>/add-image/', views.add_image_to_product, name='add_image_to_product'),
     path('client_table/', views.client_table_page, name='client_table_page'),
     path('client_table/data/', views.client_table_data, name='client_table_data'),
+    path('api/get_clients/', views.get_clients, name='get_clients'),
+    path('api/get_warehouses/', views.get_warehouses, name='get_warehouses'),
     path('api/delete/<str:model_name>/<int:pk>/', views.UniversalDeleteView.as_view(), name='universal_delete'),
+    path('mod_addrow/', views.mod_addrow_view, name='mod_addrow'),
+    path('clients/stream/', views.sse_clients_stream, name='clients_stream'),
+    path('api/get_companies/', views.get_companies, name='get_companies'),
+    path('api/get_cargo_types/', views.get_cargo_types, name='get_cargo_types'),
+    path('api/get_cargo_statuses/', views.get_cargo_statuses, name='get_cargo_statuses'),
+    path('api/get_packaging_types/', views.get_packaging_types, name='get_packaging_types'),
+    path('settings_modal', views.settings_modal, name='settings_modal'),
+    path('mod_delrow/', views.mod_delrow_view, name='mod_delrow'),
 ]
-

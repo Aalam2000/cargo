@@ -9,100 +9,45 @@
         <!-- Здесь будет размещение фильтров -->
     </div>
 
-    <!-- Таблица Товары -->
-    <div class="table-header-container">
-        <h2>Товары</h2>
-        <div class="filter-container">
-            <label for="client-filter">Найти товар:</label>
-            <input type="text" id="client-filter" placeholder="Введите код товара">
+    <!-- tiket: Таблица Товары -->
+    <div class="table-container" data-table="product-table">
+        <div class="table-header-container">
+            <h2>Товары</h2>
+            <div class="filter-container">
+                <label for="product-filter">Найти товар:</label>
+                <input type="text" id="product-filter" placeholder="Введите код товара">
+            </div>
+            <div class="table-header-buttons">
+                <button id="add-row-product" class="add-button" data-modal="product-modal">
+                    Добавить
+                </button>
+                <button class="settings-button">
+                    <i class="fa fa-cog"></i> <!-- Шестеренка -->
+                </button>
+            </div>
         </div>
-        <div class="table-header-buttons">
-            <button id="add-row-product" class="add-button" data-modal="product-modal" data-table="product-table">
-                Добавить
-            </button>
-            <button class="settings-button">
-                <i class="fa fa-cog"></i> <!-- Шестеренка -->
-            </button>
-        </div>
-    </div>
-    <div class="table-container">
-        <table id="product-table-h" class="table">
-            <thead></thead> <!-- Заголовок заполняется динамически -->
-        </table>
-        <table id="product-table-r" class="table-body">
-            <tbody></tbody> <!-- Тело таблицы заполняется динамически -->
+        <table id="product-table" class="table">
+            <thead></thead>
+            <tbody></tbody>
         </table>
     </div>
-
-
 {% endblock %}
+<script>
+function startSSE() {
+    const es = new EventSource('/cargo_acc/clients/stream/');
+    es.onmessage = (ev) => {
+        const updated = JSON.parse(ev.data);
+        console.log("Список клиентов обновлён:", updated);
+        // Здесь можете обновлять таблицу или выпадающий список
+    };
+    es.onerror = (err) => {
+        console.error("SSE error:", err);
+    };
+}
+document.addEventListener('DOMContentLoaded', startSSE);
+</script>
 
 {% block scripts %}
-    <!-- Модальное окно для добавления строки -->
-    <div id="product-modal" class="product-modal">
-        <div class="modal-content">
-            <div class="modal-header"></div> <!-- Синяя полоска -->
-
-            <div class="modal-title">
-                <h3>Добавить запись</h3> <!-- Заголовок модального окна -->
-            </div>
-
-            <form id="modal-form">
-                <!-- Поля формы будут добавляться сюда динамически -->
-                <label for="company">Компания</label>
-                <input type="text" id="company" name="company" class="modal-input" autocomplete="off">
-                <div id="company-list" class="company-list"></div> <!-- Контейнер для списка компаний -->
-            </form>
-
-
-            <div class="modal-buttons">
-                <button id="modal-save" class="modal-save">Сохранить</button>
-                <button class="modal-close" data-close-modal="product-modal">Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <form id="modal-form">
-        {% csrf_token %}
-        <!-- Поля формы будут добавляться сюда динамически -->
-    </form>
-    <!-- Модальное окно подтверждения удаления -->
-    <div id="delete-confirmation-modal" class="del-modal">
-        <div class="modal-content">
-            <p id="delete-confirmation-message"></p>
-            <div class="modal-buttons">
-                <button id="confirm-delete" class="confirm-button">Ок</button>
-                <button id="cancel-delete" class="cancel-button">Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно для загрузки изображения -->
-    <div id="image-modal" class="image-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="close" id="close-image-modal">&times;</span> <!-- Перемещаем сюда крестик -->
-            </div> <!-- Синяя полоска -->
-            <div class="img-modal-header">
-                <h2>Загрузка изображения</h2>
-            </div>
-            <div class="img-modal-body">
-                <form id="image-upload-form" class="form-container">
-                    <div class="upload-section">
-                        <label for="image-file">Выберите изображение:</label>
-                        <input type="file" id="image-file" name="image_file" accept="image/*" capture="environment"
-                               onchange="previewImage(event)">
-                        <span id="file-name-display"></span> <!-- Новый элемент для отображения имени файла -->
-                        <br>
-                        <button type="submit" id="upload-image-button" class="upload-button">Загрузить</button>
-                    </div>
-                    <div class="preview-section">
-                        <img id="image-preview" src="#" alt="Превью изображения" style="display: none;"/>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
+    <script src="{% static 'js/client_cache.js' %}"></script>
     <script src="{% static 'js/load_product_table.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,108 @@
+{
+    "Проект ПАРСЕР": "Новая задача - ответ давать максимально коротко! В ответе только то, что нужно добавить/удалить/заменить. Ни строки лишнего!!! В ответе  - только ответ на поставленный вопрос! Ни какой самодеятельности (типа это тоже ему пригодится). Отвечаем только на ПОСТАВЛЕННЫЙ ВОПРОС! Предоставляю выгрузку проекта. Это именно то что сейчас есть и работает и это все выгружено только что из проекта. Структура проекта и содержание файлов.",
+    "python_version": "3.12.8",
+    "pycharm": "PyCharm 2023.2.1 (Professional Edition)",
+    "local project path": "C:/Users/Papa/PycharmProjects/cargodb",
+    "server project path": "/var/www/cargodb",
+    "server venv": "/var/www/cargodb/venv/bin",
+    "domain name": "https://bonablog.ru/",
+    "requirements_content": "annotated-types==0.7.0\nanyio==4.7.0\nasgiref==3.8.1\nbeautifulsoup4==4.12.3\ncertifi==2024.12.14\ncolorama==0.4.6\ndistro==1.9.0\nDjango==5.1.4\ndjango-extensions==3.2.3\ndjangorestframework==3.15.2\nh11==0.14.0\nhttpcore==1.0.7\nhttpx==0.28.1\nidna==3.10\njiter==0.8.2\nnumpy==2.2.0\nopenai==1.57.4\npandas==2.2.3\npillow==11.0.0\npsycopg2==2.9.9\npydantic==2.10.3\npydantic_core==2.27.1\npython-dateutil==2.9.0.post0\npython-dotenv==1.0.1\npytz==2024.2\nsetuptools==74.1.2\nsix==1.17.0\nsniffio==1.3.1\nsoupsieve==2.6\nsqlparse==0.5.3\ntqdm==4.67.1\ntransliterate==1.10.2\ntyping_extensions==4.12.2\ntzdata==2024.2\n",
+    "tree": {
+        "root": {
+            ".git": {},
+            ".idea": {},
+            "__pycache__": {},
+            "accounts": {
+                "__pycache__": {},
+                "migrations": {},
+                "admin.py": {},
+                "forms.py": {},
+                "models.py": {},
+                "serializers.py": {},
+                "urls.py": {},
+                "views.py": {}
+            },
+            "cargo_acc": {
+                "__pycache__": {},
+                "management": {},
+                "migrations": {},
+                "__init__.py": {},
+                "admin.py": {},
+                "apps.py": {},
+                "models.py": {},
+                "serializers.py": {},
+                "tests.py": {},
+                "urls.py": {},
+                "views.py": {}
+            },
+            "cargodb": {
+                "__pycache__": {},
+                "__init__.py": {},
+                "asgi.py": {},
+                "forms.py": {},
+                "settings.py": {},
+                "urls.py": {},
+                "views.py": {},
+                "wsgi.py": {}
+            },
+            "chatgpt_ui": {},
+            "home": {},
+            "img": {},
+            "manuals": {},
+            "media": {},
+            "static": {
+                "cargo_acc": {},
+                "chatgpt_ui": {},
+                "css": {
+                    "styles.css": {},
+                    "table.css": {}
+                },
+                "img": {},
+                "js": {
+                    "client_cache.js": {},
+                    "client_table.js": {},
+                    "dashboard.js": {},
+                    "debugging_code.js": {},
+                    "load_product_table.js": {}
+                }
+            },
+            "staticfiles": {},
+            "templates": {
+                "accounts": {
+                    "profile.html": {}
+                },
+                "cargo_acc": {
+                    "client_table.html": {},
+                    "dashboard.html": {},
+                    "debugging_code.html": {},
+                    "mod_addrow.html": {},
+                    "mod_delrow.html": {},
+                    "orders.html": {},
+                    "settings_modal.html": {}
+                },
+                "chatgpt_ui": {},
+                "registration": {
+                    "login.html": {}
+                },
+                "base.html": {},
+                "index.html": {}
+            },
+            "test": {},
+            "venv": {},
+            ".env": {},
+            ".gitignore": {},
+            "README.md": {},
+            "analyze_project.py": {},
+            "conversation_history.json": {},
+            "db.sqlite3": {},
+            "index.nginx-debian.html": {},
+            "manage.py": {},
+            "project_index.json": {},
+            "project_structure.json": {},
+            "query_data.txt": {},
+            "requirements.txt": {}
+        }
+    },
+    "include_content": [],
+    "ЗАДАЧА": "Задача"
+}

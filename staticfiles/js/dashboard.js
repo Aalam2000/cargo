@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', function () {
         'product_code', 'client_code', 'company', 'warehouse', 'cargo_type',
         'weight', 'volume', 'cost', 'shipping_date', 'delivery_date'
     ]);
+    // Загрузка данных для Типов Груза
+    loadTableData('/cargo_acc/api/cargo-types/', 'cargo-types-table', ['name', 'description']);
+
+    // Загрузка данных для Статусов Груза
+    loadTableData('/cargo_acc/api/cargo-statuses/', 'cargo-statuses-table', ['name', 'description']);
+
+    // Загрузка данных для Типов Упаковок
+    loadTableData('/cargo_acc/api/packaging-types/', 'packaging-types-table', ['name', 'description']);
+
     loadTableData('/cargo_acc/api/cargos/', 'cargo-table', [
         'cargo_code', 'client_code', 'weight', 'volume', 'cost',
         'shipping_date', 'delivery_date', 'status'
@@ -26,17 +35,16 @@ function loadTableData(apiUrl, tableId, columnsMap) {
         .then(response => response.json())
         .then(data => {
             const tableBody = document.getElementById(tableId).querySelector('tbody');
-            tableBody.innerHTML = '';
+            tableBody.innerHTML = ''; // Очищаем тело таблицы
 
             data.forEach((item) => {
                 const row = document.createElement('tr');
                 row.classList.add('table-row');
 
-                // Проходим по колонкам в нужном порядке и добавляем данные
                 columnsMap.forEach((columnKey) => {
                     const cell = document.createElement('td');
-                    const value = item[columnKey];  // Достаем значение по ключу
-                    cell.textContent = value !== undefined && value !== null ? value : '';  // Защита от пустых значений
+                    const value = item[columnKey];
+                    cell.textContent = value !== undefined && value !== null ? value : '—';
                     row.appendChild(cell);
                 });
 
@@ -45,6 +53,7 @@ function loadTableData(apiUrl, tableId, columnsMap) {
         })
         .catch(error => console.error('Error loading table data:', error));
 }
+
 
 document.addEventListener('DOMContentLoaded', function () {
     const settingsButtons = document.querySelectorAll('.settings-button');
@@ -438,5 +447,5 @@ document.addEventListener('DOMContentLoaded', function () {
         return cookieValue;
     }
 
-    //loadTableSettings();  // Загружаем настройки при загрузке страницы
+   // loadTableSettings();  // Загружаем настройки при загрузке страницы
 });

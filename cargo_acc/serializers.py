@@ -53,17 +53,103 @@ class ImageSerializer(serializers.ModelSerializer):
 
 # serializers.py
 class ProductSerializer(serializers.ModelSerializer):
-    images = ImageSerializer(many=True)  # Включаем связанные изображения
-    client = serializers.SlugRelatedField(slug_field='client_code', queryset=Client.objects.all())
-    company = serializers.SlugRelatedField(slug_field='name', queryset=Company.objects.all())
-    warehouse = serializers.SlugRelatedField(slug_field='name', queryset=Warehouse.objects.all())
-    cargo_type = serializers.SlugRelatedField(slug_field='name', queryset=CargoType.objects.all())
-    cargo_status = serializers.SlugRelatedField(slug_field='name', queryset=CargoStatus.objects.all())
-    packaging_type = serializers.SlugRelatedField(slug_field='name', queryset=PackagingType.objects.all())
+    images = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+
+    # Клиент
+    client_id = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(),
+        source='client',
+        required=False
+    )
+    client_code = serializers.SlugRelatedField(
+        slug_field='client_code',
+        source='client',
+        read_only=True
+    )
+
+    # Компания
+    company_id = serializers.PrimaryKeyRelatedField(
+        queryset=Company.objects.all(),
+        source='company',
+        required=False
+    )
+    company_name = serializers.SlugRelatedField(
+        slug_field='name',
+        source='company',
+        read_only=True
+    )
+
+    # Склад
+    warehouse_id = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all(),
+        source='warehouse',
+        required=False
+    )
+    warehouse_name = serializers.SlugRelatedField(
+        slug_field='name',
+        source='warehouse',
+        read_only=True
+    )
+
+    # Тип груза
+    cargo_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=CargoType.objects.all(),
+        source='cargo_type',
+        required=False
+    )
+    cargo_type_name = serializers.SlugRelatedField(
+        slug_field='name',
+        source='cargo_type',
+        read_only=True
+    )
+
+    # Статус груза
+    cargo_status_id = serializers.PrimaryKeyRelatedField(
+        queryset=CargoStatus.objects.all(),
+        source='cargo_status',
+        required=False
+    )
+    cargo_status_name = serializers.SlugRelatedField(
+        slug_field='name',
+        source='cargo_status',
+        read_only=True
+    )
+
+    # Тип упаковки
+    packaging_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=PackagingType.objects.all(),
+        source='packaging_type',
+        required=False
+    )
+    packaging_type_name = serializers.SlugRelatedField(
+        slug_field='name',
+        source='packaging_type',
+        read_only=True
+    )
 
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = [
+            'id', 'product_code', 'record_date', 'cargo_description', 'comment',
+            'departure_place', 'destination_place', 'weight', 'volume', 'cost',
+            'insurance', 'dimensions', 'shipping_date', 'delivery_date',
+            'images',  # ManyToMany (read_only)
+            # Для клиентов
+            'client_id', 'client_code',
+            # Для компании
+            'company_id', 'company_name',
+            # Для склада
+            'warehouse_id', 'warehouse_name',
+            # Для типа груза
+            'cargo_type_id', 'cargo_type_name',
+            # Для статуса груза
+            'cargo_status_id', 'cargo_status_name',
+            # Для типа упаковки
+            'packaging_type_id', 'packaging_type_name',
+        ]
+
+
+
 
 class CargoSerializer(serializers.ModelSerializer):
     class Meta:

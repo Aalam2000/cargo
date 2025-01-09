@@ -15,6 +15,16 @@ class Client(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     description = models.CharField(max_length=500, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from .views import mark_clients_changed
+        mark_clients_changed()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        from .views import mark_clients_changed
+        mark_clients_changed()
+
     def __str__(self):
         return self.client_code
 
@@ -80,6 +90,7 @@ class Product(models.Model):
     images = models.ManyToManyField(Image)
     packaging_type = models.ForeignKey(PackagingType, on_delete=models.CASCADE)
     delivery_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    comment = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return self.product_code
