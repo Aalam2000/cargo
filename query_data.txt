@@ -14,7 +14,7 @@ templates/cargo_acc/orders.html - файл с таблицами
 static/css/debugging_code.css - стили
 static/cargo_acc/js/debugging_code.js - скрипты страницы
 
-Работу с SQL делаем через AJAX и Django REST Framework (DRF),
+
 
 Правила для ответов:
 Отвечать по русски.

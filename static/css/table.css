@@ -1,3 +1,5 @@
+/*File: static/css/table.css*/
+
 /* Контейнер таблицы */
 .table-container {
     /*overflow-x: auto; !* Горизонтальная прокрутка *!*/
@@ -233,6 +235,53 @@
     text-align: center;
 }
 
+/* Сетка для формы */
+#product-modal-body form {
+    display: grid;
+    grid-template-columns: 1fr; /* По умолчанию одна колонка имен полей и одна поля */
+    gap: 12px;
+}
+
+/* Элементы формы */
+.form-group {
+    display: grid;
+    grid-template-columns: auto 1fr; /* Две колонки: первая для лейбла, вторая для поля ввода */
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Лейблы */
+.form-group label {
+    justify-self: end;
+    margin-right: 8px;
+}
+
+/* Поля ввода */
+.form-group .form-control {
+    justify-self: start;
+    width: 100%; /* Одинаковая ширина для всех полей */
+}
+
+.grid-form {
+    display: grid;
+    grid-template-columns: 1fr; /* Одна колонка по умолчанию */
+    gap: 10px; /* Отступы между полями */
+}
+
+#product-modal-body-two form {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.grid-form.two-columns .form-group {
+    display: flex;
+    flex-direction: column;
+}
+
 /* Подвал модальных окон */
 #delete-modal-footer, #product-modal-footer, #settings-modal-footer {
     padding: 10px;
@@ -250,7 +299,7 @@
 }
 
 #delete-close-modal:hover, #product-close-modal:hover, #settings-modal-modal:hover {
-    color: red;
+    color: #ff0000; /* При наведении */
 }
 
 /*Модальные окна*/
@@ -267,11 +316,6 @@
     height: 100vh;
     background: rgba(0, 0, 0, 0.5); /* Полупрозрачный черный фон */
     z-index: 1040; /* Значение z-index выше, чем у модального окна */
-}
-
-.modal {
-    max-width: 700px;
-    width: 90%;
 }
 
 .d-flex {

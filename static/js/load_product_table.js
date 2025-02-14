@@ -121,17 +121,16 @@ let tableSettings = {}; // Настройка колонок таблицы
 
 // Статический список обязательных полей для кнопки "Добавить"
 const requiredFieldsForAdd = [
-    'product_code',         // Код Товара
-    'client_code',               // Клиент
-    'company_name',              // Компания
-    'warehouse_name',            // Склад
-    'cargo_type_name',           // Тип груза
-    'cargo_status_name',         // Статус груза
-    'packaging_type_name',       // Тип упаковки
+    'product_code',                 // Код Товара
+    'client_code',                  // Клиент
+    'company_name',                 // Компания
+    'warehouse_name',               // Склад
+    'cargo_type_name',              // Тип груза
+    'cargo_status_name',            // Статус груза
+    'packaging_type_name',          // Тип упаковки
 ];
 
 // tiket: Функция для генерации таблицы
-// Функция для генерации таблицы
 async function generateTable(tableData) {
     const table = document.querySelector(`#${tableData.tableId}`);
     const settings = tableSettings[tableData.tableId];
@@ -164,7 +163,6 @@ async function generateTable(tableData) {
             }
         });
 
-
         // Добавление колонки для удаления
         const deleteHeader = document.createElement('th');
         deleteHeader.innerHTML = '<i class="fa fa-trash"></i>';
@@ -185,16 +183,13 @@ async function generateTable(tableData) {
                 }
             });
 
-
             // Добавление кнопки удаления
             const deleteCell = document.createElement('td');
             deleteCell.classList.add('delete-cell');
             deleteCell.innerHTML = `<i class="fa fa-trash" data-id="${item.id}"></i>`;
             row.appendChild(deleteCell);
-
             fragment.appendChild(row);
         });
-
 
         tbody.innerHTML = '';
         tbody.appendChild(fragment);
@@ -203,8 +198,6 @@ async function generateTable(tableData) {
         console.error('Ошибка загрузки данных:', error);
         alert('Ошибка загрузки данных. Проверьте API или консоль разработчика.');
     }
-
-
 }
 
 
@@ -221,6 +214,72 @@ tableElements.forEach((tableElement) => {
     });
 });
 
+async function saveTableData(modalId, tableId, editMode, rowInfo = null) {
+    const form = document.getElementById(`${modalId}-form`);
+    if (!form) return console.error(`Форма с id ${modalId}-form не найдена`);
+
+    // Логика проверки заполненности полей остается
+    for (const input of form.elements) {
+        if (input.type !== 'checkbox' && input.type !== 'file' && !input.value) {
+            alert(`Пожалуйста, заполните поле: ${input.name}`);
+            return;
+        }
+    }
+
+    const formData = new FormData(form);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'company') {
+            // Преобразуйте значение в ожидаемое имя компании
+            const companySelect = form.querySelector(`select[name="company"]`);
+            const selectedOption = companySelect.options[companySelect.selectedIndex];
+            data[key] = selectedOption.text;  // Используйте текст выбранной опции
+        } else {
+            data[key] = value;
+        }
+    });
+    console.log("Отправляемые данные:", data);
+    // Получение пути API из метаданных
+    const metadata = tableMetadata[tableId];
+    const url = editMode && rowInfo && rowInfo.id ? `${metadata.apiPath}${rowInfo.id}/` : metadata.apiPath;
+    const method = editMode ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) throw new Error(`Ошибка сохранения данных: ${response.status}`);
+
+        const responseData = await response.json();
+        console.log("Данные сохранены:", responseData);
+
+        closeModal(modalId);
+
+        // Добавьте этот вызов, чтобы обновить данные таблицы
+        initializeTable(document.getElementById(tableId));
+
+    } catch (error) {
+        console.error(`=== Error ===`, error);
+    }
+}
+
+// // Вызов функции внутри события
+// document.getElementById('product-modal-save').onclick = () => {
+//     const isEditMode = rowInfo !== null && rowInfo.id;
+//     saveTableData('product-modal', tableId, isEditMode, rowInfo);
+// };
+
+// Функция для получения CSRF-токена
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
 
 // Заполняем таблицу
 async function initializeTable(tableElement) {
@@ -231,59 +290,35 @@ async function initializeTable(tableElement) {
         await loadTableSettings(tableId); // Загрузка настроек
         generateTable(metadata);         // Генерация таблицы
     } else {
-        console.error(`Метаданные для таблицы с ID "${tableId}" не найдены.`);
+        console.error(`=== initializeTable === Метаданные для таблицы с ID "${tableId}" не найдены.`);
     }
 }
 
-// Слушатель на клики в таблицах
+// tiket: Слушатель на клики в таблицах
 document.addEventListener('click', async (event) => {
+    if (event.target.tagName === 'TH') return;
+
     const container = event.target.closest('[data-table]');
-    let tableId;
-    let metadata;
-    if (container) {
-        tableId = container.dataset.table; // Получаем ID таблицы
-        metadata = tableMetadata[tableId]; // Получаем метаданные таблицы
-        if (!metadata) {
-            console.error(`Метаданные для таблицы с ID "${tableId}" не найдены.`);
-            return;
-        }
+    const tableId = container?.dataset.table;
+    const metadata = tableMetadata[tableId];
 
-        // Исключаем обработку кликов на заголовке таблицы (th)
-        if (event.target.tagName === 'TH')
-            return; // Прерываем выполнение, если клик был на th
-    }
+    if (!metadata) return;
 
-    if (event.target.closest('.delete-cell')) {
-        const row = event.target.closest('tr');
-        const rowId = row.dataset.id;
-        const rowData = row.children[0]?.textContent || '';
-        openDeleteModal(rowId, rowData, metadata.tableName, tableId);
-        return;
-    }
-
-    if (event.target.matches('.add-button')) {
-        const modalId = event.target.dataset.modal;
-        openAddRowModal(modalId, metadata.tableName, tableId, null); // Передаем null для добавления новой строки
-        return;
-    }
-
-    if (event.target.closest('.settings-button')) {
-        const modalId = event.target.dataset.modal || 'settings-modal';
-        openSettingsModal(modalId, metadata.tableName, tableId, tableMetadata[tableId]);
-        return;
-    }
-
-
-    // Обработка клика по строке таблицы для редактирования
     const row = event.target.closest('tr');
-    if (row) {
-        const rowId = row.dataset.id;
-        const rowData = Array.from(row.children).map((cell) => cell.textContent.trim());
+    const rowId = row?.dataset.id;
+    const rowData = row ? Array.from(row.cells).map(cell => cell.textContent.trim()) : null;
+    console.log("Нажата кнопка: ", {event});
+    const actions = {
+        '.delete-cell': () => openDeleteModal(rowId, row?.cells[0]?.textContent.trim() || '', metadata.tableName, tableId),
+        '.add-button': () => openAddRowModal('product-modal', metadata.tableName, tableId, null),
+        '.settings-button': () => openSettingsModal('settings-modal', metadata.tableName, tableId, metadata),
+        'tr': () => rowId && openAddRowModal('product-modal', metadata.tableName, tableId, {id: rowId, data: rowData}),
+    };
 
-        openAddRowModal('product-modal', metadata.tableName, tableId, {id: rowId, data: rowData}); // Передаем данные строки
+    for (const selector in actions) {
+        if (event.target.closest(selector)) return actions[selector]();
     }
-})
-;
+});
 
 
 // Функция открытия модального окна
@@ -324,7 +359,7 @@ function showDeleteModal(rowId, productCode, tableName, tableId) {
 async function deleteRow(tableId, itemId) {
     const tableData = tableMetadata[tableId];
     if (!tableData) {
-        console.error(`Метаданные для таблицы с ID "${tableId}" не найдены.`);
+        console.error(`=== deleteRow === Метаданные для таблицы с ID "${tableId}" не найдены.`);
         return;
     }
 
@@ -382,271 +417,201 @@ function takeCurRowInfo() {
 }
 
 
-async function showAddRowModal(modalId, tableName, tableId, rowInfo = null) {
-    const modal = document.getElementById(modalId);
+function createModalFields(modalId, tableId, editMode, editType = null) {
     const tableData = tableMetadata[tableId];
-    console.log("Параметры для showAddRowModal:", {modalId, tableName, tableId, rowInfo});
-
     if (!tableData) {
-        console.error(`Метаданные для таблицы ${tableId} не найдены.`);
+        console.error(`=== createModalFields === Метаданные для таблицы ${tableId} не найдены.`);
         return;
     }
 
-    // Режим редактирования
-    const isEditMode = rowInfo !== null && rowInfo.id;
-
-    // Заголовок
-    document.getElementById('product-modal-title').textContent = isEditMode
-        ? 'Изменение строки'
-        : 'Добавление строки';
-
-    // Очищаем модалку
-    const modalBody = document.getElementById('product-modal-body');
+    const modalBody = document.querySelector(`#${modalId}-body`);
+    if (!modalBody) {
+        console.error(`=== createModalFields === Модальное окно ${modalId} не найдено.`);
+        return;
+    }
     modalBody.innerHTML = '';
 
-    // Форма
     const form = document.createElement('form');
-    form.id = 'add-row-form';
+    form.id = `${modalId}-form`;
+    form.classList.add('grid-form'); // Добавляем общий класс
 
-    // Сетка
-    const row = document.createElement('div');
-    row.classList.add('d-grid');
-    row.style.gridTemplateColumns = '1fr 1fr';
-    row.style.gap = '1rem';
-    let fieldsToDisplay;
-    if (isEditMode) {
-        // В режиме редактирования показываем все доступные поля
-        fieldsToDisplay = [
-            'product_code',
-            'client_name',
-            'comment',
-            'warehouse_name',
-            'company_name',
-            'cargo_description'
-        ];
-    } else {
-        // В режиме добавления показываем только обязательные поля
-        fieldsToDisplay = requiredFieldsForAdd;
-    }
-    CurRowInfoGLOBAL = rowInfo;
-    // Загружаем старые данные, если редактируем
-    let productData = null;
-    if (isEditMode) {
-        try {
-            const response = await fetch(`${tableData.apiPath}${rowInfo.id}/`);
-            if (!response.ok) {
-                console.log("rowInfo.id: ", rowInfo.id)
-                throw new Error(`Ошибка загрузки записи с ID ${rowInfo.id}`);
-            }
-            productData = await response.json();
-        } catch (error) {
-            console.error('Ошибка при загрузке записи:', error);
-            return;
+    tableData.fields.forEach(field => {
+        if (!field.visible) return;
+
+        if (tableId === 'order-table' && editType) {
+            if (!checkOrderFieldVisibility(field.name, editType)) return;
         }
-    }
-
-    // Создаем поля
-    tableData.fields.forEach((field) => {
-        if (!fieldsToDisplay.includes(field.name)) return;
 
         const formGroup = document.createElement('div');
-        formGroup.classList.add('form-group', 'flex-grow-1');
+        formGroup.classList.add('form-group');
 
         const label = document.createElement('label');
         label.textContent = field.label;
-        label.setAttribute('for', field.name);
-        formGroup.appendChild(label);
+        label.setAttribute('for', `${modalId}-${field.name}`);
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.name = field.name;
-        input.id = field.name;
+        let input;
+        if (field.type === 'ForeignKey' || field.type === 'ManyToManyField') {
+            input = document.createElement('select');
+            input.innerHTML = `<option value="">Загрузка...</option>`; // Пока список пуст
+            input.dataset.relatedModel = field.relatedModel;
+        } else {
+            input = document.createElement('input');
+            input.type = field.type === 'DateField' ? 'date' : 'text';
+        }
+
         input.classList.add('form-control');
-        input.placeholder = field.placeholder || `Введите ${field.label.toLowerCase()}`;
+        input.id = `${modalId}-${field.name}`;
+        input.name = field.name;
 
-        // Подставляем старое значение
-        if (isEditMode && productData && productData[field.name] !== undefined) {
-            input.value = productData[field.name] ? String(productData[field.name]) : '';
-        }
-
-        // Особый случай для поля Client (с бесконечным скроллом и фильтром)
-        if (field.name === 'client_code') {
-            const dropdown = document.createElement('div');
-            dropdown.classList.add('dropdown-menu');
-            dropdown.style.display = 'none';
-            modalBody.appendChild(dropdown);
-
-            input.addEventListener('input', () => {
-                updateClientDropdownForID(input, dropdown);
-            });
-            input.addEventListener('focus', () => {
-                updateClientDropdownForID(input, dropdown);
-            });
-            input.addEventListener('blur', () => {
-                setTimeout(() => {
-                    dropdown.style.display = 'none';
-                }, 100);
-            });
-            document.addEventListener('click', (event) => {
-                if (
-                    !event.target.closest('.form-control') &&
-                    !event.target.closest('.dropdown-menu')
-                ) {
-                    dropdown.style.display = 'none';
-                }
-            });
-
-            // Остальные ForeignKey (склад, компания и т.д.)
-        } else if (
-            field.relatedModel &&
-            ['companies', 'warehouses', 'cargo-types', 'cargo-statuses', 'packaging-types']
-                .includes(field.relatedModel)
-        ) {
-            const dropdown = document.createElement('div');
-            dropdown.classList.add('dropdown-menu');
-            dropdown.style.display = 'none';
-            modalBody.appendChild(dropdown);
-
-            input.addEventListener('focus', async () => {
-                await updateUniversalDropdownForID(input, dropdown, field.relatedModel);
-                dropdown.style.display = 'block';
-            });
-            input.addEventListener('blur', () => {
-                setTimeout(() => {
-                    dropdown.style.display = 'none';
-                }, 100);
-            });
-            document.addEventListener('click', (event) => {
-                if (
-                    !event.target.closest('.form-control') &&
-                    !event.target.closest('.dropdown-menu')
-                ) {
-                    dropdown.style.display = 'none';
-                }
-            });
-        }
-
+        formGroup.appendChild(label);
         formGroup.appendChild(input);
-        row.appendChild(formGroup);
+        form.appendChild(formGroup);
     });
 
-    form.appendChild(row);
+    if (tableData.fields.filter(f => f.visible).length > 7) {
+        modalBody.id = 'product-modal-body-two';
+    }
     modalBody.appendChild(form);
 
-    // Показываем модалку
-    modal.style.display = 'block';
-    document.body.classList.add('modal-open');
+}
 
-    // Обработчики кнопок
-    if (!modal.dataset.listenersAdded) {
-        document.getElementById('product-close-modal').addEventListener('click', () => closeModal(modalId));
-        document.getElementById('product-cancel-modal').addEventListener('click', () => closeModal(modalId));
-        // Сохранение
-        document.getElementById('product-modal-save').addEventListener('click', async () => {
+async function loadDropdownData(modalId) {
+    const selects = document.querySelectorAll(`#${modalId} select[data-relatedModel]`);
 
-            const curRowInfo = takeCurRowInfo();
+    for (const select of selects) {
+        const relatedModel = select.dataset.relatedModel;
+        const apiUrl = `/cargo_acc/api/${relatedModel}/`;
 
-            // Сбор полей
-            const patchData = {};
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error(`Ошибка загрузки данных: ${response.status}`);
 
-            fieldsToDisplay.forEach((fieldName) => {
-                const inputEl = document.getElementById(fieldName);
-                if (!inputEl) return;
+            const data = await response.json();
+            select.innerHTML = `<option value="">Выберите...</option>`; // Сбрасываем
 
-                let newValue = inputEl.value.trim();
-                // ForeignKey → берём ID из dataset.selectedId
-                if (['client_code', 'warehouse_name', 'company_name', 'cargo_status_name', 'cargo_type_name', 'packaging_type_name'].includes(fieldName)) {
-                    if (inputEl.dataset.selectedId) {
-                        newValue = parseInt(inputEl.dataset.selectedId, 10);
-                        if (isNaN(newValue)) {
-                            return;
-                        }
-                    } else {
-
-                        // Не выбрали новый → не трогаем
-                        if (!isEditMode) {
-                            // При добавлении: null
-                            newValue = null;
-                        } else {
-                            // При редактировании: не добавляем поле в patchData
-                            return;
-                        }
-                    }
-                }
-                if (isEditMode && productData) {
-                    // Сравниваем со старым значением (частичное обновление)
-                    const oldValue = productData[fieldName];
-                    if (String(newValue) !== String(oldValue)) {
-                        patchData[fieldName] = newValue;
-                    }
-                } else {
-                    // При добавлении (POST) добавляем всё, что ввели
-                    if (newValue !== '') {
-                        patchData[fieldName] = newValue;
-                    }
-                }
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name || item.title || item.code || `ID ${item.id}`;
+                select.appendChild(option);
             });
 
-            if (isEditMode) {
-                // Если нет изменений - ничего не отправляем
-                if (Object.keys(patchData).length === 0) {
-                    console.log('Нет изменений, PATCH не отправляем');
-                } else {
-                    const response = await fetch(`${tableData.apiPath}${curRowInfo}/`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCSRFToken()
-                        },
-                        body: JSON.stringify(patchData)
-                    });
-                    if (response.ok) {
-                        const updatedItem = await response.json();
-                        updateRowInTable(tableData, updatedItem, curRowInfo);
-                        console.log('Редактирование завершено');
-                    } else {
-                        const errText = await response.text();
-                        console.error('Ошибка PATCH:', response.status, errText);
-                    }
-                }
-            } else {
-                // Добавляем новую запись
-                console.log("ПУТЬ: ", tableData.apiPath);
-                console.log("Перед отправки: ", patchData);
-
-                // Измените имена полей
-                const correctedPatchData = {
-                    product_code: patchData.product_code,
-                    client_id: patchData.client_code,
-                    company_id: patchData.company_name,
-                    warehouse_id: patchData.warehouse_name,
-                    cargo_type_id: patchData.cargo_type_name,
-                    cargo_status_id: patchData.cargo_status_name,
-                    packaging_type_id: patchData.packaging_type_name
-                };
-
-                const response = await fetch(`${tableData.apiPath}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify(correctedPatchData)
-                });
-                console.log("После отправки: ", patchData);
-                if (response.ok) {
-                    const newItem = await response.json();
-                    addRowToTable(tableData, newItem);
-                    console.log('Добавление завершено');
-                } else {
-                    console.error('Ошибка при добавлении новой записи (POST)');
-                }
-            }
-
-            closeModal(modalId);
-        });
-        modal.dataset.listenersAdded = 'true';
+        } catch (error) {
+            console.error(`=== loadDropdownData === Ошибка загрузки для ${relatedModel}:`, error);
+            select.innerHTML = `<option value="">Ошибка загрузки</option>`;
+        }
     }
+}
+
+
+function fillModalFields(modalId, tableId, editMode, rowInfo = null) {
+    const tableData = tableMetadata[tableId];
+    if (!tableData) {
+        console.error(`=== fillModalFields === Метаданные для таблицы ${tableId} не найдены.`);
+        return;
+    }
+
+    // Если у нас есть информация о строке, создаем карту name -> dataIndex
+    const fieldIndexMap = tableData.fields.reduce((map, field, index) => {
+        map[field.name] = index;
+        return map;
+    }, {});
+
+    tableData.fields.forEach(field => {
+        if (!field.visible) return;
+
+        const input = document.getElementById(`${modalId}-${field.name}`);
+        if (!input) return;
+
+        if (editMode && rowInfo) {
+            // Ищем значение по индексу
+            const index = fieldIndexMap[field.name];
+            input.value = rowInfo.data[index] ?? '';
+
+            if (field.type === 'ForeignKey') {
+                loadOptionsForSelect(input, field.relatedModel, rowInfo.data[index]);
+            }
+        } else {
+            // Новый режим: устанавливаем значение по умолчанию
+            input.value = getDefaultValue(field.type);
+
+            if (field.type === 'ForeignKey') {
+                loadOptionsForSelect(input, field.relatedModel);
+            }
+        }
+    });
+}
+
+// Функция для загрузки опций в select без изменений
+function loadOptionsForSelect(selectElement, relatedModel, selectedValue = null) {
+    const apiUrl = `/cargo_acc/api/${relatedModel}/`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            selectElement.innerHTML = '';
+
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name || item.label || 'Unnamed';
+
+                if (selectedValue && item.id === selectedValue) {
+                    option.selected = true;
+                }
+
+                selectElement.appendChild(option);
+            });
+        })
+        .catch(error => console.error(`Ошибка загрузки данных для ${relatedModel}:`, error));
+}
+
+// Функция для значений по умолчанию
+function getDefaultValue(type) {
+    switch (type) {
+        case 'DateField':
+            return new Date().toISOString().split('T')[0]; // Сегодняшняя дата
+        case 'DecimalField':
+        case 'IntegerField':
+            return 0;
+        default:
+            return '';
+    }
+}
+
+
+async function showAddRowModal(modalId, tableName, tableId, rowInfo = null, editType = null) {
+    const modal = document.getElementById(modalId);
+    const overlay = document.getElementById('modal-overlay');
+
+    if (!modal || !overlay) {
+        console.error(`=== showAddRowModal === Модальное окно или оверлей не найдены.`);
+        return;
+    }
+
+    const isEditMode = rowInfo !== null && rowInfo.id;
+    document.querySelector(`#${modalId}-title`).textContent = isEditMode
+        ? `${tableName} изменение строки`
+        : `${tableName} новая строка`;
+
+    createModalFields(modalId, tableId, isEditMode, editType);
+    await loadDropdownData(modalId);
+    fillModalFields(modalId, tableId, isEditMode, rowInfo);
+    document.getElementById('product-close-modal').onclick = () => closeModal(modalId);
+    document.getElementById('product-cancel-modal').onclick = () => closeModal(modalId);
+    document.getElementById('product-modal-save').onclick = () => {
+        const isEditMode = rowInfo !== null && rowInfo.id;
+        saveTableData(modalId, tableId, isEditMode, rowInfo);
+    }
+    overlay.style.display = 'block';
+    overlay.appendChild(modal);
+    modal.style.display = 'block';
+
+    overlay.onclick = (event) => {
+        if (event.target === overlay) {
+            closeModal(modalId);
+        }
+    };
 }
 
 
@@ -809,6 +774,13 @@ function closeModal(modalId) {
     if (modal) {
         modal.style.display = 'none'; // Скрываем окно
         document.body.classList.remove('modal-open'); // Убираем затемнение фона
+
+        // Скрываем оверлей
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) {
+            overlay.style.display = 'none'; // Скрываем оверлей
+        }
+
         // Скрываем окно со списком клиентов
         const dropdown = document.querySelector('.dropdown-menu');
         if (dropdown) {
@@ -816,7 +788,6 @@ function closeModal(modalId) {
         }
     }
 }
-
 
 // Получаем CSRF-токен из cookies
 function getCSRFToken() {
@@ -973,6 +944,7 @@ async function openSettingsModal(modalId, tableName, tableId, tableData) {
 // Онлайн применение настроек
 function initializeSettingsModal(modalId, tableName, tableId, tableData) {
     const modal = document.getElementById(modalId);
+    const overlay = document.getElementById('modal-overlay');
     const form = modal.querySelector('#settings-form');
     const settings = tableSettings[tableData.tableId];
     form.innerHTML = ''; // Очистка формы
@@ -985,7 +957,6 @@ function initializeSettingsModal(modalId, tableName, tableId, tableData) {
         checkbox.id = field.name;
         checkbox.name = field.name;
         checkbox.checked = settings && field.name in settings ? settings[field.name] : true;
-
 
         checkbox.addEventListener('change', () => {
             // Обновляем настройки в tableSettings
@@ -1006,10 +977,19 @@ function initializeSettingsModal(modalId, tableName, tableId, tableData) {
         div.appendChild(label);
         form.appendChild(div);
     });
+
     document.getElementById('settings-close-modal').onclick = () => closeModal(modalId);
     document.getElementById('settings-cancel-modal').onclick = () => closeModal(modalId);
 
+    overlay.style.display = 'block';
     modal.style.display = 'block';
+
+    overlay.onclick = (event) => {
+        if (event.target === overlay) {
+            closeModal(modalId);
+        }
+    };
+
     document.getElementById('save-settings').onclick = () => saveSettingsToDB(tableId);
 }
 

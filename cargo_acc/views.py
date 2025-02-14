@@ -1,3 +1,5 @@
+# File: cargo_acc/views.py
+
 import json
 import os
 import time
@@ -413,6 +415,34 @@ class ProductPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
 
 
+# Класс `ProductViewSet` является часть DRF (Django Rest Framework) и предоставляет API-интерфейс для работы с моделью `Product`. Он наследует от `ModelViewSet`, который предоставляет ряд стандартных действий, таких как создание, обновление, удаление и получение объектов.
+#
+# ### Основные компоненты и назначение:
+#
+# 1. **QuerySet:**
+#    - Используется `select_related` для выборки связанных объектов `client`, `company`, `warehouse`, `cargo_type`, `cargo_status`, и `packaging_type`, что оптимизирует запросы, выполняя SQL JOIN. Это позволяет избежать N+1 проблемы при обращении к связанным данным.
+#    - `prefetch_related` применяется для поля `images`, что оптимизирует выборку объектов с ManyToMany отношениями, кэшируя связанные объекты в отдельном запросе.
+#
+# 2. **Serializer:**
+#    - `serializer_class = ProductSerializer` указывает на сериализатор, который будет использоваться для преобразования объектов `Product` в JSON и обратно.
+#
+# 3. **HTTP методы:**
+#    - `http_method_names` перечисляет методы, которые поддерживает данный ViewSet. Это стандартный набор методов для REST API: получение, создание, полное и частичное обновление, удаление, а также обработка заголовков.
+#
+# 4. **Метод `list`:**
+#    - Этот метод обрабатывает GET-запросы для получения списка продуктов.
+#    - **Пагинация:** Сначала проверяется, поддерживает ли запрос пагинацию. Если да, продукция будет разбита на страницы, чтобы уменьшить нагрузку на сервер и клиент.
+#    - **Сериализация:** Объекты сериализуются в JSON-формат и отправляются обратно в виде HTTP-ответа.
+#    - Метод `list` переопределяется, чтобы убедиться, что используется весь QuerySet без вызова `values()`, что сохраняет полную структуру объектов при сериализации.
+#
+# ### Общий API функционал:
+#
+# - **GET** `/products/`: Получает список всех продуктов.
+# - **POST** `/products/`: Создает новый продукт.
+# - **PUT/PATCH** `/products/{id}/`: Обновляет указанный продукт.
+# - **DELETE** `/products/{id}/`: Удаляет указанный продукт.
+#
+# Это ViewSet обеспечивает CRUD функционал для модели `Product` в рамках RESTful API, позволяя клиентам осуществлять операции с учетными записями продуктов с помощью отправки HTTP-запросов.
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.select_related(
         'client', 'company', 'warehouse', 'cargo_type', 'cargo_status', 'packaging_type'
@@ -490,11 +520,13 @@ class CargoMovementViewSet(viewsets.ModelViewSet):
 last_update_timestamp = time.time()
 
 
+# Функция `mark_clients_changed` служит для обновления временной метки, указывающей на то, что данные о клиентах были изменены.
 def mark_clients_changed():
     global last_update_timestamp
     last_update_timestamp = time.time()
 
 
+# Функция `sse_clients_stream` предназначена для передачи данных о клиентах в режиме реального времени через серверную отправку событий (Server-Sent Events, SSE)
 def sse_clients_stream(request):
     def event_stream():
         local_ts = 0
@@ -503,6 +535,6 @@ def sse_clients_stream(request):
                 data = list(Client.objects.values('id', 'client_code', 'description'))
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 local_ts = last_update_timestamp
-            time.sleep(2)
+            time.sleep(30)
 
     return StreamingHttpResponse(event_stream(), content_type='text/event-stream')

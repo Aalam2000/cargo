@@ -30,6 +30,7 @@
                 {% if user.role == 'Admin' %}
                     <li><a href="{% url 'client_table_page' %}">Клиенты</a></li>
                     <li><a href="{% url 'debugging_code' %}">debugging code</a></li>
+                    <li><a href="{% url 'dialog' %}" class="button">ChatGPT</a></li>
                 {% endif %}
                 <li>
                     <!-- Создаем форму для POST-запроса -->

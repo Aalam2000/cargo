@@ -32,8 +32,8 @@ EXCLUDED_DIRS = [
 
 # Список файлов для включения с содержимым (относительные пути от PROJECT_ROOT)
 INCLUDE_CONTENT = [
-    "manage.py",
-    "cargodb/settings.py",
+    # "manage.py",
+    # "cargodb/settings.py",
     # "cargodb/urls.py",
     # "cargodb/views.py",
     # "cargo_acc/urls.py",

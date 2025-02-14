@@ -16,7 +16,6 @@
                 }
             },
             ".idea": {},
-            "__pycache__": {},
             "accounts": {
                 "__pycache__": {},
                 "migrations": {},
@@ -45,9 +44,7 @@
                 "__init__.py": {},
                 "asgi.py": {},
                 "forms.py": {},
-                "settings.py": {
-                    "content": "import os\nfrom pathlib import Path\n\nfrom dotenv import load_dotenv\n\n# BASE_DIR: Базовая директория проекта\nBASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n# Static files (CSS, JavaScript, Images)\nSTATIC_URL = '/static/'\nSTATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]\nTEMPLATES_DIR = [os.path.join(BASE_DIR, 'templates')]\nSTATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Для сборки статики на сервере\n\n# Добавим определение окружения\nENVIRONMENT = os.getenv('ENVIRONMENT', 'development')\n\n# SECURITY WARNING: keep the secret key used in production secret!\nSECRET_KEY = os.getenv('SECRET_KEY')\n\n# Загружаем переменные окружения из файла .env\nload_dotenv()\n\n\n# DEBUG setting: включаем или выключаем режим отладки в зависимости от окружения\nDEBUG = True  # DEBUG = os.getenv('DEBUG', 'True') == 'True'\n\n# ALLOWED_HOSTS: список хостов, которые могут обращаться к серверу\nALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '78.188.215.218']\n\n# Application definition\nINSTALLED_APPS = [\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',\n    'django_extensions',\n    'accounts',\n    'home',\n    'cargo_acc',\n    'chatgpt_ui',\n]\n\nAUTH_USER_MODEL = 'accounts.CustomUser'\n\nMIDDLEWARE = [\n    'django.middleware.security.SecurityMiddleware',\n    'django.contrib.sessions.middleware.SessionMiddleware',\n    'django.middleware.common.CommonMiddleware',\n    'django.middleware.csrf.CsrfViewMiddleware',\n    'django.contrib.auth.middleware.AuthenticationMiddleware',\n    'django.contrib.messages.middleware.MessageMiddleware',\n    'django.middleware.clickjacking.XFrameOptionsMiddleware',\n]\n\nROOT_URLCONF = 'cargodb.urls'\n\nWSGI_APPLICATION = 'cargodb.wsgi.application'\n\n# DATABASES: выбираем конфигурацию базы данных в зависимости от окружения\n\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('DB_NAME'),\n        'USER': os.getenv('DB_USER'),\n        'PASSWORD': os.getenv('DB_PASSWORD'),\n        'HOST': os.getenv('IP_POSTGRES'),\n        'PORT': os.getenv('DB_PORT', '5432'),\n        'OPTIONS': {\n            'client_encoding': 'UTF8',\n        }\n    }\n}\n\n# Password validation\nAUTH_PASSWORD_VALIDATORS = [\n    {\n        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',\n    },\n    {\n        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',\n    },\n    {\n        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',\n    },\n    {\n        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',\n    },\n]\n\n# Internationalization\nLANGUAGE_CODE = 'ru'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n\nTEMPLATES = [\n    {\n        'BACKEND': 'django.template.backends.django.DjangoTemplates',\n        'DIRS': TEMPLATES_DIR,  # Это заменяет TEMPLATES_DIR напрямую в TEMPLATES\n        'APP_DIRS': True,\n        'OPTIONS': {\n            'context_processors': [\n                'django.template.context_processors.debug',\n                'django.template.context_processors.request',\n                'django.contrib.auth.context_processors.auth',\n                'django.contrib.messages.context_processors.messages',\n            ],\n        },\n    },\n]\n\n# Media files\nMEDIA_URL = '/media/'\nMEDIA_ROOT = os.path.join(BASE_DIR, 'media')\n\n# Default primary key field type\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\n\n# LOGGING = {\n#     'version': 1,\n#     'disable_existing_loggers': False,\n#     'handlers': {\n#         'file': {\n#             'level': 'DEBUG',\n#             'class': 'logging.FileHandler',\n#             'filename': 'debug.log',\n#         },\n#     },\n#     'loggers': {\n#         'django': {\n#             'handlers': ['file'],\n#             'level': 'DEBUG',\n#             'propagate': True,\n#         },\n#     },\n# }\n\n# LOGIN_URL = 'login'  # Убедитесь, что этот путь соответствует вашему URL для входа\n\nLOGIN_REDIRECT_URL = 'profile'  # Или 'dashboard'\nLOGOUT_REDIRECT_URL = '/'\n"
-                },
+                "settings.py": {},
                 "urls.py": {},
                 "views.py": {},
                 "wsgi.py": {}
@@ -103,18 +100,13 @@
             "conversation_history.json": {},
             "db.sqlite3": {},
             "index.nginx-debian.html": {},
-            "manage.py": {
-                "content": "#!/usr/bin/env python\n\"\"\"Django's command-line utility for administrative tasks.\"\"\"\nimport os\nimport sys\n\n\ndef main():\n    \"\"\"Run administrative tasks.\"\"\"\n    os.environ.setdefault(\"DJANGO_SETTINGS_MODULE\", \"cargodb.settings\")\n    try:\n        from django.core.management import execute_from_command_line\n    except ImportError as exc:\n        raise ImportError(\n            \"Couldn't import Django. Are you sure it's installed and \"\n            \"available on your PYTHONPATH environment variable? Did you \"\n            \"forget to activate a virtual environment?\"\n        ) from exc\n    execute_from_command_line(sys.argv)\n\n\nif __name__ == \"__main__\":\n    main()\n"
-            },
+            "manage.py": {},
             "project_index.json": {},
             "project_structure.json": {},
             "query_data.txt": {},
             "requirements.txt": {}
         }
     },
-    "include_content": [
-        "manage.py",
-        "cargodb/settings.py"
-    ],
+    "include_content": [],
     "ЗАДАЧА": "Задача"
 }

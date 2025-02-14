@@ -1,3 +1,5 @@
+# File: cargo_acc/models.py
+
 from django.db import models
 
 # Модель Компании

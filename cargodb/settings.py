@@ -119,26 +119,55 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'handlers': {
-#         'file': {
-#             'level': 'DEBUG',
-#             'class': 'logging.FileHandler',
-#             'filename': 'debug.log',
-#         },
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['file'],
-#             'level': 'DEBUG',
-#             'propagate': True,
-#         },
-#     },
-# }
+# Папка для логов
+LOG_DIR = os.path.join(BASE_DIR, 'logging')
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)  # Создаём папку, если её нет
 
-# LOGIN_URL = 'login'  # Убедитесь, что этот путь соответствует вашему URL для входа
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'detailed': {
+            'format': '{asctime} | {levelname} | {name} | {module}:{funcName}:{lineno} | {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{asctime} - {levelname} - {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'debug.log'),
+            'formatter': 'simple',
+        },
+        'police_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'police.log'),
+            'formatter': 'detailed',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'pol': {
+            'handlers': ['police_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+LOGGING['loggers']['django']['level'] = 'INFO'
+# Доступ к логгерам во всех файлах
+# pol = logging.getLogger('pol')
+# log = logging.getLogger('django')
 
 LOGIN_REDIRECT_URL = 'profile'  # Или 'dashboard'
 LOGOUT_REDIRECT_URL = '/'
