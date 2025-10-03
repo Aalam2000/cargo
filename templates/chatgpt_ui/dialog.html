@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT UI</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'chatgpt_ui/css/styles.css' %}">
+    <script src="{% static 'chatgpt_ui/js/dialog.js' %}" defer></script>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>ChatGPT UI</h1>
+        <form id="chat-form" method="post">
+            {% csrf_token %}
+            <textarea name="message" rows="4" placeholder="Введите ваш запрос..." class="form-control" required></textarea>
+            <button type="submit" class="btn" id="submit-btn">Отправить</button>
+        </form>
+        <!-- Добавляем индикатор загрузки -->
+        <div id="loading-indicator" class="loading-indicator" style="display: none;">Система думает...</div>
+        <div id="chat-output" class="chat-output"></div>
+    </div>
+</body>
+</html>

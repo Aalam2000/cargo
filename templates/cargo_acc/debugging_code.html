@@ -1,0 +1,184 @@
+{#File: templates/cargo_acc/debugging_code.html#}
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Клиенты{% endblock %}
+
+{% block content %}
+    <h1>Настройки</h1>
+    <!-- Клиенты -->
+    <div class="table-header-container">
+        <h2>Клиенты</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-client" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="client-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+    <div id="pagination-client-table" class="pagination"></div>
+
+    <!-- Компании -->
+    <div class="table-header-container">
+        <h2>Компании</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-company" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="company-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Склады -->
+    <div class="table-header-container">
+        <h2>Склады</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-warehouse" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="warehouse-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Типы груза -->
+    <div class="table-header-container">
+        <h2>Типы груза</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-cargo-type" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="cargo-type-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+    <!-- Статусы груза -->
+    <div class="table-header-container">
+        <h2>Статусы груза</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-cargo-status" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="cargo-status-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+    <!-- Типы упаковок -->
+    <div class="table-header-container">
+        <h2>Типы упаковок</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-packaging-type" class="add-button" data-modal="modal-table">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="packaging-type-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Изображения -->
+    <div class="table-header-container">
+        <h2>Изображения</h2>
+        <div class="table-header-buttons">
+            <button id="add-row-image" class="add-button" data-modal="image-modal">Добавить</button>
+            <button class="settings-button">
+                <i class="fa fa-cog"></i> <!-- Шестеренка -->
+            </button>
+        </div>
+    </div>
+    <table id="image-table" class="table">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Модальное окно для добавления строки -->
+    <div id="modal-table" class="modal-table">
+        <div class="modal-content">
+            <div class="modal-header"></div> <!-- Синяя полоска -->
+
+            <div class="modal-title">
+                <h3>Добавить запись</h3> <!-- Заголовок модального окна -->
+            </div>
+
+            <form id="modal-form">
+                <!-- Поля формы будут добавляться сюда динамически -->
+                <label for="company">Компания</label>
+                <input type="text" id="company" name="company" class="modal-input" autocomplete="off">
+                <div id="company-list" class="company-list"></div> <!-- Контейнер для списка компаний -->
+            </form>
+
+
+            <div class="modal-buttons">
+                <button id="modal-save" class="modal-save">Сохранить</button>
+                <button class="modal-close" data-close-modal="modal-table">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <form id="modal-form">
+        {% csrf_token %}
+        <!-- Поля формы будут добавляться сюда динамически -->
+    </form>
+    <!-- Модальное окно подтверждения удаления -->
+    <div id="delete-confirmation-modal" class="del-modal">
+        <div class="modal-content">
+            <p id="delete-confirmation-message"></p>
+            <div class="modal-buttons">
+                <button id="confirm-delete" class="confirm-button">Ок</button>
+                <button class="modal-close" data-close-modal="delete-confirmation-modal">Отмена удаления</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для загрузки изображения -->
+    <div id="image-modal" class="image-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-close" data-close-modal="image-modal">&times;</span> <!-- Перемещаем сюда крестик -->
+            </div> <!-- Синяя полоска -->
+            <div class="img-modal-header">
+                <h2>Загрузка изображения</h2>
+            </div>
+            <div class="img-modal-body">
+                <form id="image-upload-form" class="form-container">
+                    <div class="upload-section">
+                        <label for="image-file">Выберите изображение:</label>
+                        <input type="file" id="image-file" name="image_file" accept="image/*" capture="environment"
+                               onchange="previewImage(event)">
+                        <span id="file-name-display"></span> <!-- Новый элемент для отображения имени файла -->
+                        <br>
+                        <button type="submit" id="upload-image-button" class="upload-button">Загрузить</button>
+                    </div>
+                    <div class="preview-section">
+                        <img id="image-preview" src="#" alt="Превью изображения" style="display: none;"/>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/debugging_code.js' %}"></script>
+{% endblock %}

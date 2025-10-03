@@ -1,0 +1,155 @@
+/* Основные стили */
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+}
+
+/* Контейнер для всей страницы */
+.container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Левая панель */
+.left-panel {
+    background-color: #005f87;
+    width: 15%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: nowrap;
+}
+
+.left-panel img.logo {
+    width: 3cm;
+    height: 3cm;
+    margin-top: 2cm;
+}
+
+.left-panel p {
+    color: #ffffff;
+    font-size: 1.2em;
+    margin-bottom: 20px;
+}
+
+.left-panel ul {
+    list-style: none;
+    padding: 0;
+}
+
+.left-panel ul li {
+    margin-bottom: 15px;
+}
+
+.left-panel ul li a {
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 1.1em;
+}
+
+/* Кнопки */
+.left-panel button {
+    padding: 10px;
+    background-color: #ffffff;
+    color: #005f87;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.left-panel button:hover {
+    background-color: #e1e1e1;
+}
+
+/* Ссылка на админку */
+.admin-link {
+    margin-top: auto;
+    padding: 10px;
+    background-color: #ffffff;
+    color: #005f87;
+    border-radius: 5px;
+    text-align: center;
+    text-decoration: none;
+    width: 100%;
+}
+
+.admin-link:hover {
+    background-color: #e1e1e1;
+}
+
+/* Правая панель */
+.right-panel {
+    width: 85%;
+    margin-left: 15%;
+    background-color: #b0d4e3;
+    padding: 20px;
+    box-sizing: border-box;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Форма логина */
+.left-panel form {
+    width: 100%; /* Форма занимает всю ширину панели */
+    display: flex;
+    flex-direction: column; /* Поля и кнопка располагаются вертикально */
+    align-items: center; /* Центрирование полей и кнопки */
+    gap: 15px; /* Отступ между элементами формы */
+    margin-top: 20px;
+}
+
+/* Контейнер для каждого поля ввода с подписью */
+.left-panel form div {
+    width: calc(100% - 40px); /* Отступ от краев контейнера */
+    max-width: 300px; /* Ограничение ширины */
+    display: flex;
+    flex-direction: column; /* Размещаем подпись над полем */
+    gap: 5px; /* Отступ между подписью и полем ввода */
+}
+
+/* Поля ввода */
+.left-panel form input[type="text"],
+.left-panel form input[type="password"] {
+    width: 100%; /* Поля занимают всю ширину контейнера div */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 1em;
+}
+
+/* Подписи (label) над полями */
+.left-panel form label {
+    color: white;
+    font-weight: bold;
+    align-self: flex-start; /* Выравнивание по левому краю */
+}
+
+/* Кнопка Вход (как кнопка Выход) */
+.left-panel form button {
+    width: calc(100% - 40px); /* Тот же отступ, что и у полей */
+    max-width: 300px;
+    padding: 10px;
+    background-color: white;
+    color: #005f87;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.left-panel form button:hover {
+    background-color: #e1e1e1;
+}

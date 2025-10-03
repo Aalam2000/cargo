@@ -1,0 +1,49 @@
+# Файлы конфигурации и секретов
+.env
+test/
+*.key
+*.pem
+
+# Файлы виртуального окружения
+venv/
+env/
+.venv/
+staticfiles/
+
+# Мануалы для софта
+manuals/
+
+# Файлы и папки IDE
+.idea/
+.vscode/
+
+# Компилированные файлы Python
+__pycache__/
+*.pyc
+# Логи
+logging/
+
+# Медиа (загружаемые файлы пользователей)
+media/
+
+# SQLite база (только для локальной разработки)
+db.sqlite3
+
+# Вспомогательные JSON-отчёты и анализ
+test/
+
+# SQLite базы любые
+*.sqlite3
+
+# Логи
+*.log
+
+# Дефолтный nginx html
+index.nginx-debian.html
+
+Thumbs.db
+.DS_Store
+
+gunicorn*.pid
+*.out
+pip-wheel-metadata/

@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Профиль пользователя{% endblock %}
+
+{% block content %}
+    <h1>Профиль пользователя</h1>
+
+    <!-- Отладочная информация -->
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Роль:</strong> {{ user.role }}</p>
+    <p><strong>Уровень доступа:</strong> {{ user.access_level }}</p>
+
+    <hr>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <!-- Имя -->
+        <div>
+            <label for="first_name">Имя:</label>
+            {% if can_edit %}
+                <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
+            {% else %}
+                <p>{{ user.first_name }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Фамилия -->
+        <div>
+            <label for="last_name">Фамилия:</label>
+            {% if can_edit %}
+                <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required>
+            {% else %}
+                <p>{{ user.last_name }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Код клиента (только для уровня Company) -->
+        {% if user.access_level == 'Company' %}
+            <div>
+                <label for="client_code">Код клиента:</label>
+                {% if can_edit %}
+                    <input type="text" id="client_code" name="client_code" value="{{ user.client_code }}">
+                {% else %}
+                    <p>{{ user.client_code }}</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <!-- Телефон -->
+        <div>
+            <label for="phone">Телефон:</label>
+            {% if can_edit %}
+                <input type="text" id="phone" name="phone" value="{{ user.phone }}">
+            {% else %}
+                <p>{{ user.phone }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Telegram -->
+        <div>
+            <label for="telegram">Telegram:</label>
+            {% if can_edit %}
+                <input type="text" id="telegram" name="telegram" value="{{ user.telegram }}">
+            {% else %}
+                <p>{{ user.telegram }}</p>
+            {% endif %}
+        </div>
+
+        <!-- WhatsApp -->
+        <div>
+            <label for="whatsapp">WhatsApp:</label>
+            {% if can_edit %}
+                <input type="text" id="whatsapp" name="whatsapp" value="{{ user.whatsapp }}">
+            {% else %}
+                <p>{{ user.whatsapp }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Кнопка сохранения (только для режима редактирования) -->
+        {% if can_edit %}
+            <button type="submit">Сохранить изменения</button>
+        {% endif %}
+    </form>
+{% endblock %}
