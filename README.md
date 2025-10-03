@@ -11,7 +11,7 @@
 ## Технологии
 
 - Python 3.12
-- Django 4.2_
+- Django 4.2
 - PostgreSQL 16.4
 - PyCharm 2023.2.1 (Professional Edition)
 
