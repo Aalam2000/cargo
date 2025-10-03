@@ -25,7 +25,7 @@ load_dotenv()
 DEBUG = True  # DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # ALLOWED_HOSTS: список хостов, которые могут обращаться к серверу
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '78.188.215.218']
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '185.169.54.164']
 
 # Application definition
 INSTALLED_APPS = [

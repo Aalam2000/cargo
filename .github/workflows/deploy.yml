@@ -16,10 +16,10 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.5
         with:
-          host: 78.188.215.218
+          host: 185.169.54.164
           username: webmaster
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 20
+          port: 22
           script: |
             cd /var/www/cargodb
             git pull origin master
