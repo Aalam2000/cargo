@@ -17,7 +17,7 @@ jobs:
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: 185.169.54.164
-          username: webmaster
+          username: bona
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
