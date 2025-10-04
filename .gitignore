@@ -63,3 +63,4 @@ Thumbs.db
 # Nginx дефолт
 # ==========================
 index.nginx-debian.html
+.env*
