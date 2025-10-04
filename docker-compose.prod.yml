@@ -1,14 +1,38 @@
+version: '3.9'
+
 services:
   app:
     build: .
     container_name: cargo_app
-    restart: always
-    env_file:
-      - .env.secrets
-      - .env.prod
+    command: gunicorn cargo.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/app
     ports:
       - "8000:8000"
-    command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=*
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=172.17.0.1
+      - DB_PORT=5432
+    depends_on:
+      - nginx
+    restart: always
+
+  nginx:
+    image: nginx:latest
+    container_name: cargo_nginx
+    ports:
+      - "80:80"
     volumes:
-      - ./staticfiles:/app/staticfiles
-      - ./media:/app/media
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/staticfiles
+    depends_on:
+      - app
+    restart: always
+
+volumes:
+  static_volume:
