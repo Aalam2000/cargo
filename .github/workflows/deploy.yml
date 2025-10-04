@@ -23,8 +23,9 @@ jobs:
           script: |
             cd /var/www/cargodb
             git pull origin master
-            source venv/bin/activate
-            pip install -r requirements.txt
-            python manage.py collectstatic --noinput
-            sudo systemctl restart gunicorn
-            sudo systemctl restart nginx
+            # Удаляем старое окружение venv (оно больше не используется)
+            rm -rf venv
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up --build -d
+            # применяем миграции
+            docker compose -f docker-compose.prod.yml run --rm app python manage.py migrate

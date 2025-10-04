@@ -1,31 +1,31 @@
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
 
-# BASE_DIR: Базовая директория проекта
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-TEMPLATES_DIR = [os.path.join(BASE_DIR, 'templates')]
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Для сборки статики на сервере
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Добавим определение окружения
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+# Загружаем общие секреты (SECRET_KEY, OPENAI_API_KEY)
+load_dotenv(BASE_DIR / ".env.secrets")
+
+# Определяем окружение (по умолчанию development)
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# Загружаем окружение (dev или prod)
+if ENVIRONMENT == "production":
+    load_dotenv(BASE_DIR / ".env.prod")
+else:
+    load_dotenv(BASE_DIR / ".env.dev")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
 
-# Загружаем переменные окружения из файла .env
-load_dotenv()
+# DEBUG setting
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-
-# DEBUG setting: включаем или выключаем режим отладки в зависимости от окружения
-DEBUG = True  # DEBUG = os.getenv('DEBUG', 'True') == 'True'
-
-# ALLOWED_HOSTS: список хостов, которые могут обращаться к серверу
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + ['bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '185.169.54.164']
+# ALLOWED_HOSTS
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + [
+    'bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '185.169.54.164'
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -55,11 +55,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'cargodb.urls'
-
 WSGI_APPLICATION = 'cargodb.wsgi.application'
 
-# DATABASES: выбираем конфигурацию базы данных в зависимости от окружения
-
+# DATABASES
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -76,18 +74,10 @@ DATABASES = {
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 # Internationalization
@@ -99,7 +89,7 @@ USE_TZ = True
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': TEMPLATES_DIR,  # Это заменяет TEMPLATES_DIR напрямую в TEMPLATES
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -112,62 +102,39 @@ TEMPLATES = [
     },
 ]
 
-# Media files
+# Static & Media
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Папка для логов
+# Logging
 LOG_DIR = os.path.join(BASE_DIR, 'logging')
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)  # Создаём папку, если её нет
+os.makedirs(LOG_DIR, exist_ok=True)
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'detailed': {
-            'format': '{asctime} | {levelname} | {name} | {module}:{funcName}:{lineno} | {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{asctime} - {levelname} - {message}',
-            'style': '{',
-        },
+        'detailed': {'format': '{asctime} | {levelname} | {name} | {module}:{funcName}:{lineno} | {message}', 'style': '{'},
+        'simple': {'format': '{asctime} - {levelname} - {message}', 'style': '{'},
     },
     'handlers': {
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(LOG_DIR, 'debug.log'),
-            'formatter': 'simple',
-        },
-        'police_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(LOG_DIR, 'police.log'),
-            'formatter': 'detailed',
-        },
+        'file': {'level': 'DEBUG', 'class': 'logging.FileHandler', 'filename': os.path.join(LOG_DIR, 'debug.log'), 'formatter': 'simple'},
+        'police_file': {'level': 'DEBUG', 'class': 'logging.FileHandler', 'filename': os.path.join(LOG_DIR, 'police.log'), 'formatter': 'detailed'},
     },
     'loggers': {
-        'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'pol': {
-            'handlers': ['police_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
+        'django': {'handlers': ['file'], 'level': 'INFO', 'propagate': True},
+        'pol': {'handlers': ['police_file'], 'level': 'DEBUG', 'propagate': False},
     },
 }
-LOGGING['loggers']['django']['level'] = 'INFO'
-# Доступ к логгерам во всех файлах
-# pol = logging.getLogger('pol')
-# log = logging.getLogger('django')
 
-LOGIN_REDIRECT_URL = 'profile'  # Или 'dashboard'
+LOGIN_REDIRECT_URL = 'profile'
 LOGOUT_REDIRECT_URL = '/'
+
+# Serve static in dev mode
+if DEBUG:
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
