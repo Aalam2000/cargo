@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   app:
     build: .
@@ -18,9 +16,11 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=172.17.0.1
       - DB_PORT=5432
-    depends_on:
-      - nginx
+    # depends_on: [nginx]  ← удалить
     restart: always
+    env_file:
+      - .env.prod
+      - .env.secrets
 
   nginx:
     image: nginx:latest
