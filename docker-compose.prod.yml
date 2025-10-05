@@ -22,17 +22,5 @@ services:
       - .env.prod
       - .env.secrets
 
-  nginx:
-    image: nginx:latest
-    container_name: cargo_nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - static_volume:/app/staticfiles
-    depends_on:
-      - app
-    restart: always
-
 volumes:
   static_volume:
