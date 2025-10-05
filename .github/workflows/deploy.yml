@@ -22,9 +22,8 @@ jobs:
           port: 22
           script: |
             cd /var/www/cargodb
-            git pull origin master
-            # Удаляем старое окружение venv (оно больше не используется)
-            rm -rf venv
+            git fetch origin master
+            git reset --hard origin/master
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up --build -d
             # применяем миграции
