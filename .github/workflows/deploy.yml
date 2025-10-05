@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: Upload code to server (no deploy)
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - master
 
 jobs:
-  deploy:
+  upload:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Deploy via SSH
+      - name: Upload via SSH (no docker restart)
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: 185.169.54.164
@@ -24,7 +24,4 @@ jobs:
             cd /var/www/cargodb
             git fetch origin master
             git reset --hard origin/master
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up --build -d
-            # применяем миграции
-            docker compose -f docker-compose.prod.yml run --rm app python manage.py migrate
+            echo "✅ Code updated on server, no docker restart performed."
