@@ -19,8 +19,8 @@ services:
     # depends_on: [nginx]  ← удалить
     restart: always
     env_file:
-      - .env.prod
-      - .env.secrets
+      - /var/www/cargodb/.env.prod
+      - /var/www/cargodb/.env.secrets
 
 volumes:
   static_volume:
