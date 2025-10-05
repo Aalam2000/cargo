@@ -1,121 +1,79 @@
 import os
-import sys
 import json
-import getpass
-import platform
-import socket
-import psycopg2
-from datetime import datetime, UTC
 from pathlib import Path
-from dotenv import load_dotenv
 
-# === 1. Загрузка переменных окружения ===
-env_path = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=env_path)
+# === Настройки ===
+BASE_DIR = Path(__file__).resolve().parent.parent   # корень проекта (на 1 уровень выше tmp)
+TMP_DIR = Path(__file__).resolve().parent            # папка tmp
+OUTPUT_FILE = TMP_DIR / "project_analysis.json"      # результат
+GITIGNORE_FILE = BASE_DIR / ".gitignore"
+REQUIREMENTS_FILE = BASE_DIR / "requirements.txt"
 
-# === 2. Основные переменные ===
-SERVER_DB = {
-    "host": os.getenv("IP_POSTGRES"),
-    "port": os.getenv("DB_PORT", "5432"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "dbname": os.getenv("DB_NAME"),
-}
 
-LOCAL_DB = {
-    "host": "localhost",
-    "port": "5432",
-    "user": "dev_user",
-    "password": "dev_pass",
-    "dbname": "cargo_dev",
-}
+def load_gitignore_patterns():
+    """Считывает .gitignore и возвращает список шаблонов."""
+    patterns = []
+    if GITIGNORE_FILE.exists():
+        with open(GITIGNORE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                patterns.append(line)
+    return patterns
 
-# === 3. Функция проверки соединения ===
-def test_connection(cfg: dict):
-    result = {
-        "host": cfg["host"],
-        "port": cfg["port"],
-        "dbname": cfg["dbname"],
-        "user": cfg["user"],
-        "status": "unknown",
-        "error": None,
+
+def is_ignored(path, patterns):
+    """Проверяет, попадает ли путь под исключение из .gitignore."""
+    from fnmatch import fnmatch
+    for p in patterns:
+        # поддержка шаблонов типа *.pyc, /tmp/, build/
+        if fnmatch(str(path), p) or fnmatch(path.name, p):
+            return True
+        # поддержка каталогов (например, "tmp/")
+        if path.is_dir() and (p.rstrip("/") == path.name or fnmatch(str(path), p.rstrip("/"))):
+            return True
+    return False
+
+
+def build_tree(root, patterns):
+    """Рекурсивно строит структуру проекта, исключая gitignore."""
+    tree = {}
+    for item in sorted(root.iterdir()):
+        if item.name.startswith("."):
+            continue  # скрытые файлы (вроде .git, .idea и т.п.)
+        if is_ignored(item, patterns):
+            continue
+        if item.is_dir():
+            tree[item.name] = build_tree(item, patterns)
+        else:
+            tree[item.name] = None
+    return tree
+
+
+def read_file(path):
+    """Считывает текст из файла или возвращает '' если файла нет."""
+    if path.exists():
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
+    return ""
+
+
+def main():
+    patterns = load_gitignore_patterns()
+    tree = build_tree(BASE_DIR, patterns)
+
+    data = {
+        "gitignore_content": read_file(GITIGNORE_FILE),
+        "requirements_content": read_file(REQUIREMENTS_FILE),
+        "project_structure": tree,
     }
-    try:
-        conn = psycopg2.connect(
-            host=cfg["host"],
-            port=cfg["port"],
-            user=cfg["user"],
-            password=cfg["password"],
-            dbname=cfg["dbname"],
-            connect_timeout=3
-        )
-        conn.close()
-        result["status"] = "ok"
-    except Exception as e:
-        result["status"] = "error"
-        result["error"] = str(e)
-    return result
 
-# === 4. Проверки ===
-server_check = test_connection(SERVER_DB)
-local_check = test_connection(LOCAL_DB)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-# === 5. Общая информация ===
-info = {
-    "timestamp": datetime.now(UTC).isoformat(),
-    "project_root": str(Path(__file__).resolve().parents[1]),
-    "env_file": str(env_path),
-    "system_user": getpass.getuser(),
-    "python_version": sys.version,
-    "os": platform.platform(),
-    "hostname": socket.gethostname(),
-    "ip_local": socket.gethostbyname(socket.gethostname()),
-    "checks": {
-        "local_docker_db": local_check,
-        "server_prod_db": server_check
-    },
-    "instructions": """
-Этот файл создан для анализа конфигурации перед переходом на Docker.
+    print(f"✅ Анализ завершён. Результат сохранён в: {OUTPUT_FILE}")
 
-1️⃣ Сейчас проект работает напрямую с Postgres на сервере (server_prod_db).
-   После перехода Docker должен использовать ЛОКАЛЬНЫЙ контейнер Postgres для разработки.
 
-2️⃣ Как переходить:
-   - Создать docker-compose.dev.yml:
-       services:
-         app:
-           build: .
-           env_file: .env
-           ports:
-             - "8000:8000"
-           depends_on:
-             - db
-         db:
-           image: postgres:15
-           environment:
-             POSTGRES_USER: dev_user
-             POSTGRES_PASSWORD: dev_pass
-             POSTGRES_DB: cargo_dev
-           ports:
-             - "5432:5432"
-           volumes:
-             - pgdata:/var/lib/postgresql/data
-       volumes:
-         pgdata:
-
-   - На сервере останется системный Postgres, подключаемый через docker-compose.prod.yml (без контейнера db).
-   - Переменные в .env определяют, к какой БД идёт подключение.
-   - Для dev-окружения база в контейнере (localhost), для prod — внешняя (185.169.54.164).
-
-3️⃣ После создания docker-compose.dev.yml запусти:
-   docker compose -f docker-compose.dev.yml up --build
-   И проверь этим же скриптом, что соединение прошло к localhost.
-"""
-}
-
-# === 6. Сохранение ===
-out_file = Path(__file__).with_name("analyze_result.json")
-with out_file.open("w", encoding="utf-8") as f:
-    json.dump(info, f, indent=2, ensure_ascii=False)
-
-print(f"[INFO] Отчёт сохранён в {out_file}")
+if __name__ == "__main__":
+    main()

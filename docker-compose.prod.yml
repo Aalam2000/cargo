@@ -3,7 +3,7 @@ services:
   app:
     build: .
     container_name: cargo_app
-    command: gunicorn cargo.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - .:/app
     ports:
