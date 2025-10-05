@@ -1,3 +1,4 @@
+#docker-compose.prod.yml
 services:
   app:
     build: .
@@ -7,20 +8,10 @@ services:
       - .:/app
     ports:
       - "8000:8000"
-    environment:
-      - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY}
-      - ALLOWED_HOSTS=*
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=172.17.0.1
-      - DB_PORT=5432
-    # depends_on: [nginx]  ← удалить
-    restart: always
     env_file:
-      - /var/www/cargodb/.env.prod
-      - /var/www/cargodb/.env.secrets
+      - .env.prod
+      - .env.secrets
+    restart: always
 
 volumes:
   static_volume:
