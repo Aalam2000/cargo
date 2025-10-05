@@ -1,3 +1,4 @@
+# cargodb/settings.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -5,16 +6,16 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Загружаем общие секреты (SECRET_KEY, OPENAI_API_KEY)
-load_dotenv(BASE_DIR / ".env.secrets")
+load_dotenv(BASE_DIR.parent / ".env.secrets")
 
 # Определяем окружение (по умолчанию development)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 # Загружаем окружение (dev или prod)
 if ENVIRONMENT == "production":
-    load_dotenv(BASE_DIR / ".env.prod")
+    load_dotenv(BASE_DIR.parent / ".env.prod")
 else:
-    load_dotenv(BASE_DIR / ".env.dev")
+    load_dotenv(BASE_DIR.parent / ".env.dev")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
