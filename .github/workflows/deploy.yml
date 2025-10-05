@@ -1,4 +1,5 @@
-name: Upload code to server (no deploy)
+# .github/workflows/deploy.yml
+name: Deploy to Production Server
 
 on:
   push:
@@ -6,14 +7,14 @@ on:
       - master
 
 jobs:
-  upload:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Upload via SSH (no docker restart)
+      - name: Deploy via SSH and restart Docker
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: 185.169.54.164
@@ -21,7 +22,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            echo "🚀 Starting deploy on server..."
             cd /var/www/cargodb
+
+            echo "📦 Updating code from master..."
             git fetch origin master
             git reset --hard origin/master
-            echo "✅ Code updated on server, no docker restart performed."
+
+            echo "🐍 Applying migrations..."
+            docker compose -f docker-compose.prod.yml run --rm app python manage.py migrate
+
+            echo "🧱 Collecting static files..."
+            docker compose -f docker-compose.prod.yml run --rm app python manage.py collectstatic --noinput
+
+            echo "🔁 Rebuilding and restarting container..."
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            echo "✅ Deploy complete!"
