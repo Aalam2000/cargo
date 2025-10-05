@@ -28,6 +28,16 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + [
     'bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '185.169.54.164'
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://bonablog.ru",
+    "https://www.bonablog.ru",
+    "https://185.169.54.164",
+    "http://bonablog.ru",
+    "http://www.bonablog.ru",
+    "http://185.169.54.164",
+]
+
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
