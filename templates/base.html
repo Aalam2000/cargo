@@ -1,78 +1,66 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Welcome{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}"> <!-- Основные стили -->
-    <link rel="stylesheet" href="{% static 'css/table.css' %}"> <!-- Стили для таблиц -->
-    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Cargo #1{% endblock %}</title>
+
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <script defer src="{% static 'js/base.js' %}"></script>
 </head>
 
 <body>
-<div class="container">
-    <div class="left-panel">
-        <a href="{% url 'index' %}">
-            <img src="{% static 'img/logo.png' %}" alt="Logo" class="logo">
-        </a>
-        {% if user.is_authenticated %}
-            <p>{{ user.username }}</p>
-            <ul>
-                <li><a href="{% url 'profile' %}">Профиль</a></li>
-                <li><a href="{% url 'dashboard' %}">Таблицы</a></li>
-                <li><a href="{% url 'orders' %}">Заказы</a></li>
+  <div class="layout">
+    <!-- Боковая панель -->
+    <aside class="sidebar">
+      <div class="logo-block">
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="logo">
+        <h1 class="brand">Cargo #1</h1>
+      </div>
 
-                {% if user.role == 'Admin' %}
-                    <li><a href="{% url 'client_table_page' %}">Клиенты</a></li>
-                    <li><a href="{% url 'debugging_code' %}">debugging code</a></li>
-                    <li><a href="{% url 'dialog' %}" class="button">ChatGPT</a></li>
-                {% endif %}
-                <li>
-                    <!-- Создаем форму для POST-запроса -->
-                    <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
-                        {% csrf_token %}
-                    </form>
-                    <!-- Ссылка, которая отправляет форму при клике -->
-                    <a href="#" onclick="document.getElementById('logout-form').submit();">Выход</a>
-                </li>
+      {% if user.is_authenticated %}
+      <div class="user-info">
+        <span class="username">{{ user.username }}</span>
+      </div>
 
-            </ul>
-        {% else %}
-            <form method="POST" action="{% url 'login' %}">
-                {% csrf_token %}
-                <div>
-                    <label for="username">Имя пользователя:</label>
-                    <input type="text" name="username" id="username" required>
-                </div>
-                <div>
-                    <label for="password">Пароль:</label>
-                    <input type="password" name="password" id="password" required>
-                </div>
-                <button type="submit">Войти</button>
-            </form>
-        {% endif %}
-        {% if user.role == 'Admin' %}
-            <a href="{% url 'admin:index' %}" class="admin-link">АДМИНКА</a>
-        {% endif %}
-    </div>
+      <nav class="menu">
+        <a href="{% url 'index' %}" class="menu-item">Главная</a>
+        <a href="#" class="menu-item disabled">Профиль</a>
+        <a href="#" class="menu-item disabled">Таблицы</a>
+        <a href="#" class="menu-item disabled">Справочники</a>
+        <a href="#" class="menu-item logout" onclick="logoutUser()">Выход</a>
+      </nav>
 
-    <div class="right-panel">
-        {% if form.errors %}
-            <p class="error-message">Пожалуйста, введите правильные имя пользователя и пароль. Оба поля могут быть
-                чувствительны к регистру.</p>
-        {% endif %}
-        {% block content %}
-        {% endblock %}
-    </div>
-</div>
-<!-- Блок для скриптов -->
-{% block scripts %}
-    <!-- Дочерние шаблоны могут вставлять свои скрипты сюда -->
-{% endblock %}
+      <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
+        {% csrf_token %}
+      </form>
+
+      {% else %}
+      <form class="login-form" method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+        <h2>Вход</h2>
+        <input type="text" name="username" placeholder="Имя пользователя" required>
+        <input type="password" name="password" placeholder="Пароль" required>
+        <button type="submit">Войти</button>
+      </form>
+      {% endif %}
+    </aside>
+
+    <!-- Основной контент -->
+    <main class="content">
+      {% block content %}
+      <div class="placeholder">
+        <h1>В разработке</h1>
+        <p>Этот раздел будет доступен позже.</p>
+      </div>
+      {% endblock %}
+    </main>
+  </div>
 </body>
 </html>
