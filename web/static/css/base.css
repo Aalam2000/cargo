@@ -1,0 +1,349 @@
+/* ========= ФИРМЕННЫЙ СТИЛЬ Cargo #1 ========= */
+:root {
+    --bg-main: #f9fafb;
+    --bg-sidebar: #ffffff;
+    --accent: #007bff;
+    --accent-dark: #0056b3;
+    --text-main: #222;
+    --text-muted: #666;
+    --border: #e3e3e3;
+    --radius: 14px;
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    --font-main: 'Montserrat', sans-serif;
+}
+
+/* ====== Базовая сетка ====== */
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-main);
+    color: var(--text-main);
+    background-color: var(--bg-main);
+    height: 100%;
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ====== Сайдбар ====== */
+.sidebar {
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow);
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding: 24px;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+    z-index: 10;
+    position: relative; /* <- чтобы .burger позиционировался внутри панели */
+    overflow: visible; /* <- чтобы «флажок» не обрезался */
+}
+
+/* ====== Свернутая панель для ПК ====== */
+.sidebar.collapsed {
+    width: 60px; /* узкая панель */
+    overflow: visible; /* <- оставляем видимым бургер, выступающий за край */
+    transition: all 0.3s ease;
+}
+
+/* ====== Свернутая панель для ПК ====== */
+.sidebar.collapsed {
+    width: 60px; /* узкая панель */
+    overflow: visible; /* оставляем видимым бургер, выступающий за край */
+    transition: all 0.3s ease;
+}
+
+/* скрываем всё, включая логотип */
+.sidebar.collapsed .logo-block,
+.sidebar.collapsed .menu,
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .login-form,
+.sidebar.collapsed .admin-block {
+    display: none;
+}
+
+/* бургер остаётся видимым */
+.sidebar.collapsed .burger {
+    right: -42px;
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow);
+    border-radius: 0 8px 8px 0;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.logo-block {
+    display: flex;
+    justify-content: center; /* центрируем по горизонтали */
+    align-items: center; /* центрируем по вертикали */
+    height: 120px; /* высота под лого */
+    margin-bottom: 2rem;
+}
+
+.logo {
+    width: 80px; /* увеличиваем, чтобы был видим */
+    height: auto; /* сохраняем пропорции */
+    object-fit: contain; /* не растягивать */
+}
+
+
+.brand {
+    font-weight: 700;
+    color: var(--accent-dark);
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+/* ====== Меню ====== */
+.menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.menu-item {
+    text-decoration: none;
+    color: var(--text-main);
+    font-weight: 500;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius);
+    transition: 0.2s ease;
+}
+
+.menu-item:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.menu-item.logout {
+    color: var(--accent-dark);
+    font-weight: 600;
+}
+
+.user-info {
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+/* ====== Контент ====== */
+.content {
+    flex-grow: 1;
+    background: var(--bg-main);
+    padding: 40px 50px;
+    box-sizing: border-box;
+}
+
+/* ====== Форма входа ====== */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+    background: var(--bg-main);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.login-form h2 {
+    margin: 0;
+    text-align: center;
+    color: var(--accent-dark);
+}
+
+.login-form input {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+}
+
+.login-form button {
+    padding: 10px 14px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.login-form button:hover {
+    background: var(--accent-dark);
+}
+
+/* ===== Универсальный стиль кнопок ===== */
+button, .btn {
+    padding: 10px 14px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+button:hover, .btn:hover {
+    background: var(--accent-dark);
+}
+
+
+.admin-block {
+    margin-top: auto;
+    text-align: center;
+    padding-top: 1.5rem;
+}
+
+/* ====== Бургер в левой панели ====== */
+.burger {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--text-main);
+    cursor: pointer;
+    z-index: 1001; /* <- поверх всего контента */
+}
+
+
+/* При свёрнутой панели бургер виден как флажок */
+.sidebar.collapsed .burger {
+    right: -42px; /* выступает за панель */
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow);
+    border-radius: 0 8px 8px 0;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ====== Мобильная адаптация: панель уезжает влево, а "ухо" с бургером остаётся ====== */
+@media (max-width: 900px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  /* Панель — изначально спрятана влево (width 0) */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 0 !important;                /* полностью скрыта */
+    height: 100vh !important;
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow);
+    overflow: hidden !important;
+    transition: width 0.28s ease, transform 0.28s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;                         /* чтобы ничего не торчало в скрытом состоянии */
+  }
+
+  /* Раскрытая панель */
+  .sidebar.open {
+    width: 260px !important;            /* раскрытие */
+    padding: 24px !important;           /* вернуть отступы при открытой панели */
+    overflow-y: auto !important;
+  }
+
+  /* Во время закрытой панели содержимое скрываем (на всякий случай) */
+  .sidebar:not(.open) .logo-block,
+  .sidebar:not(.open) .menu,
+  .sidebar:not(.open) .user-info,
+  .sidebar:not(.open) .login-form,
+  .sidebar:not(.open) .admin-block {
+    display: none !important;
+  }
+
+  /* ========= БУРГЕР =========
+     когда панель закрыта — бургер фиксирован к экрану (ухо) и виден всегда;
+     когда панель открыта — бургер внутри панели (позиция absolute).
+  */
+  .burger {
+    /* базовое состояние — фиксированное "ухо" (будет переопределено для .sidebar.open .burger ниже) */
+    position: fixed !important;
+    top: 16px !important;
+    left: -6px !important;              /* немного выступает над левой кромкой (регулируй: -6..0..-22) */
+    width: 44px !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--bg-sidebar) !important;
+    box-shadow: var(--shadow) !important;
+    border: none !important;
+    border-radius: 0 8px 8px 0 !important;
+    font-size: 24px !important;
+    color: var(--text-main) !important;
+    cursor: pointer !important;
+    z-index: 1101 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Когда панель открыта — бургер находится внутри (абсолютно относительно .sidebar) */
+  .sidebar.open .burger {
+    position: absolute !important;
+    left: 16px !important;
+    top: 16px !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    transform: none !important;
+    width: 42px !important;
+    height: 42px !important;
+    z-index: 1102 !important;
+  }
+
+  /* Содержимое панели в раскрытом виде */
+  .logo-block {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 24px;
+    margin-bottom: 1rem;
+  }
+
+  .menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    padding-left: 16px;
+    box-sizing: border-box;
+  }
+
+  .user-info {
+    text-align: left;
+    width: 100%;
+    padding-left: 16px;
+    margin-bottom: 1rem;
+  }
+
+  .admin-block {
+    text-align: left;
+    width: 100%;
+    padding-left: 16px;
+    margin-top: 1rem;
+  }
+
+  /* Контент не сдвигаем — панель ложится поверх */
+  .content {
+    padding: 20px;
+  }
+}

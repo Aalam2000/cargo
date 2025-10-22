@@ -374,7 +374,7 @@ function createTableRow(tableData, item) {
     return `<tr class="table-row" data-item-id="${item.id}" onclick="openModal(tableMetadata['${tableData.tableId}'], ${item.id})">
                 ${rowHtml}
                 <td>
-                    <img src="/static/img/delete-icon.png" class="delete-icon" 
+                    <img src="/web/staticlete-icon.png" class="delete-icon" 
                          onclick="event.stopPropagation(); openDeleteConfirmationModal('${tableData.tableId}', ${item.id}, item)">
                 </td>
             </tr>`;

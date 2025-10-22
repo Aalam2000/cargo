@@ -9,7 +9,7 @@ def create_project_index():
     project_index = {"structure": {}, "details": {}}
 
     # Анализ HTML файлов
-    templates_dir = os.path.join(BASE_DIR, "templates")
+    templates_dir = os.path.join(BASE_DIR, "web/templates")
     for root, _, files in os.walk(templates_dir):
         for file in files:
             if file.endswith(".html"):
@@ -17,7 +17,7 @@ def create_project_index():
                 analyze_html(file_path, project_index)
 
     # Анализ JS файлов
-    static_dir = os.path.join(BASE_DIR, "static/js")
+    static_dir = os.path.join(BASE_DIR, "web/static/js")
     for root, _, files in os.walk(static_dir):
         for file in files:
             if file.endswith(".js"):
