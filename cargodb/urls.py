@@ -21,6 +21,12 @@ urlpatterns = [
     path('orders/', views.orders_view, name='orders'),
     path('cargo_acc/', include('cargo_acc.urls')),  # Подключаем все маршруты для приложения cargo_acc
     path('chatgpt_ui/', include('chatgpt_ui.urls')),
+    path("cargo_table/", views.cargo_table_view, name="cargo_table"),
+    path("api/cargo_table/data/", views.cargo_table_data, name="cargo_table_data"),
+    path("api/cargo_table/config/", views.cargo_table_config, name="cargo_table_config"),
+    path("all_tables/", views.all_tables_view, name="all_tables"),
+    path("api/all_tables/", views.api_all_tables, name="api_all_tables"),
+    path("api/table_data/", views.api_table_data, name="api_table_data"),
 ]
 
 if settings.DEBUG:

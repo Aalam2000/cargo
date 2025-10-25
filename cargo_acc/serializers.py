@@ -1,10 +1,14 @@
+# cargo_acc/serializers.py
 from rest_framework import serializers
+
 from .models import *
+
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = '__all__'
+
 
 class ClientSerializer(serializers.ModelSerializer):
     company = serializers.SlugRelatedField(queryset=Company.objects.all(), slug_field='name')
@@ -19,6 +23,7 @@ class ClientSerializer(serializers.ModelSerializer):
         client = Client.objects.create(company=company, **validated_data)
         return client
 
+
 class WarehouseSerializer(serializers.ModelSerializer):
     company = serializers.SlugRelatedField(queryset=Company.objects.all(), slug_field='name')
 
@@ -31,25 +36,35 @@ class WarehouseSerializer(serializers.ModelSerializer):
         warehouse = Warehouse.objects.create(company=company, **validated_data)
         return warehouse
 
+
 class CargoTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoType
         fields = '__all__'
+
 
 class CargoStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoStatus
         fields = '__all__'
 
+
 class PackagingTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PackagingType
         fields = '__all__'
 
+
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
         fields = '__all__'
+
+class QRScanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QRScan
+        fields = '__all__'
+
 
 # serializers.py
 class ProductSerializer(serializers.ModelSerializer):
@@ -146,32 +161,58 @@ class ProductSerializer(serializers.ModelSerializer):
             'cargo_status_id', 'cargo_status_name',
             # Для типа упаковки
             'packaging_type_id', 'packaging_type_name',
+            # QR на фото
+            'qr_code', 'qr_created_at',
+
         ]
 
 
-
-
 class CargoSerializer(serializers.ModelSerializer):
+    products = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field='product_code'
+    )
+    images = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field='id'
+    )
+    client = serializers.StringRelatedField()
+    cargo_status = serializers.StringRelatedField()
+    packaging_type = serializers.StringRelatedField()
+
     class Meta:
         model = Cargo
         fields = '__all__'
+
 
 class CarrierCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = CarrierCompany
         fields = '__all__'
 
+
 class VehicleSerializer(serializers.ModelSerializer):
+    carrier_company = serializers.StringRelatedField()
+
     class Meta:
         model = Vehicle
         fields = '__all__'
 
+
 class TransportBillSerializer(serializers.ModelSerializer):
+    cargos = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    vehicle = serializers.StringRelatedField()
+    carrier_company = serializers.StringRelatedField()
+
     class Meta:
         model = TransportBill
         fields = '__all__'
 
+
 class CargoMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoMovement
+        fields = '__all__'
+
+class CargoStatusLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CargoStatusLog
         fields = '__all__'

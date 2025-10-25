@@ -468,9 +468,9 @@ class CargoViewSet(viewsets.ModelViewSet):
     serializer_class = CargoSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+        queryset = super().get_queryset()
+        sort_by = self.request.query_params.get('sort_by', 'id')
+        return queryset.order_by(sort_by)
 
 
 # ViewSet для Компаний-Перевозчиков
@@ -491,7 +491,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
+        sort_by = self.request.query_params.get('sort_by', 'license_plate')  # Получаем параметр для сортировки из запроса
         return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
 
 
@@ -502,7 +502,7 @@ class TransportBillViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
+        sort_by = self.request.query_params.get('sort_by', 'bill_code')  # Получаем параметр для сортировки из запроса
         return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
 
 
@@ -512,9 +512,10 @@ class CargoMovementViewSet(viewsets.ModelViewSet):
     serializer_class = CargoMovementSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+        queryset = super().get_queryset()
+        sort_by = self.request.query_params.get('sort_by', 'id')  # ← заменить name на id
+        return queryset.order_by(sort_by)
+
 
 
 last_update_timestamp = time.time()

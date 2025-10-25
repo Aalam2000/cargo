@@ -1,0 +1,37 @@
+{% extends '../base.html' %}
+{% load static %}
+
+{% block title %}Грузы — Cargo Table{% endblock %}
+
+{% block content %}
+<div class="cargo-table-page">
+    <div class="table-header-container">
+        <h1>📦 Таблица грузов</h1>
+
+        <div class="filter-container">
+            <input type="text" id="filter-client" placeholder="Фильтр по клиенту...">
+            <input type="text" id="filter-company" placeholder="Фильтр по компании...">
+            <input type="text" id="filter-warehouse" placeholder="Фильтр по складу...">
+            <input type="text" id="filter-status" placeholder="Фильтр по статусу...">
+        </div>
+
+        {% if user.role == "Admin" %}
+        <div class="table-header-buttons">
+            <button id="add-row" class="btn">Добавить</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="cargo-table-container" class="table-container">
+        <table id="cargo-table" class="table">
+            <thead>
+                <tr id="cargo-header-row"></tr>
+            </thead>
+            <tbody id="cargo-body"></tbody>
+        </table>
+        <div id="loader" class="loader">Загрузка...</div>
+    </div>
+</div>
+
+<script defer src="{% static 'js/cargo_table.js' %}"></script>
+{% endblock %}

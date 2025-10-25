@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>{% block title %}Cargo #1{% endblock %}</title>
+    <title>{% block title %}Cargo Учет{% endblock %}</title>
 
     <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,12 +30,42 @@
             </div>
 
             <nav class="menu">
-                <a href="{% url 'index' %}" class="menu-item">Главная</a>
-                <a href="#" class="menu-item disabled">Профиль</a>
-                <a href="#" class="menu-item disabled">Таблицы</a>
-                <a href="#" class="menu-item disabled">Справочники</a>
-                <a href="#" class="menu-item logout" onclick="logoutUser()">Выход</a>
+                <a href="{% url 'index' %}" class="menu-item">🏠 Главная</a>
+                <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
+
+                {% if user.role == "Admin" %}
+                    <!-- ========== Администрирование ========== -->
+                    <div class="accordion">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            ⚙️ Админка
+                        </div>
+                        <div class="accordion-body">
+                            <a href="/cargo_table/" class="menu-item">📦 Грузы (главная таблица)</a>
+                            <a href="{% url 'orders' %}" class="menu-item">🧾 Перевозки / накладные</a>
+                            <a href="{% url 'settings_modal' %}" class="menu-item">🏢 Компании и клиенты</a>
+                            <a href="/warehouses/" class="menu-item">🏗 Склады</a>
+                            <a href="/payments/" class="menu-item">💳 Платежи клиентов</a>
+                            <a href="{% url 'dashboard' %}" class="menu-item">📈 Отчёты / аналитика</a>
+                            <a href="{% url 'all_tables' %}" class="menu-item">📋 Все таблицы</a>
+                        </div>
+                    </div>
+
+                    <!-- ========== Справочники ========== -->
+                    <div class="accordion">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            📚 Справочники
+                        </div>
+                        <div class="accordion-body">
+                            <a href="/api/get_cargo_types/" class="menu-item">Типы грузов</a>
+                            <a href="/api/get_packaging_types/" class="menu-item">Типы упаковок</a>
+                            <a href="/api/get_cargo_statuses/" class="menu-item">Статусы грузов</a>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
             </nav>
+
 
             <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
                 {% csrf_token %}
