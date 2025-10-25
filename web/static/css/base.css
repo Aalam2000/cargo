@@ -487,3 +487,41 @@ button:hover, .btn:hover {
         font-size: 1rem;
     }
 }
+
+/* === Главная страница Cargo №1 === */
+
+.page-title {
+    color: #004aad;
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.section-title {
+    color: #004aad;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 25px 0 10px 0;
+}
+
+.text {
+    font-size: 1rem;
+    color: #1f1f1f;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.list {
+    margin: 10px 0 25px 20px;
+    padding-left: 20px;
+    line-height: 1.7;
+    color: #222;
+}
+
+.info-block, .intro-block, .summary-block {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    padding: 20px 25px;
+    margin-bottom: 25px;
+}
