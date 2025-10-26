@@ -18,7 +18,11 @@ models_list = [
     CargoMovement,
     QRScan,
     CargoStatusLog,
+    # Новые модели платежей
+    Payment,
+    PaymentCargo,
 ]
+
 
 # 🔹 Универсальная регистрация без дубликатов
 for model in models_list:

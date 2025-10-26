@@ -138,26 +138,42 @@ class Product(models.Model):
 # Модель Грузов
 class Cargo(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
-    cargo_code = models.CharField(max_length=20, unique=True)
+    cargo_code = models.CharField(max_length=50, unique=True)
     products = models.ManyToManyField(Product)
     images = models.ManyToManyField(Image)
     qr_code = models.CharField(max_length=100, unique=True, blank=True, null=True)
     qr_created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+    # Локации
     departure_place = models.CharField(max_length=200, blank=True, null=True)
     destination_place = models.CharField(max_length=200, blank=True, null=True)
-    weight = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)  # Изменено
-    volume = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)  # Изменено
-    cost = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)  # Изменено
-    insurance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)  # Изменено
+
+    # Количественные показатели
+    places_count = models.IntegerField(null=True, blank=True)  # КОЛ. МЕСТ
+    weight = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    volume = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+
+    # Тарифы/стоимости по доставке
+    cost = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)           # Итог по доставке
+    insurance = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)      # Страховка
+    packaging_cost = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True) # СТ.УПАК
+    tariff_weight = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)  # тариф (по весу)
+    tariff_min = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)     # тариф от ...
+
+    # Прочее
+    cargo_description = models.CharField(max_length=500, blank=True, null=True)  # текст из CSV (временное поле)
     dimensions = models.CharField(max_length=30, blank=True, null=True)
+
+    # Даты и статус
     shipping_date = models.DateField(null=True, blank=True)
     delivery_date = models.DateField(null=True, blank=True)
+    delivery_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # число дней
     cargo_status = models.ForeignKey(CargoStatus, on_delete=models.CASCADE)
     packaging_type = models.ForeignKey(PackagingType, on_delete=models.CASCADE)
-    delivery_time = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Изменено
 
     def __str__(self):
         return self.cargo_code
+
 
 
 # Модель Компаний-перевозчиков
@@ -224,3 +240,74 @@ class CargoStatusLog(models.Model):
 
     def __str__(self):
         return f"{self.cargo.cargo_code} → {self.status.name} ({self.changed_at.strftime('%Y-%m-%d %H:%M')})"
+
+# --- ПЛАТЕЖИ ---
+
+class Payment(models.Model):
+    """
+    Финансовый платёж от клиента. Заполняется:
+    - при импорте старых данных (payment_source='import_csv'),
+    - вручную оператором,
+    - автоматически из вебхука банка/СБП (с qr_payload/reference_number).
+    """
+    payment_code = models.CharField(max_length=50, unique=True)  # внутренний код платежа
+    payment_date = models.DateField()                             # дата поступления денег
+
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+
+    # Суммы и валюта
+    currency = models.CharField(max_length=10, default='USD')
+    amount_original = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    amount_usd = models.DecimalField(max_digits=15, decimal_places=2)
+
+    # Источники и идентификаторы
+    payment_method = models.CharField(max_length=50, blank=True, null=True)     # cash/bank/SBP/etc
+    payment_source = models.CharField(max_length=50, default='manual')          # manual/import_csv/SBP/bank/web
+    reference_number = models.CharField(max_length=100, blank=True, null=True)  # ID транзакции банка/СБП
+    qr_payload = models.TextField(blank=True, null=True)                        # содержимое QR (JSON-строка)
+    payer_phone = models.CharField(max_length=30, blank=True, null=True)
+
+    # Аудит
+    verified_at = models.DateTimeField(blank=True, null=True)
+    operator = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    comment = models.TextField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['payment_date']),
+            models.Index(fields=['client']),
+            models.Index(fields=['company']),
+        ]
+        constraints = [
+            # защитимся от дублей банковских транзакций в рамках источника
+            models.UniqueConstraint(fields=['reference_number', 'payment_source'],
+                                    name='uniq_payment_ref_by_source',
+                                    condition=~models.Q(reference_number=None)),
+        ]
+
+    def __str__(self):
+        return f"{self.payment_code} | {self.client.client_code} | {self.amount_usd} {self.currency}"
+
+
+class PaymentCargo(models.Model):
+    """
+    Распределение суммы платежа по грузам (частично или полностью).
+    Один платёж может закрывать несколько грузов, и наоборот.
+    """
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='cargo_links')
+    cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, related_name='payment_links')
+    amount_usd = models.DecimalField(max_digits=15, decimal_places=2)  # часть суммы, идущая на этот груз
+    comment = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        unique_together = [('payment', 'cargo')]
+        indexes = [
+            models.Index(fields=['payment']),
+            models.Index(fields=['cargo']),
+        ]
+
+    def __str__(self):
+        return f"{self.payment.payment_code} → {self.cargo.cargo_code}: {self.amount_usd} USD"
