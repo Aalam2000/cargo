@@ -151,3 +151,13 @@ LOGOUT_REDIRECT_URL = '/'
 # Serve static in dev mode
 if DEBUG:
     STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web/static')]
+
+# === COOKIE / SESSION FIX FOR SAFARI (iOS white screen issue) ===
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+
+# чтобы логин не терялся после редиректа
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
