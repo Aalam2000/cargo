@@ -15,6 +15,10 @@ let filters = {};
 let userConfig = null;
 
 let currentRows = []; // хранить текущие данные таблицы
+const sortableFields = ["cargo_code", "client", "shipping_date", "delivery_date"];
+let currentSort = { field: null, dir: "asc" };
+
+
 
 const USER_ROLE = window.CARGO_USER_ROLE || "Guest";
 const CLIENT_CODE = window.CLIENT_CODE || "";
@@ -76,6 +80,13 @@ async function fetchCargoData(reset = false) {
     document.getElementById("loader").style.display = "block";
 
     const params = new URLSearchParams({offset, limit: tableConfig.limit, ...filters});
+
+    if (currentSort.field) {
+        params.set("sort_by", currentSort.field);
+        params.set("sort_dir", currentSort.dir);
+    }
+
+
     if (USER_ROLE === "Client" && CLIENT_CODE) params.set("client", CLIENT_CODE);
 
     try {
@@ -85,6 +96,8 @@ async function fetchCargoData(reset = false) {
 
         const rows = data.results || [];
         renderRows(rows);
+        // 🔧 если сервер вернул пустой массив — значит больше данных нет
+    if (rows.length === 0) hasMore = false;
         offset += rows.length;
         hasMore = data.has_more;
     } catch (e) {
@@ -98,45 +111,54 @@ async function fetchCargoData(reset = false) {
 // === Таблица ===
 function renderHeader(columns) {
     const headerRow = document.getElementById("cargo-header-row");
-    if (!headerRow) {
-        log("❌ Не найден #cargo-header-row");
-        return;
-    }
-
     headerRow.innerHTML = "";
+
     columns.filter(col => col.visible).forEach((col, index) => {
         const th = document.createElement("th");
-        th.textContent = col.label;
-        th.draggable = true;
+        th.dataset.field = col.field;
         th.dataset.index = index;
+        th.draggable = true;
+
+        // === Текст заголовка ===
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = col.label;
+        th.appendChild(labelSpan);
+
+        // === Стрелочка ===
+        const arrow = document.createElement("span");
+        arrow.classList.add("sort-icon");
+
+        if (sortableFields.includes(col.field)) {
+            // колонка поддерживает сортировку
+            if (currentSort.field === col.field) {
+                arrow.textContent = currentSort.dir === "asc" ? "↓" : "↑";
+                arrow.classList.add("active-sort");
+            } else {
+                arrow.textContent = "↕";
+                arrow.classList.add("sortable-hint");
+            }
+            th.appendChild(arrow);
+
+            // клик только если колонка сортируемая
+            th.addEventListener("click", async () => {
+                if (currentSort.field === col.field) {
+                    currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+                } else {
+                    currentSort.field = col.field;
+                    currentSort.dir = "asc";
+                }
+
+                userConfig.sort = currentSort;
+                await saveSortSettings();
+                renderHeader(columns);
+                fetchCargoData(true);
+            });
+        }
+
         headerRow.appendChild(th);
     });
-
-    // === Drag-n-drop ===
-    let dragStartIndex = null;
-    headerRow.querySelectorAll("th").forEach(th => {
-        th.addEventListener("dragstart", e => {
-            dragStartIndex = parseInt(th.dataset.index);
-            th.classList.add("dragging");
-        });
-        th.addEventListener("dragend", e => {
-            th.classList.remove("dragging");
-        });
-    });
-
-    headerRow.addEventListener("dragover", e => e.preventDefault());
-    headerRow.addEventListener("drop", e => {
-        const dropTarget = e.target.closest("th");
-        if (!dropTarget || dragStartIndex === null) return;
-        const dropIndex = parseInt(dropTarget.dataset.index);
-        if (dropIndex === dragStartIndex) return;
-
-        moveColumn(dragStartIndex, dropIndex);
-        renderHeader(userConfig.columns);
-        renderRows(currentRows || []);
-    });
-
 }
+
 
 
 function renderRows(rows) {
@@ -296,6 +318,30 @@ function closeSettingsModal() {
     overlay.style.display = "none";
 }
 
+async function saveSortSettings() {
+    try {
+        function getCSRFToken() {
+            const match = document.cookie.match(/csrftoken=([^;]+)/);
+            return match ? match[1] : "";
+        }
+
+        await fetch(tableConfig.saveSettingsPath, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCSRFToken(),
+            },
+            credentials: "include",
+            body: JSON.stringify({
+                cargo_table: userConfig
+            }),
+        });
+    } catch (e) {
+        console.warn("Ошибка сохранения сортировки:", e);
+    }
+}
+
+
 async function saveSettings() {
     const rows = document.querySelectorAll("#settings-form .setting-row");
     const newOrder = [];
@@ -353,6 +399,9 @@ async function saveSettings() {
 // === Init ===
 document.addEventListener("DOMContentLoaded", async () => {
     userConfig = await fetchUserConfig();
+    if (userConfig.sort) {
+        currentSort = userConfig.sort;
+    }
 
     if (!userConfig || !userConfig.columns) {
         log("❌ Конфигурация таблицы не получена");
@@ -367,6 +416,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     fetchCargoData();
 
+    // === ПАГИНАЦИЯ при прокрутке ===
+    const wrapper = document.querySelector(".table-wrapper");
+    if (wrapper) {
+        wrapper.addEventListener("scroll", () => {
+            const nearBottom =
+                wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 40;
+            if (nearBottom && hasMore && !loading) {
+                fetchCargoData();
+            }
+        });
+    }
 
     document.getElementById("settings-btn").addEventListener("click", openSettingsModal);
     document.getElementById("settings-cancel").addEventListener("click", closeSettingsModal);

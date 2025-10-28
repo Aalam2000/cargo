@@ -339,3 +339,24 @@
     width: 100%;
     text-align: center;
 }
+
+/* --- стрелки сортировки --- */
+.sort-icon {
+    margin-left: 6px;
+    font-size: 10px;
+    opacity: 0.5;
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable-hint {
+    opacity: 0.3;
+    font-size: 10px;
+}
+
+.active-sort {
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0.9;
+    color: #ffffff;
+}

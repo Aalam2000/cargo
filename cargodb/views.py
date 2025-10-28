@@ -193,7 +193,32 @@ def cargo_table_data(request):
 
     # --- Пагинация ---
     total = qs.count()
-    qs = qs[offset: offset + limit]
+
+    # если offset превышает общее число строк — вернуть пусто
+    if offset >= total:
+        return JsonResponse({"results": [], "has_more": False})
+
+    # --- Сортировка ---
+    sort_by = request.GET.get("sort_by")
+    sort_dir = request.GET.get("sort_dir", "asc")
+
+    sortable_fields = {
+        "cargo_code": "cargo_code",
+        "client": "client__client_code",
+        "shipping_date": "shipping_date",
+        "delivery_date": "delivery_date",
+    }
+
+    if sort_by in sortable_fields:
+        order_field = sortable_fields[sort_by]
+        if sort_dir == "desc":
+            order_field = f"-{order_field}"
+        qs = qs.order_by(order_field)
+
+    qs = qs[offset:offset + limit]
+    next_offset = offset + qs.count()
+    has_more = next_offset < total
+
 
     # --- Формат вывода ---
     def fmt(d):
@@ -231,8 +256,7 @@ def cargo_table_data(request):
             "updated_at": fmt(getattr(c, "updated_at", None)),
         })
 
-    return JsonResponse({"results": results, "has_more": offset + limit < total})
-
+    return JsonResponse({"results": results, "has_more": has_more})
 
 
 @login_required
