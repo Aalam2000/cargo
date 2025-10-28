@@ -80,7 +80,7 @@
                 <button type="submit">Войти</button>
             </form>
         {% endif %}
-        {% if user.is_staff %}
+        {% if user.is_authenticated and user.role == "Admin" %}
             <div class="admin-block">
                 <button onclick="window.open('/admin/', '_blank')" class="btn">Django Admin</button>
             </div>
