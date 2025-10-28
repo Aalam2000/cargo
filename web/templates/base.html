@@ -98,5 +98,10 @@
         {% endblock %}
     </main>
 </div>
+<script>
+    window.onerror = function (message, source, lineno, colno, error) {
+        alert("Ошибка JS: " + message + " (" + source + ":" + lineno + ")");
+    };
+</script>
 </body>
 </html>
