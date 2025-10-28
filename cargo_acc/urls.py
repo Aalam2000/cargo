@@ -66,6 +66,9 @@ urlpatterns = [
     # --------------------------------------------------------------
     path('products/<int:product_id>/add-image/', views.add_image_to_product, name='add_image_to_product'),
 
+    # --- Интерфейсы оператора ---
+    path('operator/clients_payments/', views.operator_clients, name='operator_clients'),
+
     # --------------------------------------------------------------
     # ⚡ SSE (реальное время, стриминг)
     # --------------------------------------------------------------

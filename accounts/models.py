@@ -74,6 +74,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         help_text="Логин клиента. Используется для входа и фильтрации данных."
     )
 
+    timezone = models.CharField(
+        max_length=50,
+        default='UTC',
+        verbose_name='Часовой пояс',
+        help_text='Например: Asia/Baku, Europe/Moscow, Asia/Shanghai'
+    )
+
     # Профиль
     first_name = models.CharField(max_length=30, blank=True, default="Не указано")
     last_name = models.CharField(max_length=30, blank=True, default="Не указано")

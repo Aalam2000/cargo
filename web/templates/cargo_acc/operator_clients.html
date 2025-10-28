@@ -1,0 +1,61 @@
+{% extends '../base.html' %}
+{% load static %}
+
+{% block title %}Клиенты — платежи{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/modal.css' %}">
+
+<div class="clients-page">
+    <div class="table-header-container">
+        <h3>💳 Клиенты — платежи</h3>
+        <div class="d-flex gap-3">
+            <input type="text" id="filter-client" placeholder="Поиск клиента..." class="filter-input">
+            <button id="refresh-btn" class="btn-table">🔄 Обновить</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-wrapper">
+            <table id="clients-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Код клиента</th>
+                        <th>Компания</th>
+                        <th>Описание</th>
+                        <th>Баланс ($)</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="clients-body"></tbody>
+            </table>
+        </div>
+        <div id="loader" class="loader text-center" style="display:none; padding:12px;">Загрузка...</div>
+    </div>
+</div>
+
+<!-- Модалка для внесения оплаты -->
+<div id="payment-modal" class="modal">
+    <div class="modal-header">💵 Внести оплату</div>
+    <div class="modal-body">
+        <form id="payment-form">
+            <label>Клиент:</label>
+            <input type="text" id="payment-client" readonly>
+
+            <label>Сумма ($):</label>
+            <input type="number" id="payment-amount" min="0" step="0.01" required>
+
+            <label>Комментарий:</label>
+            <textarea id="payment-comment" rows="3"></textarea>
+        </form>
+    </div>
+    <div class="modal-footer">
+        <button id="payment-save" class="btn-save">💾 Сохранить</button>
+        <button id="payment-cancel" class="btn-cancel">Отмена</button>
+    </div>
+</div>
+<div id="modal-overlay" class="modal-overlay"></div>
+
+<script defer src="{% static 'js/operator_clients.js' %}"></script>
+{% endblock %}

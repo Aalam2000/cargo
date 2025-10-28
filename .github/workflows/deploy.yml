@@ -28,7 +28,10 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
 
-            echo "🐍 Applying database migrations..."
+            echo "🧩 Generating fresh migrations on production..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps app python manage.py makemigrations --noinput
+            
+            echo "🐍 Applying new migrations..."
             docker compose -f docker-compose.prod.yml run --rm --no-deps app python manage.py migrate --noinput
 
             echo "🧱 Collecting static files..."

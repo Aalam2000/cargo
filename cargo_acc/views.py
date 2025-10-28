@@ -430,6 +430,12 @@ class ProductPagination(PageNumberPagination):
     page_size = 20  # Количество записей на странице
     page_size_query_param = 'page_size'
 
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def operator_clients(request):
+    """Страница справочника клиентов и внесения платежей (для оператора)."""
+    return render(request, 'cargo_acc/operator_clients.html')
 
 # Класс `ProductViewSet` является часть DRF (Django Rest Framework) и предоставляет API-интерфейс для работы с моделью `Product`. Он наследует от `ModelViewSet`, который предоставляет ряд стандартных действий, таких как создание, обновление, удаление и получение объектов.
 #

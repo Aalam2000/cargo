@@ -33,6 +33,23 @@
                 <a href="{% url 'index' %}" class="menu-item">🏠 Главная</a>
                 <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
 
+                {% if user.role == "Operator" %}
+                    <!-- ========== Блок для Оператора ========== -->
+                    <div class="accordion">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            ⚙️ Оператор
+                        </div>
+                        <div class="accordion-body">
+                            <a href="{% url 'operator_clients' %}" class="menu-item">💳 Клиенты — платежи</a>
+                            <a href="/operator/edit_cargo/" class="menu-item">✏️ Редактирование груза</a>
+                            <a href="/operator/tariffs/" class="menu-item">💰 Указание тарифов</a>
+                            <a href="/operator/payments/" class="menu-item">💵 Оплата клиента</a>
+                            <a href="/operator/shipping/" class="menu-item">🚚 Указание отправки</a>
+                            <a href="/operator/delivery/" class="menu-item">📦 Указание отгрузки клиенту</a>
+                        </div>
+                    </div>
+                {% endif %}
+
                 {% if user.role == "Admin" %}
                     <!-- ========== Администрирование ========== -->
                     <div class="accordion">
@@ -66,7 +83,6 @@
                 <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
             </nav>
 
-
             <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
                 {% csrf_token %}
             </form>
@@ -80,13 +96,13 @@
                 <button type="submit">Войти</button>
             </form>
         {% endif %}
+
         {% if user.is_authenticated and user.role == "Admin" %}
             <div class="admin-block">
                 <button onclick="window.open('/admin/', '_blank')" class="btn">Django Admin</button>
             </div>
         {% endif %}
     </aside>
-
 
     <!-- Основной контент -->
     <main class="content">
@@ -98,6 +114,7 @@
         {% endblock %}
     </main>
 </div>
+
 <script>
     window.onerror = function (message, source, lineno, colno, error) {
         alert("Ошибка JS: " + message + " (" + source + ":" + lineno + ")");
