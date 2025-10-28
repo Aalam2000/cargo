@@ -27,6 +27,8 @@ urlpatterns = [
     path("all_tables/", views.all_tables_view, name="all_tables"),
     path("api/all_tables/", views.api_all_tables, name="api_all_tables"),
     path("api/table_data/", views.api_table_data, name="api_table_data"),
+    path("api/log/", views.js_log),
+    path("api/save_table_settings/", include("cargo_acc.urls")),
 ]
 
 if settings.DEBUG:

@@ -4,34 +4,49 @@
 {% block title %}Грузы — Cargo Table{% endblock %}
 
 {% block content %}
-<div class="cargo-table-page">
-    <div class="table-header-container">
-        <h1>📦 Таблица грузов</h1>
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <div class="cargo-table-page">
+        <div class="table-header-container">
+            <h3>📦 Таблица грузов</h3>
 
-        <div class="filter-container">
-            <input type="text" id="filter-client" placeholder="Фильтр по клиенту...">
-            <input type="text" id="filter-company" placeholder="Фильтр по компании...">
-            <input type="text" id="filter-warehouse" placeholder="Фильтр по складу...">
-            <input type="text" id="filter-status" placeholder="Фильтр по статусу...">
+            <div class="d-flex gap-3">
+                <div class="filter-container d-flex gap-2"></div>
+                <button id="settings-btn" class="settings-button" title="Настройки">⚙️</button>
+                {% if user.role in "Admin,Operator" %}
+                    <button id="add-row" class="btn-table">Добавить</button>
+                {% endif %}
+            </div>
         </div>
 
-        {% if user.role == "Admin" %}
-        <div class="table-header-buttons">
-            <button id="add-row" class="btn">Добавить</button>
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table id="cargo-table" class="table">
+                    <thead>
+                    <tr id="cargo-header-row"></tr>
+                    </thead>
+                    <tbody id="cargo-body"></tbody>
+                </table>
+            </div>
+            <div id="loader" class="loader text-center" style="display:none; padding:12px;">Загрузка...</div>
         </div>
-        {% endif %}
+
+        <!-- ⚙️ Модалка настроек -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-header">⚙️ Настройки колонок</div>
+            <div class="modal-body">
+                <form id="settings-form"></form>
+            </div>
+            <div class="modal-footer">
+                <button id="settings-save" class="btn-table">Сохранить</button>
+                <button type="button" id="settings-cancel" class="btn-table btn-cancel">Отмена</button>
+            </div>
+        </div>
+        <div id="modal-overlay" class="modal-overlay"></div>
     </div>
 
-    <div id="cargo-table-container" class="table-container">
-        <table id="cargo-table" class="table">
-            <thead>
-                <tr id="cargo-header-row"></tr>
-            </thead>
-            <tbody id="cargo-body"></tbody>
-        </table>
-        <div id="loader" class="loader">Загрузка...</div>
-    </div>
-</div>
-
-<script defer src="{% static 'js/cargo_table.js' %}"></script>
+    <script>
+        window.CARGO_USER_ROLE = "{{ user.role }}";
+        window.CLIENT_CODE = "{{ user.client_code|default:'' }}";
+    </script>
+    <script defer src="{% static 'js/cargo_table.js' %}"></script>
 {% endblock %}

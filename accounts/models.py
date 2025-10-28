@@ -29,7 +29,6 @@ class CustomUserManager(BaseUserManager):
         if not email:
             raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
-        # Нормализуем client_code (если передан)
         client_code = extra_fields.get("client_code")
         if client_code:
             extra_fields["client_code"] = str(client_code).strip().upper()
@@ -43,12 +42,9 @@ class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("role", "Admin")          # Роль для суперпользователя
-        extra_fields.setdefault("access_level", "Company")  # Доступ на уровне компании
-
-        # Дадим технический client_code суперпользователю, если не указан
+        extra_fields.setdefault("role", "Admin")
+        extra_fields.setdefault("access_level", "Company")
         extra_fields.setdefault("client_code", "ADMIN")
-
         return self.create_user(email, password, **extra_fields)
 
 
@@ -58,7 +54,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         ("Operator", "Оператор"),
         ("WarehouseWorker", "Складской Работник"),
         ("Driver", "Водитель"),
-        ("Client", "Клиент"),  # Новая роль для кабинета клиента
+        ("Client", "Клиент"),
     ]
 
     ACCESS_LEVEL_CHOICES = [
@@ -69,9 +65,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     # Учётные данные
     email = models.EmailField(unique=True)
-    # client_code — это и есть "логин" клиента.
-    # Делаем уникальным, разрешаем null (в PostgreSQL уникальность допускает несколько NULL),
-    # чтобы операторы/админы могли существовать без кода клиента.
     client_code = models.CharField(
         max_length=20,
         unique=True,
@@ -104,10 +97,20 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         help_text="Привязка к филиалу/складу (идентификатор или код)."
     )
 
+    # 🔗 Прямая связь с клиентом
+    linked_client = models.ForeignKey(
+        'cargo_acc.Client',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        help_text="Связанный объект клиента (для роли Client)."
+    )
+
     # Настройки таблиц (JSON)
     table_settings = models.JSONField(default=dict, blank=True, null=True)
 
-    USERNAME_FIELD = "email"  # Базовое поле для Django-админки/форм
+    USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
     objects = CustomUserManager()
@@ -121,22 +124,35 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         ]
 
     def __str__(self):
-        # Покажем и email, и логин-код (если есть)
         if self.client_code:
             return f"{self.email} ({self.client_code})"
         return self.email
 
     @property
     def login(self):
-        """
-        Псевдоним для ясности: логин клиента — это client_code.
-        """
+        """Псевдоним: логин клиента — это client_code"""
         return self.client_code
 
     def save(self, *args, **kwargs):
-        # Нормализуем поля перед сохранением
+        """Автоматическая синхронизация клиента и пользователя"""
         if self.email:
             self.email = self.__class__.objects.normalize_email(self.email)
         if self.client_code:
             self.client_code = str(self.client_code).strip().upper()
+
+        # --- Автосвязь пользователя с клиентом ---
+        from cargo_acc.models import Client
+        if self.role == "Client" and not self.linked_client and self.client_code:
+            client = Client.objects.filter(client_code=self.client_code).first()
+            if client:
+                self.linked_client = client
+            else:
+                # если такого клиента нет — создаём автоматически
+                client = Client.objects.create(
+                    client_code=self.client_code,
+                    company_id=1,  # ⚠️ подставь ID своей основной компании
+                    description=f"Автоматически создан для {self.email}"
+                )
+                self.linked_client = client
+
         super().save(*args, **kwargs)

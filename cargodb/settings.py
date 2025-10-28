@@ -29,6 +29,8 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
     "https://bonablog.ru",
     "https://www.bonablog.ru",
     "https://185.169.54.164",
@@ -143,7 +145,7 @@ LOGGING = {
     },
 }
 
-LOGIN_REDIRECT_URL = 'profile'
+LOGIN_REDIRECT_URL = 'cargo_table'
 LOGOUT_REDIRECT_URL = '/'
 
 # Serve static in dev mode

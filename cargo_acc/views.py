@@ -12,12 +12,11 @@ from django.http import JsonResponse
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -30,6 +29,7 @@ from .serializers import CompanySerializer, ClientSerializer, WarehouseSerialize
     CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
 
 
+# === HTML страницы ===
 def settings_modal(request):
     return render(request, 'cargo_acc/settings_modal.html')
 
@@ -41,6 +41,7 @@ def client_table_page(request):
 
 def mod_addrow_view(request):
     return render(request, 'cargo_acc/mod_addrow.html')
+
 
 def mod_delrow_view(request):
     return render(request, 'cargo_acc/mod_delrow.html')
@@ -80,6 +81,8 @@ def client_table_data(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+# === API справочники ===
+@login_required
 def get_clients(request):
     search_query = request.GET.get('search', '').lower()
     page = int(request.GET.get('page', 1))  # Параметр страницы
@@ -101,6 +104,7 @@ def get_clients(request):
     })
 
 
+@login_required
 def get_warehouses(request):
     search_query = request.GET.get('search', '').lower()
     warehouses = Warehouse.objects.filter(name__icontains=search_query).select_related('company')
@@ -120,6 +124,7 @@ def get_warehouses(request):
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
 
+@login_required
 def get_companies(request):
     search_query = request.GET.get('search', '').lower()
     companies = Company.objects.filter(name__icontains=search_query)
@@ -140,6 +145,7 @@ def get_companies(request):
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
 
+@login_required
 def get_cargo_types(request):
     search_query = request.GET.get('search', '').lower()
     cargo_types = CargoType.objects.filter(name__icontains=search_query)
@@ -159,6 +165,7 @@ def get_cargo_types(request):
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
 
+@login_required
 def get_cargo_statuses(request):
     search_query = request.GET.get('search', '').lower()
     cargo_statuses = CargoStatus.objects.filter(name__icontains=search_query)
@@ -178,6 +185,7 @@ def get_cargo_statuses(request):
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
 
+@login_required
 def get_packaging_types(request):
     search_query = request.GET.get('search', '').lower()
     packaging_types = PackagingType.objects.filter(name__icontains=search_query)
@@ -223,6 +231,7 @@ def transliterate_filename(filename):
     return transliterate.translit(name, 'ru', reversed=True) + ext
 
 
+# === API проверки ===
 # Проверка уникальности названия типа упаковки
 def check_packaging_type_name(request):
     """API для проверки уникальности названия типа упаковки."""
@@ -268,7 +277,7 @@ def check_warehouse_name(request):
     return JsonResponse({'is_unique': is_unique})
 
 
-@csrf_exempt
+@login_required
 def add_client(request):
     """API для добавления клиента."""
     if request.method == 'POST':
@@ -306,18 +315,24 @@ def get_table_settings(request):
 @csrf_exempt
 @login_required
 def save_table_settings(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=400)
+
+    try:
         data = json.loads(request.body)
-        request.user.table_settings = data
-        request.user.save()
+        user = request.user
+        settings = user.table_settings or {}  # не затираем существующие
+        settings.update(data)                 # добавляем/обновляем конкретную таблицу
+        user.table_settings = settings
+        user.save(update_fields=["table_settings"])
         return JsonResponse({'status': 'success'})
-    return JsonResponse({'status': 'error'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 class UniversalDeleteView(APIView):
-    permission_classes = [AllowAny]  # Доступ для всех
+    permission_classes = [IsAuthenticated]
 
-    @method_decorator(csrf_exempt, name='dispatch')
     def delete(self, request, model_name, pk):
         try:
             # Динамически получаем модель по имени
@@ -332,6 +347,7 @@ class UniversalDeleteView(APIView):
             return JsonResponse({'error': 'Модель не найдена'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# === ViewSet модели ===
 # ViewSet для Компаний
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
@@ -491,7 +507,8 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'license_plate')  # Получаем параметр для сортировки из запроса
+        sort_by = self.request.query_params.get('sort_by',
+                                                'license_plate')  # Получаем параметр для сортировки из запроса
         return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
 
 
@@ -517,7 +534,7 @@ class CargoMovementViewSet(viewsets.ModelViewSet):
         return queryset.order_by(sort_by)
 
 
-
+# === SSE поток ===
 last_update_timestamp = time.time()
 
 

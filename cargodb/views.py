@@ -1,18 +1,30 @@
 # cargodb/views.py
+import json
+import sys
+
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 
-from cargo_acc.models import Product
+from cargo_acc.models import Cargo
 from .forms import UserLoginForm
 
 
 # @login_required
 # def profile_view(request):
 #     return render(request, 'accounts/profile.html')
+
+@csrf_exempt
+def js_log(request):
+    data = json.loads(request.body.decode("utf-8"))
+    msg = f"[{data.get('source')}] {data.get('message')}"
+    print(msg, file=sys.stdout, flush=True)
+    return JsonResponse({"ok": True})
+
 
 @login_required
 def dashboard_view(request):
@@ -30,7 +42,9 @@ def orders_view(request):
 
 
 def index_view(request):
-    return render(request, 'index.html')
+    if request.user.is_authenticated:
+        return redirect("cargo_table")  # после логина — сразу таблица грузов
+    return render(request, "index.html")  # до логина — обычная главная
 
 
 def user_login(request):
@@ -56,61 +70,169 @@ def cargo_table_view(request):
 @login_required
 def cargo_table_config(request):
     user = request.user
-    config = (user.table_settings or {}).get("cargo_table")
-    if not config:
-        config = {
-            "columns": [
-                {"field": "product_code", "label": "Код груза", "visible": True},
-                {"field": "client_id", "label": "Клиент", "visible": True},
-                {"field": "cargo_status_id", "label": "Статус", "visible": True},
-            ],
-            "page_size": 50,
-        }
+    role = getattr(user, "role", "")
+
+    # дефолтные колонки
+    admin_columns = [
+        {"field": "cargo_code", "label": "Код", "visible": True},
+        {"field": "cargo_description", "label": "Описание", "visible": True},
+        {"field": "departure_place", "label": "Место отправки", "visible": True},
+        {"field": "destination_place", "label": "Место назначения", "visible": True},
+        {"field": "weight", "label": "Вес", "visible": True},
+        {"field": "volume", "label": "Объём", "visible": True},
+        {"field": "cost", "label": "Стоимость", "visible": True},
+        {"field": "insurance", "label": "Страховка", "visible": False},
+        {"field": "dimensions", "label": "Габариты", "visible": False},
+        {"field": "shipping_date", "label": "Дата отправки", "visible": True},
+        {"field": "delivery_date", "label": "Дата доставки", "visible": True},
+        {"field": "delivery_time", "label": "Время в пути", "visible": False},
+        {"field": "packaging_cost", "label": "Стоимость упаковки", "visible": False},
+        {"field": "places_count", "label": "Мест", "visible": False},
+        {"field": "tariff_min", "label": "Мин. тариф", "visible": False},
+        {"field": "tariff_weight", "label": "Тариф по весу", "visible": False},
+        {"field": "qr_code", "label": "QR-код", "visible": False},
+        {"field": "qr_created_at", "label": "QR дата", "visible": False},
+        {"field": "client", "label": "Клиент", "visible": True},
+        {"field": "cargo_status", "label": "Статус", "visible": True},
+        {"field": "packaging_type", "label": "Упаковка", "visible": True},
+    ]
+
+    client_columns = [
+        {"field": "cargo_code", "label": "Код", "visible": True},
+        {"field": "cargo_description", "label": "Описание", "visible": True},
+        {"field": "weight", "label": "Вес", "visible": True},
+        {"field": "volume", "label": "Объём", "visible": True},
+        {"field": "cost", "label": "Стоимость", "visible": True},
+        {"field": "cargo_status", "label": "Статус", "visible": True},
+        {"field": "packaging_type", "label": "Упаковка", "visible": True},
+        {"field": "shipping_date", "label": "Дата отправки", "visible": True},
+        {"field": "delivery_date", "label": "Дата доставки", "visible": True},
+    ]
+
+    # выбираем базовый шаблон
+    default_columns = admin_columns if role in ["Admin", "Operator"] else client_columns
+    config = {"columns": default_columns, "page_size": 50}
+
+    # если у пользователя уже сохранены настройки — применяем
+    user_settings = getattr(user, "table_settings", None) or {}
+    if "cargo_table" in user_settings:
+        saved_cfg = user_settings["cargo_table"]
+        if isinstance(saved_cfg, dict):
+            saved_columns = {c["field"]: c for c in saved_cfg.get("columns", [])}
+
+            # объединяем дефолтные с сохранёнными (только visible и порядок)
+            merged_columns = []
+            for col in default_columns:
+                field = col["field"]
+                if field in saved_columns:
+                    col["visible"] = saved_columns[field].get("visible", col["visible"])
+                merged_columns.append(col)
+
+            # добавляем пользовательские поля, которых больше нет в дефолтах
+            for field, col in saved_columns.items():
+                if field not in [c["field"] for c in merged_columns]:
+                    merged_columns.append(col)
+
+            config["columns"] = merged_columns
+
+            # обновляем page_size, если есть
+            if "page_size" in saved_cfg:
+                config["page_size"] = saved_cfg["page_size"]
+
     return JsonResponse(config)
 
 
 @login_required
 def cargo_table_data(request):
+    user = request.user
     offset = int(request.GET.get("offset", 0))
     limit = int(request.GET.get("limit", 50))
-    filters = {
-        "client": request.GET.get("client"),
-        "company": request.GET.get("company"),
-        "warehouse": request.GET.get("warehouse"),
-        "status": request.GET.get("status"),
+    role = getattr(user, "role", "")
+
+    # все возможные фильтры, приходящие с фронта
+    filters = {k: v for k, v in request.GET.items() if v}
+
+    qs = Cargo.objects.select_related("client", "cargo_status", "packaging_type")
+
+    # --- РОЛЬ КЛИЕНТА ---
+    if role == "Client" and user.client_code:
+        qs = qs.filter(client__client_code=user.client_code)
+
+    # --- Универсальная фильтрация (без числовых и суммовых полей) ---
+    # исключаем поля с цифрами и суммами
+    excluded_fields = [
+        "weight", "volume", "cost", "insurance",
+        "packaging_cost", "tariff_min", "tariff_weight",
+        "places_count",
+    ]
+
+    # маппинг фильтров на реальные поля модели
+    field_map = {
+        "cargo": "cargo_code__icontains",
+        "cargo_code": "cargo_code__icontains",
+        "cargo_description": "cargo_description__icontains",
+        "client": "client__client_code__icontains",
+        "status": "cargo_status__name__icontains",
+        "cargo_status": "cargo_status__name__icontains",
+        "packaging_type": "packaging_type__name__icontains",
+        "departure_place": "departure_place__icontains",
+        "destination_place": "destination_place__icontains",
+        "shipping_date": "shipping_date__icontains",
+        "delivery_date": "delivery_date__icontains",
     }
 
-    qs = (
-        Product.objects
-        .select_related("client", "company", "warehouse", "cargo_status")
-        .only("product_code", "client__client_code", "company__name", "warehouse__name", "cargo_status__name")
-    )
+    # применяем фильтры динамически
+    for key, value in filters.items():
+        if key in excluded_fields:
+            continue
+        lookup = field_map.get(key)
+        if lookup:
+            qs = qs.filter(**{lookup: value})
+        elif hasattr(Cargo, key):
+            qs = qs.filter(**{f"{key}__icontains": value})
 
-    # ====== Фильтры ======
-    if filters["client"]:
-        qs = qs.filter(client__client_code__icontains=filters["client"])
-    if filters["company"]:
-        qs = qs.filter(company__name__icontains=filters["company"])
-    if filters["warehouse"]:
-        qs = qs.filter(warehouse__name__icontains=filters["warehouse"])
-    if filters["status"]:
-        qs = qs.filter(cargo_status__name__icontains=filters["status"])
-
+    # --- Пагинация ---
     total = qs.count()
     qs = qs[offset: offset + limit]
 
+    # --- Формат вывода ---
+    def fmt(d):
+        try:
+            return d.strftime("%d.%m.%Y") if d else ""
+        except Exception:
+            return ""
+
     results = []
-    for p in qs:
+    for c in qs:
         results.append({
-            "product_code": p.product_code,
-            "client_id": getattr(p.client, "client_code", ""),
-            "cargo_status_id": getattr(p.cargo_status, "name", ""),
-            "company": getattr(p.company, "name", ""),
-            "warehouse": getattr(p.warehouse, "name", "")
+            "id": c.id,
+            "cargo_code": c.cargo_code,
+            "cargo_description": c.cargo_description,
+            "client": getattr(c.client, "client_code", ""),
+            "cargo_status": getattr(c.cargo_status, "name", ""),
+            "packaging_type": getattr(c.packaging_type, "name", ""),
+            "departure_place": getattr(c, "departure_place", ""),
+            "destination_place": getattr(c, "destination_place", ""),
+            "weight": f"{c.weight:.2f}" if c.weight else "",
+            "volume": f"{c.volume:.2f}" if c.volume else "",
+            "cost": f"{c.cost:.2f}" if c.cost else "",
+            "insurance": f"{c.insurance:.2f}" if c.insurance else "",
+            "dimensions": getattr(c, "dimensions", ""),
+            "shipping_date": fmt(getattr(c, "shipping_date", None)),
+            "delivery_date": fmt(getattr(c, "delivery_date", None)),
+            "delivery_time": getattr(c, "delivery_time", ""),
+            "packaging_cost": f"{c.packaging_cost:.2f}" if c.packaging_cost else "",
+            "places_count": c.places_count or "",
+            "tariff_min": f"{c.tariff_min:.2f}" if c.tariff_min else "",
+            "tariff_weight": f"{c.tariff_weight:.2f}" if c.tariff_weight else "",
+            "qr_code": getattr(c, "qr_code", ""),
+            "qr_created_at": fmt(getattr(c, "qr_created_at", None)),
+            "created_at": fmt(getattr(c, "created_at", None)),
+            "updated_at": fmt(getattr(c, "updated_at", None)),
         })
 
-    has_more = offset + limit < total
-    return JsonResponse({"results": results, "has_more": has_more})
+    return JsonResponse({"results": results, "has_more": offset + limit < total})
+
 
 
 @login_required
@@ -125,8 +247,6 @@ def api_all_tables(request):
     # Берём все таблицы из cargo_acc, включая вспомогательные
     filtered = [t.replace("cargo_acc_", "") for t in all_tables if t.startswith("cargo_acc_")]
     return JsonResponse(filtered, safe=False)
-
-
 
 
 @login_required
