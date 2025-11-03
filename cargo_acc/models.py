@@ -168,15 +168,17 @@ class Product(models.Model):
 # === ГРУЗ (агрегатор) ===
 class Cargo(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
     cargo_code = models.CharField(max_length=50, unique=True)
     products = models.ManyToManyField(Product, blank=True)
     departure_place = models.CharField(max_length=200, blank=True, null=True)
     destination_place = models.CharField(max_length=200, blank=True, null=True)
+    weight_total = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    volume_total = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     shipping_date = models.DateField(null=True, blank=True)
     delivery_date = models.DateField(null=True, blank=True)
     cargo_status = models.ForeignKey(CargoStatus, on_delete=models.CASCADE)
     packaging_type = models.ForeignKey(PackagingType, on_delete=models.CASCADE)
+    last_status = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='current_cargos')
 
     class Meta:
         verbose_name = "Груз"
@@ -208,6 +210,7 @@ class ExtraCost(models.Model):
     description = models.CharField(max_length=255, blank=True, null=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     allocated = models.BooleanField(default=False)
+    is_for_cargo = models.BooleanField(default=False, help_text="True — если расход относится ко всему грузу, False — если к товару")
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -348,6 +351,8 @@ class CargoMovement(models.Model):
     to_transport_bill = models.ForeignKey(TransportBill, related_name='to_transport_bill', on_delete=models.CASCADE)
     transfer_place = models.CharField(max_length=255, blank=True, null=True)
     transfer_date = models.DateTimeField()
+    status_before = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='status_before_moves')
+    status_after = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='status_after_moves')
     image = models.ForeignKey(Image, on_delete=models.SET_NULL, null=True, blank=True)
     qrscan = models.ForeignKey(QRScan, on_delete=models.SET_NULL, null=True, blank=True)
     operator = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True)
