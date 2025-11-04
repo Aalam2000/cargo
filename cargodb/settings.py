@@ -145,7 +145,7 @@ LOGGING = {
     },
 }
 
-LOGIN_REDIRECT_URL = 'cargo_table'
+LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = '/'
 
 # Serve static in dev mode

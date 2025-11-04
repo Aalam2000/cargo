@@ -30,7 +30,7 @@
             </div>
 
             <nav class="menu">
-                <a href="{% url 'index' %}" class="menu-item">🏠 Главная</a>
+                <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
                 <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
 
                 {% if user.role == "Operator" %}

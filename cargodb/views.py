@@ -13,6 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from cargo_acc.models import Cargo
 from .forms import UserLoginForm
 
+from cargo_acc.models import Product, Payment, Client
 
 # @login_required
 # def profile_view(request):
@@ -289,3 +290,45 @@ def api_table_data(request):
 
 def home_view(request):
     return render(request, 'index.html')
+
+
+@login_required
+def home_view(request):
+    user = request.user
+    role = user.role
+    client_id = request.GET.get("client_id")
+    product_code = request.GET.get("product_code", "").strip()
+    cargo_code = request.GET.get("cargo_code", "").strip()
+
+    products = Product.objects.select_related("cargo_status", "client", "warehouse", "company")
+    payments = Payment.objects.select_related("client", "company")
+
+    if role == "Client":
+        client_obj = getattr(user, "linked_client", None)
+        if client_obj:
+            products = products.filter(client_id=client_obj.id)
+            payments = payments.filter(client_id=client_obj.id)
+    elif role == "Operator" and client_id:
+        products = products.filter(client_id=client_id)
+        payments = payments.filter(client_id=client_id)
+
+    if product_code:
+        products = products.filter(product_code__icontains=product_code)
+
+        # Все товары, у которых статус содержит "Выдан" или "Достав"
+    delivered = products.filter(cargo_status__name__icontains="достав") | products.filter(
+        cargo_status__name__icontains="выдан"
+    )
+
+    # Остальные считаем "в пути"
+    in_transit = products.exclude(id__in=delivered.values_list("id", flat=True))
+    clients = Client.objects.all().order_by("client_code") if role == "Operator" else []
+
+    return render(request, "home.html", {
+        "role": role,
+        "delivered": delivered,
+        "in_transit": in_transit,
+        "payments": payments.order_by("-payment_date"),
+        "clients": clients,
+        "selected_client": client_id,
+    })
