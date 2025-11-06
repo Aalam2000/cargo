@@ -42,12 +42,6 @@ def orders_view(request):
     return render(request, 'cargo_acc/orders.html')
 
 
-def index_view(request):
-    if request.user.is_authenticated:
-        return redirect("cargo_table")  # после логина — сразу таблица грузов
-    return render(request, "index.html")  # до логина — обычная главная
-
-
 def user_login(request):
     if request.method == 'POST':
         form = UserLoginForm(request, data=request.POST)
@@ -288,12 +282,27 @@ def api_table_data(request):
     return JsonResponse({"columns": columns, "rows": rows})
 
 
-def home_view(request):
-    return render(request, 'index.html')
+# ==============================
+#  Публичная главная страница (до входа)
+# ==============================
+def index_view(request):
+    """
+    Если пользователь авторизован — сразу ведём в /home/
+    Если нет — показываем index.html (лендинг/вход)
+    """
+    if request.user.is_authenticated:
+        return redirect("home")
+    return render(request, "index.html")
 
 
+# ==============================
+#  Домашняя страница после входа
+# ==============================
 @login_required
 def home_view(request):
+    """
+    После входа — страница с данными, фильтрацией и таблицами.
+    """
     user = request.user
     role = user.role
     client_id = request.GET.get("client_id")
@@ -315,12 +324,9 @@ def home_view(request):
     if product_code:
         products = products.filter(product_code__icontains=product_code)
 
-        # Все товары, у которых статус содержит "Выдан" или "Достав"
     delivered = products.filter(cargo_status__name__icontains="достав") | products.filter(
         cargo_status__name__icontains="выдан"
     )
-
-    # Остальные считаем "в пути"
     in_transit = products.exclude(id__in=delivered.values_list("id", flat=True))
     clients = Client.objects.all().order_by("client_code") if role == "Operator" else []
 
@@ -332,3 +338,64 @@ def home_view(request):
         "clients": clients,
         "selected_client": client_id,
     })
+
+@login_required
+def home_data(request):
+    tab = request.GET.get("tab")
+    client_code = request.GET.get("client_code", "").strip()
+    product_code = request.GET.get("product_code", "").strip()
+
+    products = Product.objects.select_related("cargo_status", "client", "warehouse", "company")
+    payments = Payment.objects.select_related("client", "company")
+
+    user = request.user
+    if user.role == "Client":
+        client_obj = getattr(user, "linked_client", None)
+        if client_obj:
+            products = products.filter(client_id=client_obj.id)
+            payments = payments.filter(client_id=client_obj.id)
+    elif user.role in ["Operator", "Admin"] and client_code:
+        products = products.filter(client__client_code__icontains=client_code)
+        payments = payments.filter(client__client_code__icontains=client_code)
+
+    if product_code:
+        products = products.filter(product_code__icontains=product_code)
+
+    def fmt(d):
+        return d.strftime("%d.%m.%Y") if d else ""
+
+    if tab in ["in_transit", "delivered"]:
+        delivered = products.filter(cargo_status__name__icontains="достав") | products.filter(
+            cargo_status__name__icontains="выдан"
+        )
+        queryset = delivered if tab == "delivered" else products.exclude(id__in=delivered)
+        results = [
+            {
+                "Код": p.product_code,
+                "Описание": p.cargo_description,
+                "Склад": p.warehouse.name if p.warehouse else "",
+                "Назначение": p.destination_place or "",
+                "Вес": p.weight or "",
+                "Стоимость": p.cost or "",
+                "Статус": p.cargo_status.name if p.cargo_status else "",
+            }
+            for p in queryset.order_by("-id")[:50]
+        ]
+    elif tab == "payments":
+        if client_code:
+            payments = payments.filter(client__client_code__icontains=client_code)
+
+        results = [
+            {
+                "Дата": fmt(p.payment_date),
+                "Клиент": p.client.client_code if p.client else "",
+                "Сумма (USD)": p.amount_total,
+                "Метод": p.method,
+                "Комментарий": p.comment or "",
+            }
+            for p in payments.order_by("-payment_date")[:50]
+        ]
+    else:
+        results = []
+
+    return JsonResponse({"results": results})

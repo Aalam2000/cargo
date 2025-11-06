@@ -85,4 +85,19 @@ urlpatterns = [
     # ⚙️ Модалки и настройки интерфейса
     # --------------------------------------------------------------
     path('settings_modal', views.settings_modal, name='settings_modal'),
+
+    # === Раздел заказов ===
+
+    # === Подключение модулей ===
+    path('cargo_acc/', include('cargo_acc.urls')),  # все маршруты приложения cargo_acc
+    path('chatgpt_ui/', include('chatgpt_ui.urls')),  # внутренний модуль ChatGPT UI
+
+    # === Таблицы и API-грузов ===
+    path("api/cargo_table/data/", views.cargo_table_data, name="cargo_table_data"),  # JSON-данные таблицы
+    path("api/cargo_table/config/", views.cargo_table_config, name="cargo_table_config"),
+    path("api/table_data/", views.api_table_data, name="api_table_data"),
+
+    # === Служебные и API-запросы ===
+    path("api/log/", views.js_log, name="js_log"),  # логирование ошибок JS
+
 ]

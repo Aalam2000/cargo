@@ -23,9 +23,15 @@
   <div id="tab-in_transit" class="tab-content active">
     <div class="section-title">Товары в пути</div>
     <div class="filter-bar">
-      <input type="text" id="searchInTransit" class="input-filter" placeholder="Поиск по описанию...">
+      {% if role in "Admin Operator" %}
+          <input type="text" id="productFilter_in_transit" class="input-filter" placeholder="Номер товара">
+          <input type="text" id="clientFilter_in_transit" class="input-filter" placeholder="Клиент">
+      {% elif role == "Client" %}
+          <input type="text" id="productFilter_in_transit" class="input-filter" placeholder="Номер товара">
+      {% endif %}
       <button class="btn-table" onclick="applyTableFilter('in_transit')">Поиск</button>
     </div>
+
 
     <div class="table-container">
       <div class="table-wrapper">
@@ -65,9 +71,15 @@
   <div id="tab-delivered" class="tab-content">
     <div class="section-title">Доставленные товары</div>
     <div class="filter-bar">
-      <input type="text" id="searchDelivered" class="input-filter" placeholder="Поиск по описанию...">
+      {% if role in "Admin Operator" %}
+          <input type="text" id="productFilter_delivered" class="input-filter" placeholder="Номер товара">
+          <input type="text" id="clientFilter_delivered" class="input-filter" placeholder="Клиент">
+      {% elif role == "Client" %}
+          <input type="text" id="productFilter_delivered" class="input-filter" placeholder="Номер товара">
+      {% endif %}
       <button class="btn-table" onclick="applyTableFilter('delivered')">Поиск</button>
     </div>
+
 
     <div class="table-container">
       <div class="table-wrapper">
@@ -107,9 +119,12 @@
   <div id="tab-payments" class="tab-content">
     <div class="section-title">История оплат</div>
     <div class="filter-bar">
-      <input type="text" id="searchPayments" class="input-filter" placeholder="Поиск по клиенту...">
-      <button class="btn-table" onclick="applyTableFilter('payments')">Поиск</button>
+      {% if role in "Admin Operator" %}
+          <input type="text" id="clientFilter_payments" class="input-filter" placeholder="Клиент">
+          <button class="btn-table" onclick="applyTableFilter('payments')">Поиск</button>
+      {% endif %}
     </div>
+
 
     <div class="table-container">
       <div class="table-wrapper">

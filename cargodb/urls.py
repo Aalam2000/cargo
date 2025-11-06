@@ -1,8 +1,10 @@
-#cargodb/urls.py
+# ==============================
+#  cargodb/urls.py
+# ==============================
+
 from django.contrib import admin
 from django.urls import path, include
-from home import views as home_views  # импорт для index_view
-from . import views  # импорт для других представлений (profile и dashboard)
+from . import views
 from django.contrib.auth import views as auth_views
 import logging
 from django.conf import settings
@@ -10,30 +12,37 @@ from django.conf.urls.static import static
 
 logger = logging.getLogger(__name__)
 
+
+# ==============================
+#  🔹 ОСНОВНЫЕ МАРШРУТЫ ПРОЕКТА
+# ==============================
+
 urlpatterns = [
-    path('', home_views.index_view, name='index'),  # Для главной страницы
-    path("admin/", admin.site.urls),
-    path('accounts/', include('accounts.urls')),    # Подключаем все маршруты для приложения ccounts
-    path('login/', auth_views.LoginView.as_view(), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
-    path('debugging_code/', views.debugging_code_view, name='debugging_code'),
-    path('dashboard/', views.dashboard_view, name='dashboard'),
-    path('orders/', views.orders_view, name='orders'),
-    path('cargo_acc/', include('cargo_acc.urls')),  # Подключаем все маршруты для приложения cargo_acc
-    path('chatgpt_ui/', include('chatgpt_ui.urls')),
-    path("cargo_table/", views.cargo_table_view, name="cargo_table"),
-    path("api/cargo_table/data/", views.cargo_table_data, name="cargo_table_data"),
-    path("api/cargo_table/config/", views.cargo_table_config, name="cargo_table_config"),
-    path("all_tables/", views.all_tables_view, name="all_tables"),
-    path("api/all_tables/", views.api_all_tables, name="api_all_tables"),
-    path("api/table_data/", views.api_table_data, name="api_table_data"),
-    path("api/log/", views.js_log),
-    path("api/save_table_settings/", include("cargo_acc.urls")),
-    path("home/", include("cargo_acc.urls")),
-    path("home/", views.home_view, name="home"),
+
+    # === Главная страница ===
+    path('', views.index_view, name='index'),  # http://localhost:8000/ → index.html (если не вошёл)
+    path('home/', views.home_view, name='home'),  # http://localhost:8000/home/ → home.html (только после входа)
+    path("cargo_table/", views.cargo_table_view, name="cargo_table"),  # страница таблицы грузов
+
+    # === Админ-панель Django ===
+    path("admin/", admin.site.urls),                # http://localhost:8000/admin/
+
+    # === Аккаунты и авторизация ===
+    path('accounts/', include('accounts.urls')),    # http://localhost:8000/accounts/...
+    path('login/', auth_views.LoginView.as_view(), name='login'),     # http://localhost:8000/login/
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # http://localhost:8000/logout/
+    path("home/data/", views.home_data, name="home_data"),
 ]
 
+
+# ==============================
+#  🔹 ОБРАБОТКА СТАТИКИ И МЕДИА
+# ==============================
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-logger.info("Запрос на маршрут был обработан!")
+
+# ==============================
+#  🔹 ЛОГИРОВАНИЕ
+# ==============================
+logger.info("Файл cargodb/urls.py успешно загружен — маршруты активны.")

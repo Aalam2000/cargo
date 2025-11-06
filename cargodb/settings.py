@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_extensions',
     'accounts',
-    'home',
     'cargo_acc',
     'chatgpt_ui',
 ]

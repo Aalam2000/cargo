@@ -29,65 +29,47 @@
                 <span class="username">{{ user.username }}</span>
             </div>
 
+            <!-- Меню после авторизации -->
             <nav class="menu">
-                <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
-                <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
-
-                {% if user.role == "Operator" %}
-                    <!-- ========== Блок для Оператора ========== -->
-                    <div class="accordion">
-                        <div class="accordion-header" onclick="toggleAccordion(this)">
-                            ⚙️ Оператор
-                        </div>
-                        <div class="accordion-body">
-                            <a href="{% url 'operator_clients' %}" class="menu-item">💳 Клиенты — платежи</a>
-                            <a href="/operator/edit_cargo/" class="menu-item">✏️ Редактирование груза</a>
-                            <a href="/operator/tariffs/" class="menu-item">💰 Указание тарифов</a>
-                            <a href="/operator/payments/" class="menu-item">💵 Оплата клиента</a>
-                            <a href="/operator/shipping/" class="menu-item">🚚 Указание отправки</a>
-                            <a href="/operator/delivery/" class="menu-item">📦 Указание отгрузки клиенту</a>
-                        </div>
-                    </div>
-                {% endif %}
-
                 {% if user.role == "Admin" %}
-                    <!-- ========== Администрирование ========== -->
-                    <div class="accordion">
-                        <div class="accordion-header" onclick="toggleAccordion(this)">
-                            ⚙️ Админка
-                        </div>
-                        <div class="accordion-body">
-                            <a href="/cargo_table/" class="menu-item">📦 Грузы (главная таблица)</a>
-                            <a href="{% url 'orders' %}" class="menu-item">🧾 Перевозки / накладные</a>
-                            <a href="{% url 'settings_modal' %}" class="menu-item">🏢 Компании и клиенты</a>
-                            <a href="/warehouses/" class="menu-item">🏗 Склады</a>
-                            <a href="/payments/" class="menu-item">💳 Платежи клиентов</a>
-                            <a href="{% url 'dashboard' %}" class="menu-item">📈 Отчёты / аналитика</a>
-                            <a href="{% url 'all_tables' %}" class="menu-item">📋 Все таблицы</a>
-                        </div>
+                    <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
+                    <a href="#" class="menu-item">📚 Справочники (в процессе)</a>
+                    <a href="{% url 'cargo_table' %}" class="menu-item">📦 Товары</a>
+                    <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>
+                    <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>
+                    <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
+                    <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
+                    <div class="admin-block">
+                        <button onclick="window.open('/admin/', '_blank')" class="btn">Django Admin</button>
                     </div>
 
-                    <!-- ========== Справочники ========== -->
-                    <div class="accordion">
-                        <div class="accordion-header" onclick="toggleAccordion(this)">
-                            📚 Справочники
-                        </div>
-                        <div class="accordion-body">
-                            <a href="/api/get_cargo_types/" class="menu-item">Типы грузов</a>
-                            <a href="/api/get_packaging_types/" class="menu-item">Типы упаковок</a>
-                            <a href="/api/get_cargo_statuses/" class="menu-item">Статусы грузов</a>
-                        </div>
-                    </div>
+                {% elif user.role == "Operator" %}
+                    <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
+                    <a href="#" class="menu-item">📚 Справочники (в процессе)</a>
+                    <a href="{% url 'cargo_table' %}" class="menu-item">📦 Товары</a>
+                    <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>
+                    <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>
+                    <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
+                    <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
+
+                {% elif user.role == "WarehouseWorker" %}
+                    <a href="#" class="menu-item">📷 Сканировать (в разработке)</a>
+                    <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
+                    <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
+
+                {% elif user.role == "Client" %}
+                    <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
+                    <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
+                    <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
                 {% endif %}
-
-                <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
             </nav>
 
-            <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
+            <form id="logout-form" method="post" action="{% url 'logout' %}" style="display:none;">
                 {% csrf_token %}
             </form>
 
         {% else %}
+            <!-- До авторизации -->
             <form class="login-form" method="post" action="{% url 'login' %}">
                 {% csrf_token %}
                 <h2>Вход</h2>
@@ -96,28 +78,27 @@
                 <button type="submit">Войти</button>
             </form>
         {% endif %}
-
-        {% if user.is_authenticated and user.role == "Admin" %}
-            <div class="admin-block">
-                <button onclick="window.open('/admin/', '_blank')" class="btn">Django Admin</button>
-            </div>
-        {% endif %}
     </aside>
 
     <!-- Основной контент -->
     <main class="content">
         {% block content %}
-            <div class="placeholder">
-                <h1>В разработке</h1>
-                <p>Этот раздел будет доступен позже.</p>
-            </div>
+            {% if not user.is_authenticated %}
+                {% include "index.html" %}
+            {% else %}
+                {% include "home.html" %}
+            {% endif %}
         {% endblock %}
     </main>
 </div>
 
 <script>
+    function logoutUser() {
+        document.getElementById('logout-form').submit();
+    }
+
     window.onerror = function (message, source, lineno, colno, error) {
-        alert("Ошибка JS: " + message + " (" + source + ":" + lineno + ")");
+        console.error("Ошибка JS: " + message + " (" + source + ":" + lineno + ")");
     };
 </script>
 </body>

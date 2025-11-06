@@ -1,4 +1,4 @@
-# File: cargo_acc/views.py
+# cargo_acc/views.py
 
 import json
 import os
