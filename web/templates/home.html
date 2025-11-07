@@ -2,159 +2,164 @@
 {% load static %}
 {% block title %}Главная — Cargo №1{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/table.css' %}">
-<script defer src="{% static 'js/home.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <script defer src="{% static 'js/home.js' %}"></script>
 
-<div class="cargo-table-page">
+    <div class="cargo-table-page">
+        <div class="table-header-container">
+            <h3>Главная</h3>
+        </div>
+        <meta name="user-role" content="{{ role }}">
 
-  <!-- Заголовок -->
-  <div class="table-header-container">
-    <h3>Главная</h3>
-  </div>
+        <!-- 🔹 Блок баланса -->
+        <div id="client-balance" class="balance-box hidden">
+            <div class="balance-label">💰 Оплачено:</div>
+            <div id="balance-value" class="balance-value">—</div>
+        </div>
 
-  <!-- Вкладки -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="in_transit">🚚 В пути</button>
-    <button class="tab-btn" data-tab="delivered">📦 Доставленные</button>
-    <button class="tab-btn" data-tab="payments">💳 Оплаты</button>
-  </div>
+        <!-- Вкладки -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="in_transit">🚚 В пути</button>
+            <button class="tab-btn" data-tab="delivered">📦 Доставленные</button>
+            <button class="tab-btn" data-tab="payments">💳 Оплаты</button>
+        </div>
 
-  <!-- ======== В ПУТИ ======== -->
-  <div id="tab-in_transit" class="tab-content active">
-    <div class="section-title">Товары в пути</div>
-    <div class="filter-bar">
-      {% if role in "Admin Operator" %}
-          <input type="text" id="productFilter_in_transit" class="input-filter" placeholder="Номер товара">
-          <input type="text" id="clientFilter_in_transit" class="input-filter" placeholder="Клиент">
-      {% elif role == "Client" %}
-          <input type="text" id="productFilter_in_transit" class="input-filter" placeholder="Номер товара">
-      {% endif %}
-      <button class="btn-table" onclick="applyTableFilter('in_transit')">Поиск</button>
+        <!-- ===== В ПУТИ ===== -->
+        <div id="tab-in_transit" class="tab-content active">
+            <div class="filter-bar">
+                {% if role in "Admin Operator" %}
+                    <input id="productFilter_in_transit" class="input-filter" placeholder="Номер товара" type="text">
+                    <input id="clientFilter_in_transit" class="input-filter" placeholder="Код клиента" type="text"
+                           oninput="updateClientBalance(this.value)">
+                {% elif role == "Client" %}
+                    <input id="productFilter_in_transit" class="input-filter" placeholder="Номер товара" type="text">
+                {% endif %}
+                <button class="btn-table" onclick="applyTableFilter('in_transit')">Поиск</button>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>КОД</th>
+                        <th>ОПИСАНИЕ</th>
+                        <th>СКЛАД</th>
+                        <th>НАЗНАЧЕНИЕ</th>
+                        <th>ВЕС</th>
+                        <th>СТОИМОСТЬ</th>
+                        <th>СТАТУС</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tbody_in_transit">
+                    {% for p in in_transit %}
+                        <tr>
+                            <td>{{ p.product_code }}</td>
+                            <td>{{ p.cargo_description }}</td>
+                            <td>{{ p.warehouse.name }}</td>
+                            <td>{{ p.destination_place }}</td>
+                            <td>{{ p.weight }}</td>
+                            <td>{{ p.cost }}</td>
+                            <td>{{ p.cargo_status.name }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">Нет данных</td>
+                        </tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== ДОСТАВЛЕННЫЕ ===== -->
+        <div id="tab-delivered" class="tab-content">
+            <div class="filter-bar">
+                {% if role in "Admin Operator" %}
+                    <input id="productFilter_delivered" class="input-filter" placeholder="Номер товара" type="text">
+                    <input id="clientFilter_delivered" class="input-filter" placeholder="Код клиента" type="text"
+                           oninput="updateClientBalance(this.value)">
+                {% elif role == "Client" %}
+                    <input id="productFilter_delivered" class="input-filter" placeholder="Номер товара" type="text">
+                {% endif %}
+                <button class="btn-table" onclick="applyTableFilter('delivered')">Поиск</button>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>КОД</th>
+                        <th>ОПИСАНИЕ</th>
+                        <th>СКЛАД</th>
+                        <th>НАЗНАЧЕНИЕ</th>
+                        <th>ВЕС</th>
+                        <th>СТОИМОСТЬ</th>
+                        <th>ДАТА ДОСТАВКИ</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tbody_delivered">
+                    {% for p in delivered %}
+                        <tr>
+                            <td>{{ p.product_code }}</td>
+                            <td>{{ p.cargo_description }}</td>
+                            <td>{{ p.warehouse.name }}</td>
+                            <td>{{ p.destination_place }}</td>
+                            <td>{{ p.weight }}</td>
+                            <td>{{ p.cost }}</td>
+                            <td>{{ p.delivery_date }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">Нет доставленных</td>
+                        </tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== ОПЛАТЫ ===== -->
+        <div id="tab-payments" class="tab-content">
+            <div class="filter-bar">
+                {% if role in "Admin Operator" %}
+                    <input id="clientFilter_payments" class="input-filter" placeholder="Код клиента" type="text"
+                           oninput="updateClientBalance(this.value)">
+                    <button class="btn-table" onclick="applyTableFilter('payments')">Поиск</button>
+                {% endif %}
+            </div>
+
+            {% if role in "Admin Operator" %}
+            <div class="table-header-container">
+              <h3>Оплаты</h3>
+              <button id="btnAddPayment" class="btn-table">+</button>
+            </div>
+            {% endif %}
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>ДАТА</th>
+                        <th>КЛИЕНТ</th>
+                        <th>СУММА</th>
+                        <th>МЕТОД</th>
+                        <th>КОММЕНТАРИЙ</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tbody_payments">
+                    {% for pay in payments %}
+                        <tr>
+                            <td>{{ pay.payment_date }}</td>
+                            <td>{{ pay.client.client_code }}</td>
+                            <td>{{ pay.amount_total }}</td>
+                            <td>{{ pay.method }}</td>
+                            <td>{{ pay.comment }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">Платежей нет</td>
+                        </tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-
-
-    <div class="table-container">
-      <div class="table-wrapper">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>КОД ТОВАРА</th>
-              <th>ОПИСАНИЕ</th>
-              <th>СКЛАД</th>
-              <th>НАЗНАЧЕНИЕ</th>
-              <th>ВЕС</th>
-              <th>СТОИМОСТЬ</th>
-              <th>СТАТУС</th>
-            </tr>
-          </thead>
-          <tbody id="tbody_in_transit">
-            {% for p in in_transit %}
-            <tr>
-              <td>{{ p.product_code }}</td>
-              <td>{{ p.cargo_description }}</td>
-              <td>{{ p.warehouse.name }}</td>
-              <td>{{ p.destination_place }}</td>
-              <td>{{ p.weight }}</td>
-              <td>{{ p.cost }}</td>
-              <td>{{ p.cargo_status.name }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">Нет данных</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ======== ДОСТАВЛЕННЫЕ ======== -->
-  <div id="tab-delivered" class="tab-content">
-    <div class="section-title">Доставленные товары</div>
-    <div class="filter-bar">
-      {% if role in "Admin Operator" %}
-          <input type="text" id="productFilter_delivered" class="input-filter" placeholder="Номер товара">
-          <input type="text" id="clientFilter_delivered" class="input-filter" placeholder="Клиент">
-      {% elif role == "Client" %}
-          <input type="text" id="productFilter_delivered" class="input-filter" placeholder="Номер товара">
-      {% endif %}
-      <button class="btn-table" onclick="applyTableFilter('delivered')">Поиск</button>
-    </div>
-
-
-    <div class="table-container">
-      <div class="table-wrapper">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>КОД ТОВАРА</th>
-              <th>ОПИСАНИЕ</th>
-              <th>СКЛАД</th>
-              <th>НАЗНАЧЕНИЕ</th>
-              <th>ВЕС</th>
-              <th>СТОИМОСТЬ</th>
-              <th>ДАТА ДОСТАВКИ</th>
-            </tr>
-          </thead>
-          <tbody id="tbody_delivered">
-            {% for p in delivered %}
-            <tr>
-              <td>{{ p.product_code }}</td>
-              <td>{{ p.cargo_description }}</td>
-              <td>{{ p.warehouse.name }}</td>
-              <td>{{ p.destination_place }}</td>
-              <td>{{ p.weight }}</td>
-              <td>{{ p.cost }}</td>
-              <td>{{ p.delivery_date }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">Нет доставленных</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ======== ОПЛАТЫ ======== -->
-  <div id="tab-payments" class="tab-content">
-    <div class="section-title">История оплат</div>
-    <div class="filter-bar">
-      {% if role in "Admin Operator" %}
-          <input type="text" id="clientFilter_payments" class="input-filter" placeholder="Клиент">
-          <button class="btn-table" onclick="applyTableFilter('payments')">Поиск</button>
-      {% endif %}
-    </div>
-
-
-    <div class="table-container">
-      <div class="table-wrapper">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>ДАТА</th>
-              <th>КЛИЕНТ</th>
-              <th>СУММА (USD)</th>
-              <th>МЕТОД</th>
-              <th>КОММЕНТАРИЙ</th>
-            </tr>
-          </thead>
-          <tbody id="tbody_payments">
-            {% for pay in payments %}
-            <tr>
-              <td>{{ pay.payment_date }}</td>
-              <td>{{ pay.client.client_code }}</td>
-              <td>{{ pay.amount_total }}</td>
-              <td>{{ pay.method }}</td>
-              <td>{{ pay.comment }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5">Платежей нет</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-</div>
 {% endblock %}

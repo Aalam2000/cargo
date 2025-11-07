@@ -35,15 +35,19 @@
 
 .modal-body {
     padding: 20px 26px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    align-items: center;
+    column-gap: 14px;
+    row-gap: 10px;
 }
 
 .modal-body label {
     font-weight: 600;
     color: #333;
-    margin-bottom: 4px;
+    text-align: right;
+    margin: 0;
+    white-space: nowrap;
 }
 
 .modal-body input,
@@ -130,4 +134,47 @@
         opacity: 1;
         transform: translate(-50%, -50%);
     }
+}
+
+/* === Модалка настроек таблицы === */
+.modal.show {
+    display: block !important;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+/* === Overlay для модалки === */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    z-index: 1049;
+}
+
+.modal-overlay.show {
+    display: block;
+}
+
+
+/* === Корректировка позиции модалки === */
+#settings-modal {
+    z-index: 1050;
+}
+
+
+/* Мобильная адаптация — метки сверху, поля снизу */
+@media (max-width: 600px) {
+  .modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-body label {
+    text-align: left;
+    width: 100%;
+  }
 }

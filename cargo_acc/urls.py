@@ -1,7 +1,7 @@
 # cargo_acc/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from . import views, views_payment
 
 # --------------------------------------------------------------------
 # 📦 ROUTER — стандартные ViewSet API (CRUD для моделей)
@@ -86,7 +86,9 @@ urlpatterns = [
     # --------------------------------------------------------------
     path('settings_modal', views.settings_modal, name='settings_modal'),
 
-    # === Раздел заказов ===
+    # === Оплаты клиентов ===
+    path("api/add_payment/", views_payment.add_or_edit_payment, name="add_payment"),
+
 
     # === Подключение модулей ===
     path('cargo_acc/', include('cargo_acc.urls')),  # все маршруты приложения cargo_acc

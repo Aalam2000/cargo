@@ -9,11 +9,11 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum, Count
+from cargo_acc.models import Product, Payment, Client
 
 from cargo_acc.models import Cargo
 from .forms import UserLoginForm
-
-from cargo_acc.models import Product, Payment, Client
 
 # @login_required
 # def profile_view(request):
@@ -399,3 +399,49 @@ def home_data(request):
         results = []
 
     return JsonResponse({"results": results})
+
+# ==============================
+#  Расчет баланса клиента + последний платеж
+# ==============================
+@login_required
+def client_balance(request):
+    user = request.user
+    role = getattr(user, "role", "")
+    client_code = request.GET.get("client_code", "").strip()
+    total_paid = 0.0
+    last_payment_date = None
+    last_payment_amount = 0.0
+
+    # --- Для клиента ---
+    if role == "Client":
+        client_obj = getattr(user, "linked_client", None)
+        if client_obj:
+            payments = Payment.objects.filter(client=client_obj).order_by("-payment_date")
+            total_paid = payments.aggregate(total=Sum("amount_total")).get("total") or 0
+            if payments.exists():
+                last = payments.first()
+                last_payment_date = last.payment_date
+                last_payment_amount = last.amount_total
+
+    # --- Для админа / оператора ---
+    elif role in ["Admin", "Operator"] and client_code:
+        if client_code == "self":  # защита
+            return JsonResponse({"total_paid": 0})
+        matches = Client.objects.filter(client_code__icontains=client_code)
+        if matches.count() == 1:
+            client = matches.first()
+            payments = Payment.objects.filter(client=client).order_by("-payment_date")
+            total_paid = payments.aggregate(total=Sum("amount_total")).get("total") or 0
+            if payments.exists():
+                last = payments.first()
+                last_payment_date = last.payment_date
+                last_payment_amount = last.amount_total
+
+    # --- Форматируем ответ ---
+    result = {
+        "total_paid": float(total_paid),
+        "last_payment_date": last_payment_date.strftime("%d.%m.%Y") if last_payment_date else "",
+        "last_payment_amount": float(last_payment_amount) if last_payment_amount else 0.0,
+    }
+
+    return JsonResponse(result)

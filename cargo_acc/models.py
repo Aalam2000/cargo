@@ -246,7 +246,9 @@ class Payment(models.Model):
     cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, null=True, blank=True, related_name='payments')
     payment_date = models.DateField()
     amount_total = models.DecimalField(max_digits=14, decimal_places=2)
-    currency = models.CharField(max_length=10, default='AZN')
+    currency = models.CharField(max_length=10, default='RUB')
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=1.0000)
+    amount_usd = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     method = models.CharField(
         max_length=20,
         choices=[
@@ -275,6 +277,17 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.client} — {self.amount_total} {self.currency}"
+
+    def save(self, *args, **kwargs):
+        if self.currency == "USD":
+            self.exchange_rate = 1
+            self.amount_usd = self.amount_total
+        elif not self.amount_usd:
+            try:
+                self.amount_usd = round(float(self.amount_total) / float(self.exchange_rate), 2)
+            except Exception:
+                self.amount_usd = 0
+        super().save(*args, **kwargs)
 
 
 class PaymentProduct(models.Model):
