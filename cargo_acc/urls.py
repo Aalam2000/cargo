@@ -2,6 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views, views_payment
+from cargodb import views as core_views
 
 # --------------------------------------------------------------------
 # 📦 ROUTER — стандартные ViewSet API (CRUD для моделей)
@@ -88,18 +89,17 @@ urlpatterns = [
 
     # === Оплаты клиентов ===
     path("api/add_payment/", views_payment.add_or_edit_payment, name="add_payment"),
-
+    path("get_unpaid_cargos/", views_payment.get_unpaid_cargos, name="get_unpaid_cargos"),
 
     # === Подключение модулей ===
-    path('cargo_acc/', include('cargo_acc.urls')),  # все маршруты приложения cargo_acc
     path('chatgpt_ui/', include('chatgpt_ui.urls')),  # внутренний модуль ChatGPT UI
 
     # === Таблицы и API-грузов ===
-    path("api/cargo_table/data/", views.cargo_table_data, name="cargo_table_data"),  # JSON-данные таблицы
-    path("api/cargo_table/config/", views.cargo_table_config, name="cargo_table_config"),
-    path("api/table_data/", views.api_table_data, name="api_table_data"),
+    path("api/cargo_table/data/", core_views.cargo_table_data, name="cargo_table_data"),
+    path("api/cargo_table/config/", core_views.cargo_table_config, name="cargo_table_config"),
+    path("api/table_data/", core_views.api_table_data, name="api_table_data"),
 
     # === Служебные и API-запросы ===
-    path("api/log/", views.js_log, name="js_log"),  # логирование ошибок JS
+    path("api/log/", core_views.js_log, name="js_log"),  # логирование ошибок JS
 
 ]

@@ -33,3 +33,4 @@ tqdm==4.67.1
 transliterate==1.10.2
 typing_extensions==4.15.0
 tzdata==2025.2
+requests==2.32.5

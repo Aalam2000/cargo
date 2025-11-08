@@ -178,3 +178,6 @@
     width: 100%;
   }
 }
+
+.table tbody tr[data-id] { cursor: pointer; }
+.table tbody tr[data-id]:hover { background-color: #eaf1ff; }

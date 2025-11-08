@@ -387,6 +387,7 @@ def home_data(request):
 
         results = [
             {
+                "id": p.id,
                 "Дата": fmt(p.payment_date),
                 "Клиент": p.client.client_code if p.client else "",
                 "Сумма (USD)": p.amount_total,

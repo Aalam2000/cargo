@@ -127,10 +127,10 @@
             </div>
 
             {% if role in "Admin Operator" %}
-            <div class="table-header-container">
-              <h3>Оплаты</h3>
-              <button id="btnAddPayment" class="btn-table">+</button>
-            </div>
+                <div class="table-header-container">
+                    <h3>Оплаты</h3>
+                    <button id="btnAddPayment" class="btn-table">+</button>
+                </div>
             {% endif %}
 
             <div class="table-container">
@@ -146,7 +146,11 @@
                     </thead>
                     <tbody id="tbody_payments">
                     {% for pay in payments %}
-                        <tr>
+                        <tr data-id="{{ pay.id }}"
+                            data-currency="{{ pay.currency }}"
+                            data-rate="{{ pay.exchange_rate }}"
+                            data-usd="{{ pay.amount_usd }}"
+                            data-created="{{ pay.created_by }}">
                             <td>{{ pay.payment_date }}</td>
                             <td>{{ pay.client.client_code }}</td>
                             <td>{{ pay.amount_total }}</td>
