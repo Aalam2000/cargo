@@ -446,3 +446,10 @@ def client_balance(request):
     }
 
     return JsonResponse(result)
+
+@login_required
+def api_user_role(request):
+    """Возвращает текущую роль авторизованного пользователя."""
+    user = request.user
+    role = getattr(user, "role", None)
+    return JsonResponse({"role": role or "Unknown"})

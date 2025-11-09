@@ -34,7 +34,7 @@ urlpatterns = [
     path("home/data/", views.home_data, name="home_data"),
     path("home/balance/", views.client_balance, name="client_balance"),
     path('', include('cargo_acc.urls')),
-
+    path("api/user_role/", views.api_user_role, name="api_user_role"),
 ]
 
 

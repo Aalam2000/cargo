@@ -3,8 +3,27 @@
 //  home.js (версия 2025.11, исправленная)
 // ===============================
 
-document.addEventListener("DOMContentLoaded", () => {
-    // --- Переключение вкладок ---
+// --- Глобальные переменные ---
+let ROLE = "";
+
+// --- Получение роли пользователя ---
+async function getUserRole() {
+    try {
+        const res = await fetch("/api/user_role/");
+        if (!res.ok) throw new Error("Ошибка получения роли");
+        const data = await res.json();
+        return data.role || "Unknown";
+    } catch (err) {
+        console.error("Ошибка getUserRole:", err);
+        return "Unknown";
+    }
+}
+
+
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1️⃣ Получаем роль перед основной инициализацией
+    ROLE = await getUserRole();
+    console.log("🎭 Текущая роль:", ROLE);
     const tabs = document.querySelectorAll(".tab-btn");
     const contents = document.querySelectorAll(".tab-content");
     tabs.forEach((btn) => {
@@ -30,66 +49,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Кнопка добавления оплаты ---
     const addBtn = document.getElementById("btnAddPayment");
-    if (addBtn) addBtn.addEventListener("click", openPaymentModal);
+    if (addBtn && (ROLE === "Admin" || ROLE === "Operator")) {
+        addBtn.addEventListener("click", openPaymentModal);
+    } else if (addBtn && ROLE === "Client") {
+        addBtn.remove(); // клиенту не показываем кнопку
+    }
+    // --- Кликабельность строк таблицы оплат ---
+    const payTable = document.getElementById("tbody_payments");
 
-    // --- Кликабельность строк таблицы оплат (с логами) ---
-const payTable = document.getElementById("tbody_payments");
-if (payTable) {
-    console.log("🟩 payTable найден, назначаем обработчик кликов...");
+    if (payTable) {
+        if (ROLE === "Admin" || ROLE === "Operator") {
+            console.log(`🟩 payTable найден, клики включены для роли: ${ROLE}`);
 
-    payTable.querySelectorAll("tr").forEach((tr, i) => {
-        tr.style.cursor = "pointer";
-        console.log(`➡️ строка #${i}: data-id=${tr.dataset.id || "(нет id)"}`);
-    });
+            // Устанавливаем курсор "pointer" и назначаем обработчик
+            payTable.querySelectorAll("tr").forEach((tr) => {
+                tr.style.cursor = "pointer";
+            });
 
-    payTable.addEventListener("click", async (e) => {
-        const tr = e.target.closest("tr");
-        if (!tr) {
-            console.log("⚠️ Клик вне строки таблицы");
-            return;
+            payTable.addEventListener("click", async (e) => {
+                const tr = e.target.closest("tr");
+                if (!tr) return;
+                const payId = tr.dataset.id;
+                if (!payId) return;
+
+                try {
+                    console.log(`📡 Загрузка данных платежа ID=${payId}`);
+                    const res = await fetch(`/api/add_payment/?id=${payId}`);
+                    const data = await res.json();
+
+                    if (data.error) return alert(data.error);
+                    if (data.payment_date?.includes("T"))
+                        data.payment_date = data.payment_date.split("T")[0];
+
+                    openPaymentModal("edit", data);
+                } catch (err) {
+                    console.error("💥 Ошибка загрузки платежа:", err);
+                    alert("Не удалось загрузить данные платежа с сервера.");
+                }
+            });
+        } else {
+            // Для клиентов и неизвестных ролей — курсор обычный, без кликов
+            console.log(`🚫 Клики по таблице отключены для роли: ${ROLE}`);
+            payTable.querySelectorAll("tr").forEach((tr) => {
+                tr.style.cursor = "default";
+            });
         }
+    } else {
+        console.warn("⚠️ payTable (tbody_payments) не найден на странице");
+    }
 
-        const payId = tr.dataset.id;
-        console.log(`🖱 Клик по строке с data-id=${payId}`);
-
-        if (!payId) {
-            console.log("⛔ Строка без data-id — выходим");
-            return;
-        }
-
-        try {
-            console.log(`📡 Отправляем запрос: /api/add_payment/?id=${payId}`);
-            const res = await fetch(`/api/add_payment/?id=${payId}`);
-            console.log(`✅ Ответ от сервера: ${res.status}`);
-            const data = await res.json();
-            console.log("📦 Полученные данные платежа:", data);
-
-            if (data.error) {
-                console.log("❌ Ошибка API:", data.error);
-                alert(data.error);
-                return;
-            }
-
-            if (data.payment_date && data.payment_date.includes("T")) {
-                data.payment_date = data.payment_date.split("T")[0];
-            }
-
-            console.log("🚀 Открываем модалку редактирования платежа...");
-            openPaymentModal("edit", data);
-        } catch (err) {
-            console.error("💥 Ошибка при загрузке данных платежа:", err);
-            alert("Не удалось загрузить данные платежа с сервера.");
-        }
-    });
-} else {
-    console.warn("⚠️ payTable (tbody_payments) не найден на странице");
-}
-
-
-    // --- Автопоказ баланса при входе клиента ---
-    const roleMeta = document.querySelector('meta[name="user-role"]');
-    const role = roleMeta ? roleMeta.content : "";
-    if (role === "Client") updateClientBalanceAuto();
 });
 
 // ===============================
@@ -136,7 +144,7 @@ function debounce(fn, delay = 300) {
 }
 
 async function liveFilter(tab) {
-    const params = new URLSearchParams({ tab });
+    const params = new URLSearchParams({tab});
     const productInput = document.getElementById(`productFilter_${tab}`);
     const clientInput = document.getElementById(`clientFilter_${tab}`);
     if (productInput?.value.trim()) params.append("product_code", productInput.value.trim());
@@ -167,9 +175,9 @@ async function updateClientBalance(clientCode = "") {
         const paid = parseFloat(data.total_paid || 0);
         const lastDate = data.last_payment_date || "";
         const lastAmount = parseFloat(data.last_payment_amount || 0);
-        let text = `${paid.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} AZN`;
+        let text = `${paid.toLocaleString("ru-RU", {minimumFractionDigits: 2})} AZN`;
         if (lastDate)
-            text += ` — Последний платеж ${lastDate} на ${lastAmount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} AZN`;
+            text += ` — Последний платеж ${lastDate} на ${lastAmount.toLocaleString("ru-RU", {minimumFractionDigits: 2})} AZN`;
         val.textContent = text;
         box.classList.remove("hidden");
     } catch (err) {
@@ -185,9 +193,9 @@ async function updateClientBalanceAuto() {
         const paid = parseFloat(data.total_paid || 0);
         const lastDate = data.last_payment_date || "";
         const lastAmount = parseFloat(data.last_payment_amount || 0);
-        let text = `${paid.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} AZN`;
+        let text = `${paid.toLocaleString("ru-RU", {minimumFractionDigits: 2})} AZN`;
         if (lastDate)
-            text += ` — Последний платеж ${lastDate} на ${lastAmount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} AZN`;
+            text += ` — Последний платеж ${lastDate} на ${lastAmount.toLocaleString("ru-RU", {minimumFractionDigits: 2})} AZN`;
         document.getElementById("balance-value").textContent = text;
         document.getElementById("client-balance").classList.remove("hidden");
     } catch (err) {
@@ -206,7 +214,7 @@ async function openPaymentModal(mode = "add", data = null) {
 
     const headerText = mode === "edit" ? "Редактировать оплату" : "Добавить оплату";
     const p = data || {};
-        // === Автоматическая подгрузка курса валют при открытии (для добавления) ===
+    // === Автоматическая подгрузка курса валют при открытии (для добавления) ===
     if (mode === "add") {
         // устанавливаем валюту RUB по умолчанию
         p.currency = "RUB";
@@ -317,7 +325,6 @@ async function openPaymentModal(mode = "add", data = null) {
     );
 
     async function loadUnpaidCargos(clientCode, drop, input) {
-        const res = await fetch(`/api/get_unpaid_cargos/?client_code=${encodeURIComponent(clientCode)}`);
         const data = await res.json();
         drop.innerHTML = "";
         (data.results || []).forEach((c) => {
@@ -384,7 +391,7 @@ async function openPaymentModal(mode = "add", data = null) {
 
         const res = await fetch("/api/add_payment/", {
             method: mode === "edit" ? "PUT" : "POST",
-            headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+            headers: {"Content-Type": "application/json", "X-CSRFToken": csrftoken},
             body: JSON.stringify(payload),
         });
 

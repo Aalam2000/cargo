@@ -178,7 +178,8 @@ class Cargo(models.Model):
     delivery_date = models.DateField(null=True, blank=True)
     cargo_status = models.ForeignKey(CargoStatus, on_delete=models.CASCADE)
     packaging_type = models.ForeignKey(PackagingType, on_delete=models.CASCADE)
-    last_status = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='current_cargos')
+    last_status = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='current_cargos')
 
     class Meta:
         verbose_name = "Груз"
@@ -210,7 +211,8 @@ class ExtraCost(models.Model):
     description = models.CharField(max_length=255, blank=True, null=True)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     allocated = models.BooleanField(default=False)
-    is_for_cargo = models.BooleanField(default=False, help_text="True — если расход относится ко всему грузу, False — если к товару")
+    is_for_cargo = models.BooleanField(default=False,
+                                       help_text="True — если расход относится ко всему грузу, False — если к товару")
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -243,7 +245,6 @@ class ExtraCostAllocation(models.Model):
 class Payment(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='payments')
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='payments')
-    cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, null=True, blank=True, related_name='payments')
     payment_date = models.DateField()
     amount_total = models.DecimalField(max_digits=14, decimal_places=2)
     currency = models.CharField(max_length=10, default='RUB')
@@ -261,6 +262,14 @@ class Payment(models.Model):
     )
     comment = models.TextField(blank=True, null=True)
     is_locked = models.BooleanField(default=False)
+    payment_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('accrual', 'Начисление'),
+            ('payment', 'Оплата'),
+        ],
+        default='payment'
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='created_payments'
@@ -276,7 +285,7 @@ class Payment(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.client} — {self.amount_total} {self.currency}"
+        return f"{self.client} — {self.amount_total} {self.currency} ({self.payment_type})"
 
     def save(self, *args, **kwargs):
         if self.currency == "USD":
@@ -288,6 +297,7 @@ class Payment(models.Model):
             except Exception:
                 self.amount_usd = 0
         super().save(*args, **kwargs)
+
 
 
 class PaymentProduct(models.Model):
@@ -364,8 +374,10 @@ class CargoMovement(models.Model):
     to_transport_bill = models.ForeignKey(TransportBill, related_name='to_transport_bill', on_delete=models.CASCADE)
     transfer_place = models.CharField(max_length=255, blank=True, null=True)
     transfer_date = models.DateTimeField()
-    status_before = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='status_before_moves')
-    status_after = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name='status_after_moves')
+    status_before = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name='status_before_moves')
+    status_after = models.ForeignKey(CargoStatus, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='status_after_moves')
     image = models.ForeignKey(Image, on_delete=models.SET_NULL, null=True, blank=True)
     qrscan = models.ForeignKey(QRScan, on_delete=models.SET_NULL, null=True, blank=True)
     operator = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True)

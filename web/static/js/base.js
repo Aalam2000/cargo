@@ -70,3 +70,15 @@ function toggleAccordion(header) {
 document.addEventListener('DOMContentLoaded', () => {
     highlightActiveLink();
 });
+
+async function getUserRole() {
+    try {
+        const res = await fetch("/api/user_role/");
+        if (!res.ok) throw new Error("Ошибка получения роли");
+        const data = await res.json();
+        return data.role || "Unknown";
+    } catch (err) {
+        console.error("Ошибка getUserRole:", err);
+        return "Unknown";
+    }
+}

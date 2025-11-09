@@ -89,7 +89,6 @@ urlpatterns = [
 
     # === Оплаты клиентов ===
     path("api/add_payment/", views_payment.add_or_edit_payment, name="add_payment"),
-    path("get_unpaid_cargos/", views_payment.get_unpaid_cargos, name="get_unpaid_cargos"),
 
     # === Подключение модулей ===
     path('chatgpt_ui/', include('chatgpt_ui.urls')),  # внутренний модуль ChatGPT UI
