@@ -100,5 +100,8 @@ urlpatterns = [
 
     # === Служебные и API-запросы ===
     path("api/log/", core_views.js_log, name="js_log"),  # логирование ошибок JS
-
+    # === Курс валют (Google Finance proxy) ===
+    path("api/get_rate/", views_payment.get_currency_rate, name="get_currency_rate"),
+    # в cargo_acc/urls.py (рядом с client_table/ и другими страницами)
+    path('references/', views.references_page, name='references_page'),
 ]

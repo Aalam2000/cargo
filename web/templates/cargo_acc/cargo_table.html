@@ -30,18 +30,8 @@
             <div id="loader" class="loader text-center" style="display:none; padding:12px;">Загрузка...</div>
         </div>
 
-        <!-- ⚙️ Модалка настроек -->
-        <div id="settings-modal" class="modal">
-            <div class="modal-header">⚙️ Настройки колонок</div>
-            <div class="modal-body">
-                <form id="settings-form"></form>
-            </div>
-            <div class="modal-footer">
-                <button id="settings-save" class="btn-table">Сохранить</button>
-                <button type="button" id="settings-cancel" class="btn-table btn-cancel">Отмена</button>
-            </div>
-        </div>
-        <div id="modal-overlay" class="modal-overlay"></div>
+        {% include 'cargo_acc/settings_modal.html' %}
+
     </div>
 
     <script>

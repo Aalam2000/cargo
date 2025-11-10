@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- Кнопка добавления оплаты ---
     const addBtn = document.getElementById("btnAddPayment");
     if (addBtn && (ROLE === "Admin" || ROLE === "Operator")) {
-        addBtn.addEventListener("click", openPaymentModal);
+        addBtn.addEventListener("click", () => openPaymentModal("add"));
     } else if (addBtn && ROLE === "Client") {
         addBtn.remove(); // клиенту не показываем кнопку
     }
@@ -211,24 +211,42 @@ async function openPaymentModal(mode = "add", data = null) {
     overlay.className = "modal-overlay show";
     const modal = document.createElement("div");
     modal.className = "modal show";
-
     const headerText = mode === "edit" ? "Редактировать оплату" : "Добавить оплату";
     const p = data || {};
-    // === Автоматическая подгрузка курса валют при открытии (для добавления) ===
-    if (mode === "add") {
-        // устанавливаем валюту RUB по умолчанию
-        p.currency = "RUB";
-        // пробуем получить курс RUB к USD
+    // === Функция подтягивания курса по валюте и дате ===
+    async function fetchExchangeRate() {
+        const curEl = document.getElementById("payCurrency");
+        const dateEl = document.getElementById("payDate");
+        const rateEl = document.getElementById("payRate");
+
+        if (!curEl || !dateEl || !rateEl) return;
+
+        const cur = curEl.value;
+        const date = dateEl.value;
+
+        if (!cur || !date) return;
+
+        // для USD курс всегда 1
+        if (cur === "USD") {
+            rateEl.value = 1;
+            recalcUSD();
+            return;
+        }
+
+        console.log(`💱 Подтягиваем курс для ${cur} на ${date}`);
+
         try {
-            const q = await fetch(`/api/get_rate/?currency=${cur}`);
-            const d = await q.json();
-            if (d.rate) document.getElementById("payRate").value = d.rate;
-        } catch (e) {
-            console.error("Ошибка загрузки курса RUB-USD:", e);
-            p.exchange_rate = 1;
+            const resp = await fetch(`/api/get_rate/?currency=${cur}&date=${date}`);
+            const data = await resp.json();
+            if (data.rate) {
+                rateEl.value = data.rate;
+                console.log(`💱 Курс ${cur} → USD = ${data.rate}`);
+                recalcUSD();
+            }
+        } catch (err) {
+            console.error("Ошибка получения курса:", err);
         }
     }
-
 
     modal.innerHTML = `
     <div class="modal-header">${headerText}</div>
@@ -260,7 +278,7 @@ async function openPaymentModal(mode = "add", data = null) {
       </select>
 
       <label>Курс к USD</label>
-      <input id="payRate" type="number" step="0.0001" value="${p.exchange_rate || ""}" ${mode === "edit" ? "" : "disabled"}>
+      <input id="payRate" type="number" step="0.0001" value="${p.exchange_rate || ""}">
 
       <label>Сумма в USD</label>
       <input id="payUSD" type="number" step="0.01" readonly value="${p.amount_usd || ""}">
@@ -277,12 +295,20 @@ async function openPaymentModal(mode = "add", data = null) {
       <textarea id="payComment" ${mode === "edit" ? "" : "disabled"}>${p.comment || ""}</textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn-cancel">Отмена</button>
       <button class="btn-save">Сохранить</button>
+      <button class="btn-cancel">Отмена</button>
     </div>`;
 
     document.body.appendChild(overlay);
     document.body.appendChild(modal);
+    // === Автоматическая подгрузка курса валют при открытии (для добавления) ===
+    if (mode === "add") {
+        p.currency = p.currency || "RUB";
+        await fetchExchangeRate();
+    }
+    // реагируем на изменения валюты и даты
+    document.getElementById("payCurrency").addEventListener("change", fetchExchangeRate);
+    document.getElementById("payDate").addEventListener("change", fetchExchangeRate);
 
     modal.querySelector(".btn-cancel").onclick = () => {
         modal.remove();
@@ -290,9 +316,7 @@ async function openPaymentModal(mode = "add", data = null) {
     };
 
     const clientInput = modal.querySelector("#payClient");
-    const cargoInput = modal.querySelector("#payCargo");
     const clientDropdown = modal.querySelector("#clientDropdown");
-    const cargoDropdown = modal.querySelector("#cargoDropdown");
 
     const otherFields = modal.querySelectorAll("#payCargo,#payDate,#payAmount,#payCurrency,#payRate,#payMethod,#payComment");
 
@@ -340,23 +364,13 @@ async function openPaymentModal(mode = "add", data = null) {
         drop.style.display = data.results?.length ? "block" : "none";
     }
 
-    async function updateRate() {
-        const cur = document.getElementById("payCurrency").value;
-        if (cur === "USD") {
-            document.getElementById("payRate").value = 1;
-            return;
+    // === Подключаем реагирование на изменение валюты и даты ===
+    document.addEventListener("change", (e) => {
+        if (["payCurrency", "payDate"].includes(e.target.id)) {
+            fetchExchangeRate();
         }
-        try {
-            const q = await fetch(`/api/get_rate/?currency=${cur}`);
-            const d = await q.json();
-            if (d.rate) document.getElementById("payRate").value = d.rate;
-        } catch (e) {
-            console.error(e);
-        }
-    }
+    });
 
-    // document.getElementById("payDate").addEventListener("change", updateRate);
-    // document.getElementById("payCurrency").addEventListener("change", updateRate);
 
     function recalcUSD() {
         const amt = parseFloat(document.getElementById("payAmount").value) || 0;

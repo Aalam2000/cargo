@@ -110,24 +110,60 @@ def add_or_edit_payment(request):
         "amount_usd": float(payment.amount_usd),
     })
 
-
-
-
 @require_GET
 @login_required
 def get_currency_rate(request):
     """
-    Возвращает курс валюты к USD, запрашивая Google Finance на сервере (без CORS)
+    Возвращает курс 1 USD = X <валюта> на указанную дату
+    из внутренней таблицы CurrencyRate.
+    Если на указанную дату нет курса — берётся последний предыдущий.
+    Если есть custom_rate — используется он.
     """
-    cur = request.GET.get("currency", "RUB").upper()
-    url = f"https://www.google.com/finance/quote/{cur}-USD"
-    try:
-        resp = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
-        html = resp.text
-        import re
-        m = re.search(r'>([0-9]+(?:\.[0-9]+)?)<', html)
-        rate = float(m.group(1)) if m else 1.0
-    except Exception as e:
-        return JsonResponse({"error": str(e), "rate": 1.0})
-    return JsonResponse({"currency": cur, "rate": rate})
+    from datetime import datetime
+    from django.db.models import Q
+    from cargo_acc.models import CurrencyRate
 
+    cur = request.GET.get("currency", "RUB").upper().strip()
+    date_str = request.GET.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    print("────────────────────────────────────────────", flush=True)
+    print(f"[get_currency_rate] ▶ Локальный запрос: currency={cur}, date={date}", flush=True)
+
+    if cur == "USD":
+        return JsonResponse({
+            "currency": "USD",
+            "base": "USD",
+            "rate": 1.0,
+            "source": "local",
+            "date": date_str,
+        })
+
+    # Ищем последний известный курс на эту дату или до неё
+    rate_obj = (
+        CurrencyRate.objects.filter(currency=cur, date__lte=date)
+        .order_by("-date")
+        .first()
+    )
+
+    if not rate_obj:
+        return JsonResponse({"error": f"Нет данных по валюте {cur}"}, status=404)
+
+    # Приоритет: custom_rate > rate*(1+conversion_percent/100) > rate
+    if rate_obj.custom_rate:
+        rate = rate_obj.custom_rate
+        source = "custom_rate"
+    elif rate_obj.conversion_percent:
+        rate = rate_obj.rate * (1 + rate_obj.conversion_percent / 100)
+        source = f"rate+{rate_obj.conversion_percent}%"
+    else:
+        rate = rate_obj.rate
+        source = "official_rate"
+
+    return JsonResponse({
+        "currency": cur,
+        "base": "USD",
+        "rate": float(rate),
+        "source": source,
+        "date": rate_obj.date.strftime("%Y-%m-%d"),
+    })

@@ -407,3 +407,26 @@ class CargoStatusLog(models.Model):
 
     def __str__(self):
         return f"{self.cargo.cargo_code} → {self.status.name} ({self.changed_at.strftime('%Y-%m-%d %H:%M')})"
+
+# === КУРСЫ ВАЛЮТ ===
+class CurrencyRate(models.Model):
+    date = models.DateField()
+    currency = models.CharField(max_length=10)
+    rate = models.DecimalField(max_digits=14, decimal_places=6, help_text="Курс валюты к USD")
+    custom_rate = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True,
+                                      help_text="Переопределённый (наш) курс")
+    conversion_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0,
+                                             help_text="Коррекция в % относительно официального курса")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Курс валют"
+        verbose_name_plural = "Курсы валют"
+        unique_together = ("date", "currency")
+        indexes = [
+            models.Index(fields=["currency"]),
+            models.Index(fields=["date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.date} — {self.currency} = {self.rate}"

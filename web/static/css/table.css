@@ -67,51 +67,40 @@
     border-top: 1px solid #e6e9f0;
 }
 
-/* --- Кнопки и элементы управления --- */
-.btn-table {
-    background: #004aad;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease;
-}
-
-.btn-table:hover {
-    background: #003b8d;
-}
-
-/* --- Заголовочный блок таблицы --- */
-.table-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f6f8fb;
-    border-bottom: 1px solid #e4e6eb;
-    padding: 12px 18px;
-}
-
-.table-header-container h3 {
-    margin: 0;
-    color: #004aad;
-    font-weight: 600;
-}
-
-/* --- Иконка настроек --- */
-.settings-button {
-    background: none;
+/* ====== Единый стиль для кнопок управления (плюс и шестерёнка) ====== */
+.btn-table, .settings-button {
+    background: none;            /* как у settings-button */
     border: none;
     cursor: pointer;
     color: #004aad;
     font-size: 22px;
-    transition: transform 0.2s ease;
+    padding: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+    border-radius: 8px;
+    line-height: 1;
 }
 
-.settings-button:hover {
+/* hover — поведение шестерёнки (и теперь плюса) */
+.btn-table:hover, .settings-button:hover {
     color: #003b8d;
     transform: rotate(15deg);
+    background: rgba(0, 74, 173, 0.04); /* лёгкий фон при наведении */
+}
+
+/* ====== Header layout: заголовок слева, кнопки — справа рядом ====== */
+.table-header-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Заголовок занимает всё свободное место и "отталкивает" кнопки вправо */
+.table-header-container h3 {
+    margin: 0;
+    margin-right: auto; /* <-- ключевой момент для выравнивания кнопок справа */
 }
 
 /* --- Delete-иконка --- */
@@ -363,3 +352,24 @@
   font-weight: 700;
   color: #006b43;
 }
+
+/* === compact, single-line modal rows (replace previous modal rules) === */
+#settings-modal .settings-list { padding:6px; max-height:70vh; overflow:auto; }
+#settings-modal .setting-row, #settings-modal .settings-item {
+  display:block;
+  padding:4px 6px;
+  margin-bottom:6px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.04);
+  font-size:13px;
+  line-height:20px;
+}
+#settings-modal .setting-row > .drag-handle,
+#settings-modal .setting-row > input[type="checkbox"],
+#settings-modal .setting-row > label {
+  display:inline-block;
+  vertical-align:middle;
+}
+#settings-modal .setting-row > .drag-handle { width:20px; text-align:center; margin-right:8px; }
+#settings-modal .setting-row > input[type="checkbox"] { width:16px; height:16px; margin:0 8px 0 0; }
+#settings-modal .setting-row > label { max-width:calc(100% - 56px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0; }

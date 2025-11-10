@@ -562,3 +562,8 @@ def sse_clients_stream(request):
             time.sleep(30)
 
     return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+
+
+@login_required
+def references_page(request):
+    return render(request, 'cargo_acc/references.html')

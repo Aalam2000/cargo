@@ -34,7 +34,7 @@
             <nav class="menu">
                 {% if user.role == "Admin" %}
                     <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
-                    <a href="#" class="menu-item">📚 Справочники (в процессе)</a>
+                    <a href="{% url 'references_page' %}" class="menu-item">📚 Справочники</a>
                     <a href="{% url 'cargo_table' %}" class="menu-item">📦 Товары</a>
                     <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>
                     <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>
@@ -46,7 +46,7 @@
 
                 {% elif user.role == "Operator" %}
                     <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
-                    <a href="#" class="menu-item">📚 Справочники (в процессе)</a>
+                    <a href="{% url 'references_page' %}" class="menu-item">📚 Справочники</a>
                     <a href="{% url 'cargo_table' %}" class="menu-item">📦 Товары</a>
                     <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>
                     <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>

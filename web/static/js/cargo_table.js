@@ -68,6 +68,7 @@ async function fetchUserConfig() {
 }
 
 async function fetchCargoData(reset = false) {
+    return
     if (loading) return;
     if (reset) {
         offset = 0;
