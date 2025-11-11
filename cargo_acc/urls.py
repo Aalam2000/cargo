@@ -104,4 +104,6 @@ urlpatterns = [
     path("api/get_rate/", views_payment.get_currency_rate, name="get_currency_rate"),
     # в cargo_acc/urls.py (рядом с client_table/ и другими страницами)
     path('references/', views.references_page, name='references_page'),
+    # в cargo_acc/urls.py: добавить в urlpatterns
+    path('products/', views.products_page, name='products_page'),
 ]

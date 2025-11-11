@@ -147,7 +147,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'product_code', 'record_date', 'cargo_description', 'comment',
             'departure_place', 'destination_place', 'weight', 'volume', 'cost',
-            'insurance', 'dimensions', 'shipping_date', 'delivery_date',
+            'insurance', 'shipping_date', 'delivery_date',
             'images',  # ManyToMany (read_only)
             # Для клиентов
             'client_id', 'client_code',

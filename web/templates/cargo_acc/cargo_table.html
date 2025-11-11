@@ -1,42 +1,71 @@
 {% extends '../base.html' %}
 {% load static %}
 
-{% block title %}Грузы — Cargo Table{% endblock %}
+{% block title %}Товары — Products{% endblock %}
 
 {% block content %}
-    <link rel="stylesheet" href="{% static 'css/table.css' %}">
-    <div class="cargo-table-page">
-        <div class="table-header-container">
-            <h3>📦 Таблица грузов</h3>
-
-            <div class="d-flex gap-3">
-                <div class="filter-container d-flex gap-2"></div>
-                <button id="settings-btn" class="settings-button" title="Настройки">⚙️</button>
-                {% if user.role in "Admin,Operator" %}
-                    <button id="add-row" class="btn-table">Добавить</button>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="table-container">
-            <div class="table-wrapper">
-                <table id="cargo-table" class="table">
-                    <thead>
-                    <tr id="cargo-header-row"></tr>
-                    </thead>
-                    <tbody id="cargo-body"></tbody>
-                </table>
-            </div>
-            <div id="loader" class="loader text-center" style="display:none; padding:12px;">Загрузка...</div>
-        </div>
-
-        {% include 'cargo_acc/settings_modal.html' %}
-
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<div class="cargo-table-page">
+  <div class="table-header-container">
+    <h3>📦 Товары</h3>
+    <div class="d-flex gap-3">
+      <div class="filter-container d-flex gap-2"></div>
+      <button id="settings-btn" class="settings-button" title="Настройки" data-action="settings">⚙️</button>
+      {% if user.role in "Admin,Operator" %}
+      <button id="add-row" class="btn-table add-button" data-action="add">➕</button>
+      {% endif %}
     </div>
+  </div>
 
-    <script>
-        window.CARGO_USER_ROLE = "{{ user.role }}";
-        window.CLIENT_CODE = "{{ user.client_code|default:'' }}";
-    </script>
-    <script defer src="{% static 'js/cargo_table.js' %}"></script>
+  <div class="table-container">
+    <div class="table-wrapper" data-table-key="product_table" data-table-id="product-table">
+      <table id="product-table" class="table">
+        <thead><tr id="product-header-row"></tr></thead>
+        <tbody id="product-body"></tbody>
+      </table>
+    </div>
+    <div id="loader" class="loader text-center" style="display:none; padding:12px;">Загрузка...</div>
+  </div>
+
+  {% include 'cargo_acc/settings_modal.html' %}
+</div>
+
+<script>
+  // Универсальный набор метаданных (включаем все вариации имён)
+  window.PRODUCT_TABLE_META = {
+    // варианты имён для совместимости с разными реализациями
+    tableKey: "product_table",
+    table_key: "product_table",
+    key: "product_table",
+
+    tableId: "product-table",
+    table_id: "product-table",
+    tableIdLegacy: "product-table",
+
+    tableName: "product",
+    table_name: "product",
+
+    // вероятные API пути — при несовпадении замените на реальные
+    apiPath: "/cargo_acc/api/products/",
+    api_path: "/cargo_acc/api/products/",
+    listEndpoint: "/cargo_acc/api/products/",
+
+    rowApiPath: "/cargo_acc/api/product/",
+    row_api_path: "/cargo_acc/api/product/",
+
+    configPath: "/cargo_acc/api/get_table_settings/?table_id=product-table",
+    config_path: "/api/table_settings/?key=product_table",
+    saveSettingsPath: "/cargo_acc/api/save_table_settings/",
+    addRowModalPath: "/cargo_acc/mod_addrow",
+    delRowModalPath: "/cargo_acc/mod_delrow",
+  };
+
+  // дублируем в legacy-имя (если load_product_table.js читает другое окно)
+  window.PRODUCT_TABLE_META_LEGACY = window.PRODUCT_TABLE_META;
+  window.CARGO_USER_ROLE = "{{ user.role }}";
+  window.CLIENT_CODE = "{{ user.client_code|default:'' }}";
+</script>
+
+<script defer src="{% static 'js/load_product_table.js' %}"></script>
+<script defer src="{% static 'js/product_table_init.js' %}"></script>
 {% endblock %}

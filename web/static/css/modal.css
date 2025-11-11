@@ -1,183 +1,276 @@
 /* ===========================
-   Cargo #1 — Универсальные модалки ввода
-   Версия: 2025.10
+   modal.css — объединённая версия
+   Сохранены рабочие правила, добавлены недостающие
    =========================== */
 
+/* --- (1) общие правила модалки — оставляем совместимыми с проектом --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45); /* затемнение фона */
+  z-index: 1050;
+  display: none;                /* включается классом .show */
+  align-items: center;
+  justify-content: center;
+  /* блокируем клики по странице под модалкой (фон не реагирует на мышку) */
+  pointer-events: auto;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+/* модальное окно (контейнер) */
 .modal {
-    display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-    z-index: 1050;
-    width: 440px;
-    max-width: 95%;
-    font-family: 'Montserrat', sans-serif;
-    animation: fadeIn 0.2s ease-in-out;
+  position: relative;
+  max-width: 940px;
+  width: 94%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(3,20,40,0.35);
+  z-index: 1060;
+  display: none; /* включается классом .show */
+  animation: fadeIn .18s ease-out;
+  overflow: hidden;
 }
 
+/* показываем модалку (после добавления .show) */
 .modal.show {
-    display: block;
+  display: block;
 }
 
-.modal-header {
-    background: #004aad;
-    color: #fff;
-    font-weight: 600;
-    padding: 14px 20px;
-    border-radius: 14px 14px 0 0;
-    font-size: 1.1rem;
-    letter-spacing: 0.02em;
+/* --- (2) заголовок/футер модалки (не менять визуально) --- */
+.modal-header, .modal-footer {
+  padding: 14px 18px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
-
-.modal-body {
-    padding: 20px 26px;
-    display: grid;
-    grid-template-columns: 180px 1fr;
-    align-items: center;
-    column-gap: 14px;
-    row-gap: 10px;
-}
-
-.modal-body label {
-    font-weight: 600;
-    color: #333;
-    text-align: right;
-    margin: 0;
-    white-space: nowrap;
-}
-
-.modal-body input,
-.modal-body textarea,
-.modal-body select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-family: inherit;
-    transition: 0.2s ease;
-}
-
-.modal-body input:focus,
-.modal-body textarea:focus,
-.modal-body select:focus {
-    outline: none;
-    border-color: #004aad;
-    box-shadow: 0 0 5px rgba(0, 74, 173, 0.3);
-}
-
 .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding: 14px 20px;
-    border-top: 1px solid #eee;
-    background: #f9fafb;
-    border-radius: 0 0 14px 14px;
-    gap: 10px;
+  border-top: 1px solid rgba(0,0,0,0.04);
+  border-bottom: none;
+  justify-content: flex-end;
 }
 
-.modal-footer button {
-    padding: 10px 16px;
-    border: none;
+/* --- (3) тело модалки: обязателен скролл только для полей внутри --- */
+.modal-body {
+  max-height: calc(80vh - 120px); /* учитываем header/footer */
+  overflow-y: auto;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+/* гарантируем красивый внутренний отступ при прокрутке */
+.modal-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 8px;
+}
+
+/* --- (4) форма внутри модалки: лейбл слева, поле справа --- */
+.modal-form {
+  display: grid;
+  grid-template-columns: 240px 1fr; /* слева фиксированная ширина для label */
+  gap: 12px 18px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* один ряд формы — для каждого поля */
+.modal-form .modal-row {
+  display: contents; /* позволяем grid управлять лейблом и полем */
+}
+
+/* label (название поля) — справа выравниваем текст, чтобы выглядело аккуратно */
+.modal-form .form-label {
+  align-self: center;
+  justify-self: end;
+  padding: 10px 6px 0 0;
+  font-size: 0.95rem;
+  color: #222;
+  text-align: right;
+}
+
+/* поле ввода/селект — занимает вторую колонку */
+.modal-form .form-field {
+  width: 100%;
+  align-self: center;
+  justify-self: stretch;
+  box-sizing: border-box;
+}
+
+/* делаем, чтобы инпуты/селекты занимали всю доступную ширину */
+.modal-form input[type="text"],
+.modal-form input[type="number"],
+.modal-form select,
+.modal-form textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #d6d9df;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+/* textarea: авто-рост до определённой высоты с прокруткой */
+.modal-form textarea {
+  min-height: 100px;
+  max-height: 320px;
+  resize: vertical;
+  overflow: auto;
+}
+
+/* пометка обязательного поля */
+.modal-form .required::after {
+  content: " *";
+  color: #c0392b;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* --- (5) мобильная адаптация: лейбл сверху, поле ниже --- */
+@media (max-width: 640px) {
+  .modal {
+    width: 98%;
     border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    font-family: inherit;
-    transition: background 0.2s ease;
-}
-
-.modal-footer .btn-save {
-    background: #004aad;
-    color: #fff;
-}
-
-.modal-footer .btn-save:hover {
-    background: #003b8d;
-}
-
-.modal-footer .btn-cancel {
-    background: #cfd7ea;
-    color: #333;
-}
-
-.modal-footer .btn-cancel:hover {
-    background: #b6c3e1;
-}
-
-/* Overlay */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.45);
-    display: none;
-    z-index: 1049;
-}
-
-.modal-overlay.show {
-    display: block;
-}
-
-/* Анимация */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -48%);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%);
-    }
-}
-
-/* === Модалка настроек таблицы === */
-.modal.show {
-    display: block !important;
-    animation: fadeIn 0.2s ease-in-out;
-}
-
-/* === Overlay для модалки === */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    display: none;
-    z-index: 1049;
-}
-
-.modal-overlay.show {
-    display: block;
-}
-
-
-/* === Корректировка позиции модалки === */
-#settings-modal {
-    z-index: 1050;
-}
-
-
-/* Мобильная адаптация — метки сверху, поля снизу */
-@media (max-width: 600px) {
-  .modal-body {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
   }
-
-  .modal-body label {
+  .modal-form {
+    grid-template-columns: 1fr;
+    gap: 8px 0;
+  }
+  .modal-form .form-label {
+    justify-self: stretch;
     text-align: left;
-    width: 100%;
+    padding: 0 0 6px 0;
   }
 }
 
-.table tbody tr[data-id] { cursor: pointer; }
-.table tbody tr[data-id]:hover { background-color: #eaf1ff; }
+/* --- (6) кнопки в модалке — не трогаем глобальные классы, добавим минимальную совместимость --- */
+.modal .btn-primary {
+  background: #004aad;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.modal .btn-secondary {
+  background: #f1f5f9;
+  color: #222;
+  border: 1px solid #d6d9df;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* --- (7) автодополнение / выпадашка для связанных таблиц --- */
+/* контейнер для выпадающей подсказки (позиционируется через JS относительно поля) */
+.autocomplete-list {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #d6d9df;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  z-index: 1100;
+  overflow: hidden;
+  width: 100%;
+  max-height: calc(7 * 44px); /* показываем не более 7 строк видимых */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* элемент в списке автодополнения */
+.autocomplete-item {
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .12s ease;
+}
+
+/* подсветка при наведении и активном состоянии */
+.autocomplete-item:hover,
+.autocomplete-item.active {
+  background: #eaf1ff;
+}
+
+/* если элемент скрыт (фильтрация) — добавляем класс .hidden через JS */
+.autocomplete-item.hidden {
+  display: none;
+}
+
+/* маленькая подсказка внизу если списка нет */
+.autocomplete-empty {
+  padding: 10px 12px;
+  color: #777;
+  font-size: 0.9rem;
+}
+
+/* --- (8) таблица: при наведении строка — курсор "палец" и ховер эффект (сохраняем визуал) --- */
+/* оставляем существующие hover-правила, добавляем cursor:pointer */
+.table tbody tr {
+  cursor: pointer; /* ключевое требование: курсор в палец */
+}
+
+/* сохраним уже существующий ховер (если есть) — не переопределяем цвет, только плавность */
+.table tbody tr:hover {
+  transition: background 0.18s ease;
+}
+
+/* --- (9) маленькие UX-правки для select-search полей (чтобы было видно ввод и выпадашку) --- */
+.select-search-wrapper {
+  position: relative; /* чтобы .autocomplete-list позиционировалась по полю */
+}
+
+.select-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 36px; /* место под иконку стрелки/креста (если нужно) */
+}
+
+/* иконка очистки внутри поля (если используется) */
+.input-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+/* --- (10) доступность: фокус на поле — явное outline --- */
+.modal-form input:focus,
+.modal-form select:focus,
+.modal-form textarea:focus {
+  outline: 3px solid rgba(0,74,173,0.12);
+  border-color: #004aad;
+}
+
+/* --- (11) вспомогательные ограничения: чтобы модалка не растягивалась сильнее --- */
+.modal {
+  max-height: 92vh;
+}
+
+/* --- (12) небольшая рекомендация (необязательная): фиксируем z-index для overlay/модалки,
+       если в приложении есть другие плавающие элементы */
+.modal-overlay { z-index: 1050; }
+.modal { z-index: 1060; }
+
+/* === Конец файла ===
+   Пояснения:
+   - Поведение "не более 7 строк в выпадающем" реализуется в JS (обрезать/скрыть лишние элементы),
+     но CSS задаёт max-height и прокрутку для удобства.
+   - Для селектов, связанных с внешними таблицами, ожидается, что JS создаёт .autocomplete-list
+     внутри .select-search-wrapper и добавляет .autocomplete-item (и класс .active при навигации).
+   - overlay.pointer-events = auto блокирует клики по основной странице (фон НЕ реагирует),
+     тем самым пользователь не сможет кликнуть по элементам под модалкой.
+*/

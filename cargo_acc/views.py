@@ -27,7 +27,11 @@ from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, I
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, ProductSerializer, CargoSerializer, \
     CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
+import traceback
+import sys
+import logging
 
+logger = logging.getLogger(__name__)
 
 # === HTML страницы ===
 def settings_modal(request):
@@ -473,16 +477,46 @@ class ProductViewSet(ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
     def list(self, request, *args, **kwargs):
-        # Возвращаем QuerySet без использования values()
-        queryset = self.queryset.all()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        # Отладочные принты — смотрите логи контейнера/консоли
+        try:
+            print("+++ ProductViewSet.list START user:", getattr(request, "user", None), file=sys.stderr)
+            # Попытка собрать queryset
+            queryset = self.queryset.all()
+            try:
+                # печатаем SQL (коротко) и количество записей, если это возможно
+                print("+++ ProductViewSet queryset SQL:", str(queryset.query), file=sys.stderr)
+            except Exception as e_q:
+                print("+++ ProductViewSet: cannot read queryset.query:", e_q, file=sys.stderr)
+            try:
+                cnt = queryset.count()
+                print("+++ ProductViewSet queryset.count():", cnt, file=sys.stderr)
+            except Exception as e_cnt:
+                print("+++ ProductViewSet: queryset.count() error:", e_cnt, file=sys.stderr)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                print("+++ ProductViewSet: using pagination, page length:", len(page), file=sys.stderr)
+                serializer = self.get_serializer(page, many=True)
+                print("+++ ProductViewSet: serializer created for page", file=sys.stderr)
+                return self.get_paginated_response(serializer.data)
 
+            print("+++ ProductViewSet: serializing full queryset", file=sys.stderr)
+            serializer = self.get_serializer(queryset, many=True)
+            # Внимание: serializer.data вызывает сериализацию — это нормально для отладки
+            try:
+                items_len = len(serializer.data)
+            except Exception as e_ser:
+                items_len = f"error getting len: {e_ser}"
+            print("+++ ProductViewSet: serialization finished, items:", items_len, file=sys.stderr)
+            return Response(serializer.data)
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            print("=== ProductViewSet.list EXCEPTION ===", file=sys.stderr)
+            print(tb, file=sys.stderr)
+            for _n in ('debug','pol'): __import__('logging').getLogger(_n).exception("ProductViewSet.list error", exc_info=True)
+            # Возвращаем трассировку в ответ для быстрой отладки (dev only)
+            return Response({"error": str(e), "traceback": tb}, status=500)
 
 # ViewSet для Грузов
 class CargoViewSet(viewsets.ModelViewSet):
@@ -567,3 +601,7 @@ def sse_clients_stream(request):
 @login_required
 def references_page(request):
     return render(request, 'cargo_acc/references.html')
+
+@login_required
+def products_page(request):
+    return render(request, "cargo_acc/product_table.html")
