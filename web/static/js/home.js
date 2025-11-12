@@ -203,242 +203,139 @@ async function updateClientBalanceAuto() {
     }
 }
 
-// ===============================
-//  Модальное окно добавления / редактирования оплаты
-// ===============================
 async function openPaymentModal(mode = "add", data = null) {
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay show";
-    const modal = document.createElement("div");
-    modal.className = "modal show";
-    const headerText = mode === "edit" ? "Редактировать оплату" : "Добавить оплату";
-    const p = data || {};
-    // === Функция подтягивания курса по валюте и дате ===
-    async function fetchExchangeRate() {
-        const curEl = document.getElementById("payCurrency");
-        const dateEl = document.getElementById("payDate");
-        const rateEl = document.getElementById("payRate");
+  const headerText = mode === "edit" ? "Редактировать оплату" : "Добавить оплату";
+  const p = data || {};
 
-        if (!curEl || !dateEl || !rateEl) return;
-
-        const cur = curEl.value;
-        const date = dateEl.value;
-
-        if (!cur || !date) return;
-
-        // для USD курс всегда 1
-        if (cur === "USD") {
-            rateEl.value = 1;
-            recalcUSD();
-            return;
-        }
-
-        console.log(`💱 Подтягиваем курс для ${cur} на ${date}`);
-
-        try {
-            const resp = await fetch(`/api/get_rate/?currency=${cur}&date=${date}`);
-            const data = await resp.json();
-            if (data.rate) {
-                rateEl.value = data.rate;
-                console.log(`💱 Курс ${cur} → USD = ${data.rate}`);
-                recalcUSD();
-            }
-        } catch (err) {
-            console.error("Ошибка получения курса:", err);
-        }
-    }
-
-    modal.innerHTML = `
+  // --- HTML с обёртками .modal-row ---
+  const html = `
+  <div class="modal">
     <div class="modal-header">${headerText}</div>
     <div class="modal-body">
-      <label>Код клиента</label>
-      <div style="position:relative">
-        <input id="payClient" type="text" placeholder="Начните вводить..." value="${p.client_code || ""}" ${mode === "edit" ? "disabled" : ""}/>
-        <div id="clientDropdown" class="dropdown-menu" style="display:none;position:absolute;top:42px;left:0;width:100%;z-index:1051"></div>
+      <div class="modal-row">
+        <label>Код клиента</label>
+        <input id="payClient" type="text" placeholder="Начните вводить..." 
+          value="${p.client_code || ""}" ${mode === "edit" ? "disabled" : ""}/>
       </div>
 
-      <label>Груз</label>
-      <div style="position:relative">
-        <input id="payCargo" type="text" placeholder="Выберите груз" value="${p.cargo_code || ""}" ${mode === "edit" ? "" : "disabled"}/>
-        <div id="cargoDropdown" class="dropdown-menu" style="display:none;position:absolute;top:42px;left:0;width:100%;z-index:1051"></div>
+      <div class="modal-row">
+        <label>Груз</label>
+        <input id="payCargo" type="text" placeholder="Выберите груз" 
+          value="${p.cargo_code || ""}" ${mode === "edit" ? "" : "disabled"}/>
       </div>
 
-      <label>Дата платежа</label>
-      <input id="payDate" type="date" value="${p.payment_date || new Date().toISOString().split("T")[0]}" ${mode === "edit" ? "" : "disabled"}>
+      <div class="modal-row">
+        <label>Дата платежа</label>
+        <input id="payDate" type="date" 
+          value="${p.payment_date || new Date().toISOString().split("T")[0]}" 
+          ${mode === "edit" ? "" : "disabled"}>
+      </div>
 
-      <label>Сумма платежа</label>
-      <input id="payAmount" type="number" step="0.01" value="${p.amount_total || ""}" ${mode === "edit" ? "" : "disabled"}>
+      <div class="modal-row">
+        <label>Сумма платежа</label>
+        <input id="payAmount" type="number" step="0.01" 
+          value="${p.amount_total || ""}" ${mode === "edit" ? "" : "disabled"}>
+      </div>
 
-      <label>Валюта</label>
-      <select id="payCurrency" ${mode === "edit" ? "" : "disabled"}>
-        <option ${p.currency === "RUB" ? "selected" : ""}>RUB</option>
-        <option ${p.currency === "USD" ? "selected" : ""}>USD</option>
-        <option ${p.currency === "EUR" ? "selected" : ""}>EUR</option>
-        <option ${p.currency === "AZN" ? "selected" : ""}>AZN</option>
-      </select>
+      <div class="modal-row">
+        <label>Валюта</label>
+        <select id="payCurrency" ${mode === "edit" ? "" : "disabled"}>
+          <option ${p.currency === "RUB" ? "selected" : ""}>RUB</option>
+          <option ${p.currency === "USD" ? "selected" : ""}>USD</option>
+          <option ${p.currency === "EUR" ? "selected" : ""}>EUR</option>
+          <option ${p.currency === "AZN" ? "selected" : ""}>AZN</option>
+        </select>
+      </div>
 
-      <label>Курс к USD</label>
-      <input id="payRate" type="number" step="0.0001" value="${p.exchange_rate || ""}">
+      <div class="modal-row">
+        <label>Курс к USD</label>
+        <input id="payRate" type="number" step="0.0001" 
+          value="${p.exchange_rate || ""}">
+      </div>
 
-      <label>Сумма в USD</label>
-      <input id="payUSD" type="number" step="0.01" readonly value="${p.amount_usd || ""}">
+      <div class="modal-row">
+        <label>Сумма в USD</label>
+        <input id="payUSD" type="number" step="0.01" readonly 
+          value="${p.amount_usd || ""}">
+      </div>
 
-      <label>Метод оплаты</label>
-      <select id="payMethod" ${mode === "edit" ? "" : "disabled"}>
-        <option value="cash" ${p.method === "cash" ? "selected" : ""}>Наличные</option>
-        <option value="bank" ${p.method === "bank" ? "selected" : ""}>Безнал</option>
-        <option value="pos" ${p.method === "pos" ? "selected" : ""}>POS-терминал</option>
-        <option value="offset" ${p.method === "offset" ? "selected" : ""}>Взаимозачёт</option>
-      </select>
+      <div class="modal-row">
+        <label>Метод оплаты</label>
+        <select id="payMethod" ${mode === "edit" ? "" : "disabled"}>
+          <option value="cash" ${p.method === "cash" ? "selected" : ""}>Наличные</option>
+          <option value="bank" ${p.method === "bank" ? "selected" : ""}>Безнал</option>
+          <option value="pos" ${p.method === "pos" ? "selected" : ""}>POS-терминал</option>
+          <option value="offset" ${p.method === "offset" ? "selected" : ""}>Взаимозачёт</option>
+        </select>
+      </div>
 
-      <label>Комментарий</label>
-      <textarea id="payComment" ${mode === "edit" ? "" : "disabled"}>${p.comment || ""}</textarea>
+      <div class="modal-row">
+        <label>Комментарий</label>
+        <textarea id="payComment" ${mode === "edit" ? "" : "disabled"}>${p.comment || ""}</textarea>
+      </div>
     </div>
+
     <div class="modal-footer">
       <button class="btn-save">Сохранить</button>
       <button class="btn-cancel">Отмена</button>
-    </div>`;
+    </div>
+  </div>`;
 
-    document.body.appendChild(overlay);
-    document.body.appendChild(modal);
-    // === Автоматическая подгрузка курса валют при открытии (для добавления) ===
-    if (mode === "add") {
-        p.currency = p.currency || "RUB";
-        await fetchExchangeRate();
-    }
-    // реагируем на изменения валюты и даты
-    document.getElementById("payCurrency").addEventListener("change", fetchExchangeRate);
-    document.getElementById("payDate").addEventListener("change", fetchExchangeRate);
+  const inst = openModal({ html, modalName: 'payment', closable: true });
+  const modal = inst.modal;
 
-    modal.querySelector(".btn-cancel").onclick = () => {
-        modal.remove();
-        overlay.remove();
+  // === Логика ===
+  const recalcUSD = () => {
+    const amt = parseFloat(document.getElementById("payAmount").value) || 0;
+    const rate = parseFloat(document.getElementById("payRate").value) || 1;
+    document.getElementById("payUSD").value = (amt / rate).toFixed(2);
+  };
+
+  async function fetchExchangeRate() {
+    const cur = document.getElementById("payCurrency").value;
+    const date = document.getElementById("payDate").value;
+    const rateEl = document.getElementById("payRate");
+    if (!cur || !date) return;
+    if (cur === "USD") { rateEl.value = 1; recalcUSD(); return; }
+    try {
+      const resp = await fetch(`/api/get_rate/?currency=${cur}&date=${date}`);
+      const data = await resp.json();
+      if (data.rate) { rateEl.value = data.rate; recalcUSD(); }
+    } catch (err) { console.error("Ошибка курса:", err); }
+  }
+
+  modal.querySelector(".btn-cancel").onclick = () => inst.close();
+  modal.querySelector(".btn-save").onclick = async () => {
+    const payload = {
+      id: p.id || null,
+      client_code: document.getElementById("payClient").value.trim(),
+      cargo_code: document.getElementById("payCargo").value.trim(),
+      payment_date: document.getElementById("payDate").value,
+      amount_total: parseFloat(document.getElementById("payAmount").value) || 0,
+      currency: document.getElementById("payCurrency").value,
+      exchange_rate: parseFloat(document.getElementById("payRate").value) || 1,
+      method: document.getElementById("payMethod").value,
+      comment: document.getElementById("payComment").value.trim(),
     };
 
-    const clientInput = modal.querySelector("#payClient");
-    const clientDropdown = modal.querySelector("#clientDropdown");
-
-    const otherFields = modal.querySelectorAll("#payCargo,#payDate,#payAmount,#payCurrency,#payRate,#payMethod,#payComment");
-
-    clientInput.addEventListener(
-        "input",
-        debounce(async () => {
-            const s = clientInput.value.trim();
-            if (!s) {
-                clientDropdown.style.display = "none";
-                return;
-            }
-            const r = await fetch(`/api/get_clients/?search=${encodeURIComponent(s)}`);
-            const d = await r.json();
-            clientDropdown.innerHTML = "";
-            (d.results || []).slice(0, 7).forEach((c) => {
-                const div = document.createElement("div");
-                div.className = "dropdown-item";
-                div.textContent = c.client_code;
-                div.onclick = () => {
-                    clientInput.value = c.client_code;
-                    clientDropdown.style.display = "none";
-                    otherFields.forEach((f) => (f.disabled = false));
-                    // loadUnpaidCargos(c.client_code, cargoDropdown, cargoInput);
-                    // updateRate();
-                };
-                clientDropdown.appendChild(div);
-            });
-            clientDropdown.style.display = d.results?.length ? "block" : "none";
-        }, 300)
-    );
-
-    async function loadUnpaidCargos(clientCode, drop, input) {
-        const data = await res.json();
-        drop.innerHTML = "";
-        (data.results || []).forEach((c) => {
-            const div = document.createElement("div");
-            div.className = "dropdown-item";
-            div.textContent = `${c.product_code} — ${c.cost} USD`;
-            div.onclick = () => {
-                input.value = c.product_code;
-                drop.style.display = "none";
-            };
-            drop.appendChild(div);
-        });
-        drop.style.display = data.results?.length ? "block" : "none";
-    }
-
-    // === Подключаем реагирование на изменение валюты и даты ===
-    document.addEventListener("change", (e) => {
-        if (["payCurrency", "payDate"].includes(e.target.id)) {
-            fetchExchangeRate();
-        }
+    const csrftoken = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("csrftoken="))?.split("=")[1];
+    const res = await fetch("/api/add_payment/", {
+      method: mode === "edit" ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+      body: JSON.stringify(payload),
     });
 
+    const text = await res.text();
+    if (!res.ok) return alert("Ошибка: " + res.status + "\n" + text);
+    const j = JSON.parse(text);
+    if (j.ok) { inst.close(); applyTableFilter("payments"); }
+    else alert("Ошибка: " + (j.error || JSON.stringify(j)));
+  };
 
-    function recalcUSD() {
-        const amt = parseFloat(document.getElementById("payAmount").value) || 0;
-        const rate = parseFloat(document.getElementById("payRate").value) || 1;
-        document.getElementById("payUSD").value = (amt / rate).toFixed(2);
-    }
+  document.getElementById("payCurrency").addEventListener("change", fetchExchangeRate);
+  document.getElementById("payDate").addEventListener("change", fetchExchangeRate);
+  document.getElementById("payAmount").addEventListener("input", recalcUSD);
+  document.getElementById("payRate").addEventListener("input", recalcUSD);
 
-    document.getElementById("payAmount").addEventListener("input", recalcUSD);
-    document.getElementById("payRate").addEventListener("input", recalcUSD);
-    // === Автозагрузка курса сразу после создания модалки ===
-    if (mode === "add") {
-        // updateRate();
-    }
-    modal.querySelector(".btn-save").onclick = async () => {
-        const payload = {
-            id: p.id || null,
-            client_code: clientInput.value.trim(),
-            cargo_code: document.getElementById("payCargo").value.trim(),
-            payment_date: document.getElementById("payDate").value,
-            amount_total: parseFloat(document.getElementById("payAmount").value) || 0,
-            currency: document.getElementById("payCurrency").value,
-            exchange_rate: parseFloat(document.getElementById("payRate").value) || 1,
-            method: document.getElementById("payMethod").value,
-            comment: document.getElementById("payComment").value.trim(),
-        };
-
-        const csrftoken = document.cookie
-            .split(";")
-            .map((x) => x.trim())
-            .find((x) => x.startsWith("csrftoken="))
-            ?.split("=")[1];
-
-        const res = await fetch("/api/add_payment/", {
-            method: mode === "edit" ? "PUT" : "POST",
-            headers: {"Content-Type": "application/json", "X-CSRFToken": csrftoken},
-            body: JSON.stringify(payload),
-        });
-
-        let text;
-        try {
-            text = await res.text(); // читаем ответ как текст
-        } catch (e) {
-            console.error("Ошибка чтения ответа:", e);
-        }
-
-        if (!res.ok) {
-            console.error("❌ Ошибка сервера при /api/add_payment:", res.status, text);
-            alert("Ошибка сервера: " + res.status + "\n" + (text || "Нет текста ответа"));
-            return;
-        }
-
-        let j;
-        try {
-            j = JSON.parse(text);
-        } catch (e) {
-            console.error("Ошибка парсинга JSON:", e, "\nОтвет:", text);
-            alert("Ошибка формата ответа сервера. См. консоль.");
-            return;
-        }
-
-        if (j.ok) {
-            modal.remove();
-            overlay.remove();
-            applyTableFilter("payments");
-        } else {
-            console.error("Ошибка API:", j);
-            alert("Ошибка: " + (j.error || JSON.stringify(j)));
-        }
-
-    };
+  if (mode === "add") await fetchExchangeRate();
 }
