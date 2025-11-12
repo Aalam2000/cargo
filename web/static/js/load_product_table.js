@@ -378,43 +378,55 @@
         const mode = context.__mode || 'edit';
         const id = context.__id || (product.id || product.pk) || null;
 
-        // --- Создаём DOM-обёртку модалки до рендера полей ---
-        // требуется, чтобы последующий код мог обращаться к modal / dialog / body / form / overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay show';
+        // Определяем поле с кодом товара (первое попавшееся)
+        const codeCandidates = ['product', 'code', 'product_code', 'sku', 'code_product'];
+        let codeFieldName = null;
+        let codeValue = null;
+        for (const c of codeCandidates) {
+            if (product[c] !== undefined && product[c] !== null && String(product[c]).trim() !== '') {
+                codeFieldName = c;
+                codeValue = String(product[c]);
+                break;
+            }
+        }
 
+        // --- Строим DOM модалки (не апендим overlay вручную) ---
         const form = document.createElement('form');
         form.className = 'modal-form';
 
-        const dialog = document.createElement('div');
-        dialog.className = 'modal show';
+        const modalRoot = document.createElement('div');
+        modalRoot.className = 'modal';
 
-        // header
+        // header: показываем "Товар: <код>" в режиме редактирования
         const header = document.createElement('div');
         header.className = 'modal-header';
-        header.textContent = (mode === 'create') ? 'Добавить товар' : `Редактировать товар ${id ? '#' + id : ''}`;
-        dialog.appendChild(header);
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = (mode === 'create') ? 'Добавить товар' : `Редактировать товар ${id ? '#' + id : ''}`;
+        header.appendChild(titleSpan);
+        if (mode === 'edit' && codeValue) {
+            const codeSpan = document.createElement('span');
+            codeSpan.style.fontWeight = '500';
+            codeSpan.style.color = '#1f2937';
+            codeSpan.textContent = `Товар: ${codeValue}`;
+            header.appendChild(codeSpan);
+        }
+        modalRoot.appendChild(header);
 
-        // body (сюда будем вставлять .modal-fields)
+        // body
         const body = document.createElement('div');
         body.className = 'modal-body';
-        dialog.appendChild(body);
+        modalRoot.appendChild(body);
 
-        // добавим dialog в форму и форму в overlay, но пока не append'им overlay в body документа
-        form.appendChild(dialog);
-        overlay.appendChild(form);
+        const fieldsContainer = document.createElement('div');
+        fieldsContainer.className = 'modal-fields';
+        body.appendChild(fieldsContainer);
 
-        // для удобства назывем modal = dialog (в коде дальше используется modal)
-        const modal = dialog;
-
-
+        // вычисляем поля
         const defaultFields = (typeof defaultColumns !== 'undefined' && Array.isArray(defaultColumns)) ? defaultColumns.map(c => c.field) : [];
         const productKeys = Object.keys(product || {});
-        // Нормализуем: убираем суффиксы (_id/_name/_code/_pk), чтобы поля и связанные имена совпадали
         const rawFields = Array.from(new Set([...(Array.isArray(defaultFields) ? defaultFields : []), ...productKeys]));
         const fields = rawFields.map(f => String(f).replace(/(_id|_name|_code|_pk)$/, ''));
 
-        // вычисляем какие поля — связанные: смотрим на product.BASE, product.BASE_id, product.BASE_name, product.BASE_code
         const relatedFields = new Set();
         for (const f of fields) {
             const base = String(f);
@@ -424,39 +436,26 @@
                 product[`${base}_name`] !== undefined ||
                 product[`${base}_code`] !== undefined ||
                 product[`${base}_pk`] !== undefined
-            ) {
-                relatedFields.add(base);
-            }
+            ) relatedFields.add(base);
         }
 
-        // ... далее при рендеринге поля используем «base»-совместимый доступ к данным
-        // гарантируем контейнер для полей (если в коде уже есть modalFieldsContainer — можно использовать его)
-        const fieldsContainer = modal.querySelector('.modal-fields') || (() => {
-            const c = document.createElement('div');
-            c.className = 'modal-fields';
-            // вставляем перед футером модалки или в тело модалки
-            const mf = modal.querySelector('.modal-body') || modal;
-            mf.appendChild(c);
-            return c;
-        })();
-
+        // Рендерим поля — пропускаем поле с кодом товара в режиме редактирования
         for (const f of fields) {
             const base = String(f);
+            if (mode === 'edit' && codeFieldName && base === codeFieldName) continue; // убираем поле кода из тела
+
             const raw = (product[base] !== undefined && product[base] !== null) ? product[base] :
                 (product[`${base}_name`] !== undefined && product[`${base}_name`] !== null) ? product[`${base}_name`] :
-                    (product[`${base}_code`] !== undefined && product[`${base}_code`] !== null) ? product[`${base}_code`] :
-                        '';
+                    (product[`${base}_code`] !== undefined && product[`${base}_code`] !== null) ? product[`${base}_code`] : '';
 
             let displayValue = '';
             if (raw && typeof raw === 'object') displayValue = raw.name || raw.client_code || raw.title || raw.code || raw.id || '';
             else displayValue = raw !== undefined && raw !== null ? String(raw) : '';
 
-            // --- создаём обёртку поля и элементы ---
             const fieldWrapper = document.createElement('div');
-            fieldWrapper.className = 'modal-row'; // сохранить стили вашей модалки
+            fieldWrapper.className = 'modal-row';
 
             const labelEl = document.createElement('label');
-            // человекочитаемое название: client -> Client, cargo_status -> Cargo Status
             labelEl.textContent = base.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
             fieldWrapper.appendChild(labelEl);
 
@@ -467,7 +466,6 @@
             inputEl.className = 'modal-input';
             fieldWrapper.appendChild(inputEl);
 
-            // если поле связано — добавляем hidden _id и инициализируем автокомплит
             if (relatedFields.has(base)) {
                 const hid = document.createElement('input');
                 hid.type = 'hidden';
@@ -476,78 +474,75 @@
                     ? product[`${base}_id`]
                     : ((product[base] && (product[base].id || product[base].pk)) ? (product[base].id || product[base].pk) : '');
                 fieldWrapper.appendChild(hid);
-
-                try {
-                    // attachAutocomplete должен принимать (visibleInput, hiddenInput, fieldName)
-                    attachAutocomplete(inputEl, hid, base);
-                } catch (e) {
-                    console.warn("attachAutocomplete failed for", base, e);
-                }
             }
 
-            // добавляем строку в контейнер полей
             fieldsContainer.appendChild(fieldWrapper);
         }
 
-
-        dialog.appendChild(body);
-
+        // footer
         const footer = document.createElement('div');
         footer.className = 'modal-footer';
-
         const btnCancel = document.createElement('button');
         btnCancel.type = 'button';
         btnCancel.className = 'btn-cancel';
         btnCancel.textContent = 'Отмена';
-
         const btnSave = document.createElement('button');
         btnSave.type = 'submit';
         btnSave.className = 'btn-save';
         btnSave.textContent = 'Сохранить';
-
         footer.appendChild(btnCancel);
         footer.appendChild(btnSave);
-        dialog.appendChild(footer);
 
-        form.appendChild(dialog);
-        overlay.appendChild(form);
-        document.body.appendChild(overlay);
+        form.appendChild(modalRoot);
+        form.appendChild(footer);
 
-        document.documentElement.style.overflow = 'hidden';
-        document.body.style.overflow = 'hidden';
+        // открываем через универсальную
+        const inst = openModal({html: form, modalName: 'product', closable: true});
+        if (!inst) return null;
+
+        const modal = inst.modal;
+        const realForm = modal.tagName === 'FORM' ? modal : modal.querySelector('form') || modal;
+        const realFieldsContainer = realForm.querySelector('.modal-fields');
+
+        // инициализация автокомплита (после вставки в DOM)
+        for (const f of fields) {
+            if (!relatedFields.has(f)) continue;
+            const visible = realForm.querySelector(`input[name="${f}"]`);
+            const hidden = realForm.querySelector(`input[name="${f}_id"]`);
+            try {
+                if (typeof attachAutocomplete === 'function') attachAutocomplete(visible, hidden, f);
+            } catch (e) {
+                console.warn('attachAutocomplete failed for', f, e);
+            }
+        }
 
         setTimeout(() => {
-            const first = form.querySelector('input, textarea, select');
+            const first = realForm.querySelector('input, textarea, select');
             if (first) first.focus();
         }, 0);
 
-        function closeModal() {
+        // обработчики
+        function cleanup() {
             try {
-                document.removeEventListener('keydown', onKey);
+                realForm.removeEventListener('submit', onSubmit);
+                btnCancel.removeEventListener('click', onCancel);
             } catch (e) {
             }
-            overlay.remove();
-            document.documentElement.style.overflow = '';
-            document.body.style.overflow = '';
         }
 
-        btnCancel.addEventListener('click', closeModal);
-
-        function onKey(ev) {
-            if (ev.key === 'Escape') closeModal();
+        function onCancel(ev) {
+            ev && ev.preventDefault();
+            inst.close();
         }
 
-        document.addEventListener('keydown', onKey);
-        dialog.addEventListener('click', e => e.stopPropagation());
-
-        form.addEventListener('submit', async (ev) => {
+        async function onSubmit(ev) {
             ev.preventDefault();
-            const fd = new FormData(form);
-            const payload = {};
+            const fd = new FormData(realForm);
             const entries = Array.from(fd.entries());
             const map = {};
             for (const [k, v] of entries) map[k] = v;
 
+            const payload = {};
             for (const f of fields) {
                 if (relatedFields.has(f)) {
                     const hidName = `${f}_id`;
@@ -561,7 +556,6 @@
                     if (map[f] !== undefined) payload[f] = map[f];
                 }
             }
-
             Object.keys(payload).forEach(k => {
                 if (payload[k] === '' || payload[k] === null) delete payload[k];
             });
@@ -591,15 +585,22 @@
                     alert('Ошибка сохранения. Смотрите консоль.');
                     return;
                 }
-                closeModal();
+                inst.close();
+                cleanup();
                 if (typeof main === 'function') await main();
                 else if (typeof window.reloadProductsTable === 'function') window.reloadProductsTable();
             } catch (err) {
                 console.error('save product error', err);
                 alert('Ошибка сохранения. Смотрите консоль.');
             }
-        });
+        }
+
+        btnCancel.addEventListener('click', onCancel);
+        realForm.addEventListener('submit', onSubmit);
+
+        return inst;
     }
+
 
     // bind add-product btn
     const btnAddProduct = el('#btn-add-product');

@@ -352,24 +352,3 @@
   font-weight: 700;
   color: #006b43;
 }
-
-/* === compact, single-line modal rows (replace previous modal rules) === */
-#settings-modal .settings-list { padding:6px; max-height:70vh; overflow:auto; }
-#settings-modal .setting-row, #settings-modal .settings-item {
-  display:block;
-  padding:4px 6px;
-  margin-bottom:6px;
-  background:#fff;
-  border:1px solid rgba(0,0,0,0.04);
-  font-size:13px;
-  line-height:20px;
-}
-#settings-modal .setting-row > .drag-handle,
-#settings-modal .setting-row > input[type="checkbox"],
-#settings-modal .setting-row > label {
-  display:inline-block;
-  vertical-align:middle;
-}
-#settings-modal .setting-row > .drag-handle { width:20px; text-align:center; margin-right:8px; }
-#settings-modal .setting-row > input[type="checkbox"] { width:16px; height:16px; margin:0 8px 0 0; }
-#settings-modal .setting-row > label { max-width:calc(100% - 56px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0; }

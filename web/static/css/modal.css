@@ -7,36 +7,70 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45); /* затемнение фона */
-  z-index: 1050;
-  display: none;                /* включается классом .show */
+  display: flex;
   align-items: center;
   justify-content: center;
-  /* блокируем клики по странице под модалкой (фон не реагирует на мышку) */
-  pointer-events: auto;
+  padding: 20px;
+  background: rgba(0,0,0,0.35);
+  z-index: 1050;
 }
 
-.modal-overlay.show {
+.modal-overlay.show,
+.modal-overlay[open],
+.modal-overlay[aria-hidden="false"] {
   display: flex;
 }
 
 /* модальное окно (контейнер) */
 .modal {
-  position: relative;
-  max-width: 940px;
-  width: 94%;
+  width: min(800px, 95%);
+  max-height: calc(90vh);
   background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(3,20,40,0.35);
-  z-index: 1060;
-  display: none; /* включается классом .show */
-  animation: fadeIn .18s ease-out;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(3,20,40,0.25);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* показываем модалку (после добавления .show) */
-.modal.show {
-  display: block;
+/* корректная вёрстка полей в текущем DOM */
+.modal .modal-fields .modal-row {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+.modal .modal-fields .modal-row label {
+  flex: 0 0 200px;
+  max-width: 45%;
+  text-align: right;
+  padding-right: 8px;
+  color:#333;
+  font-size:13px;
+}
+.modal .modal-fields .modal-row .modal-input,
+.modal .modal-fields .modal-row input[type="text"],
+.modal .modal-fields .modal-row textarea,
+.modal .modal-fields .modal-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding:8px 10px;
+  border:1px solid rgba(0,0,0,0.12);
+  border-radius:6px;
+  box-sizing:border-box;
+}
+
+
+
+/* Хедер: заголовок слева, код товара справа */
+.modal-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 18px;
+  font-weight:600;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
 /* --- (2) заголовок/футер модалки (не менять визуально) --- */
@@ -55,12 +89,8 @@
 }
 
 /* --- (3) тело модалки: обязателен скролл только для полей внутри --- */
-.modal-body {
-  max-height: calc(80vh - 120px); /* учитываем header/footer */
-  overflow-y: auto;
-  padding: 18px;
-  box-sizing: border-box;
-}
+/* внутри скроллим только body */
+.modal-body { overflow-y: auto; padding:14px 18px; box-sizing:border-box; }
 
 /* гарантируем красивый внутренний отступ при прокрутке */
 .modal-body::-webkit-scrollbar {
@@ -72,19 +102,39 @@
   border-radius: 8px;
 }
 
-/* --- (4) форма внутри модалки: лейбл слева, поле справа --- */
-.modal-form {
-  display: grid;
-  grid-template-columns: 240px 1fr; /* слева фиксированная ширина для label */
-  gap: 12px 18px;
-  align-items: start;
-  width: 100%;
-  box-sizing: border-box;
+/* Строка поля — лейбл слева, поле ввода справа */
+.modal-row {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+.modal-row label {
+  flex: 0 0 200px; /* ширина лейбла */
+  max-width: 45%;
+  color:#333;
+  font-size:13px;
+}
+.modal-row .modal-input,
+.modal-row input[type="text"],
+.modal-row textarea,
+.modal-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding:8px 10px;
+  border:1px solid rgba(0,0,0,0.12);
+  border-radius:6px;
+  box-sizing:border-box;
 }
 
-/* один ряд формы — для каждого поля */
-.modal-form .modal-row {
-  display: contents; /* позволяем grid управлять лейблом и полем */
+/* Футер — кнопки в строке справа */
+.modal-footer {
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  padding:12px 18px;
+  border-top:1px solid rgba(0,0,0,0.06);
+  background: #fff;
 }
 
 /* label (название поля) — справа выравниваем текст, чтобы выглядело аккуратно */
@@ -255,10 +305,6 @@
   border-color: #004aad;
 }
 
-/* --- (11) вспомогательные ограничения: чтобы модалка не растягивалась сильнее --- */
-.modal {
-  max-height: 92vh;
-}
 
 /* --- (12) небольшая рекомендация (необязательная): фиксируем z-index для overlay/модалки,
        если в приложении есть другие плавающие элементы */
