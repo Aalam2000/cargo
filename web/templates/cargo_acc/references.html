@@ -25,6 +25,17 @@
   .table-wrapper { overflow: visible !important; }
 </style>
 
+<!-- Компания (только для Admin/Operator) -->
+{% if user.role == 'Admin' or user.role == 'Operator' %}
+<div class="table-card table-container">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
+    <h4 style="margin:0;font-size:18px;">Компания</h4>
+    <button class="btn-table" id="btn-company-settings" style="font-size:16px;padding:8px 12px;border-radius:8px;">Открыть</button>
+  </div>
+</div>
+{% endif %}
+
+
 <div class="cargo-table-page" style="padding:16px;">
   <div class="table-header-container" style="margin-bottom:12px;">
     <h3>📚 Справочники</h3>
@@ -109,5 +120,9 @@
 
 <div id="refs-modal-root"></div>
 
+<script>
+    window.USER_COMPANY_ID = {{ company_id }};
+</script>
 <script src="{% static 'js/references.js' %}"></script>
+
 {% endblock %}

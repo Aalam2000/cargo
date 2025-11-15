@@ -1,4 +1,13 @@
 // web/static/js/base.js
+window.getCsrf = function () {
+    const name = 'csrftoken=';
+    const cookies = document.cookie.split(';').map(s => s.trim());
+    for (const c of cookies) if (c.startsWith(name)) return c.substring(name.length);
+
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+};
+
 // Минимальная, проверенная реализация: TableSettings (auto-init).
 (function () {
     const API_URL = '/api/table_settings/';
@@ -19,11 +28,6 @@
         const r = await fetch(url, opts);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
-    }
-
-    function getCsrf() {
-        const c = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrftoken='));
-        return c ? c.split('=')[1] : '';
     }
 
     // === Универсальная функция открытия модалок ===
@@ -192,7 +196,7 @@
             return await fetchJson(API_URL, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrf()},
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.getCsrf()},
                 body: JSON.stringify({key, settings})
             });
         } catch (e) {

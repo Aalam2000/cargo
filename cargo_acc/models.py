@@ -7,6 +7,14 @@ from django.db import models
 class Company(models.Model):
     name = models.CharField(max_length=255, unique=True)
     registration = models.CharField(max_length=50)
+    tax_id = models.CharField(max_length=50, verbose_name="ИНН/Tax ID")
+    ogrn = models.CharField(max_length=50, verbose_name="ОГРН/Registration №")
+    legal_address = models.CharField(max_length=500, verbose_name="Юридический адрес")
+    actual_address = models.CharField(max_length=500, verbose_name="Фактический адрес", blank=True, null=True)
+    representative_fullname = models.CharField(max_length=255, verbose_name="Ф.И.О. представителя")
+    representative_basis = models.CharField(max_length=255, verbose_name="Действует на основании")
+    phone = models.CharField(max_length=50, verbose_name="Телефон", blank=True, null=True)
+    email = models.EmailField(verbose_name="Электронная почта", blank=True, null=True)
     description = models.CharField(max_length=500, blank=True, null=True)
 
     class Meta:
@@ -299,7 +307,6 @@ class Payment(models.Model):
         super().save(*args, **kwargs)
 
 
-
 class PaymentProduct(models.Model):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='allocations')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='payment_links')
@@ -407,6 +414,7 @@ class CargoStatusLog(models.Model):
 
     def __str__(self):
         return f"{self.cargo.cargo_code} → {self.status.name} ({self.changed_at.strftime('%Y-%m-%d %H:%M')})"
+
 
 # === КУРСЫ ВАЛЮТ ===
 class CurrencyRate(models.Model):

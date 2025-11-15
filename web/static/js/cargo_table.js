@@ -321,16 +321,11 @@ function closeSettingsModal() {
 
 async function saveSortSettings() {
     try {
-        function getCSRFToken() {
-            const match = document.cookie.match(/csrftoken=([^;]+)/);
-            return match ? match[1] : "";
-        }
-
         await fetch(tableConfig.saveSettingsPath, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": getCSRFToken(),
+                "X-CSRFToken": window.getCsrf(),
             },
             credentials: "include",
             body: JSON.stringify({
@@ -341,6 +336,7 @@ async function saveSortSettings() {
         console.warn("Ошибка сохранения сортировки:", e);
     }
 }
+
 
 
 async function saveSettings() {
@@ -361,24 +357,18 @@ async function saveSettings() {
     userConfig.columns = newOrder;
 
     try {
-        function getCSRFToken() {
-            const match = document.cookie.match(/csrftoken=([^;]+)/);
-            return match ? match[1] : "";
-        }
-
         const res = await fetch(tableConfig.saveSettingsPath, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": getCSRFToken(),
+                "X-CSRFToken": window.getCsrf(),
             },
             credentials: "include",
-            body: JSON.stringify({cargo_table: userConfig}),
+            body: JSON.stringify({ cargo_table: userConfig }),
         });
     } catch (e) {
         log("❌ Ошибка сохранения настроек:", e);
     }
-
 
     closeSettingsModal();
     renderHeader(userConfig.columns);

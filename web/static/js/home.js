@@ -318,10 +318,9 @@ async function openPaymentModal(mode = "add", data = null) {
       comment: document.getElementById("payComment").value.trim(),
     };
 
-    const csrftoken = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("csrftoken="))?.split("=")[1];
     const res = await fetch("/api/add_payment/", {
       method: mode === "edit" ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": window.getCsrf() },
       body: JSON.stringify(payload),
     });
 

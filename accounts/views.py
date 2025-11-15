@@ -1,75 +1,47 @@
-# accounts/views.py
-from rest_framework.response import Response
-from rest_framework.decorators import api_view
-from .models import CustomUser
-from .serializers import UserSerializer
-from django.contrib.auth import login, authenticate
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from .forms import UserLoginForm
 from django.contrib import messages
-
+from cargo_acc.models import Company
 
 @login_required
 def profile_view(request):
     user = request.user
-
-    # Проверяем роль и доступ
     role = getattr(user, 'role', None)
+    can_edit = role in ['Admin', 'Operator', 'Client']
 
-    # Убедимся, что role — это строка
-    can_edit = role in ['Admin', 'Operator'] if isinstance(role, str) else False
+    if request.method == 'POST':
+        user.client_type = request.POST.get('client_type', user.client_type)
+        user.first_name = request.POST.get('first_name', user.first_name)
+        user.last_name = request.POST.get('last_name', user.last_name)
+        user.phone = request.POST.get('phone', user.phone)
+        user.telegram = request.POST.get('telegram', user.telegram)
+        user.whatsapp = request.POST.get('whatsapp', user.whatsapp)
 
-    # Передаем данные в шаблон
-    context = {
-        'can_edit': can_edit,
-        'user': user,
-        'role_type': type(role).__name__  # Передаем тип роли в шаблон
-    }
+        if user.role == 'Client':
+            user.inn = request.POST.get('inn', user.inn)
+            user.ogrn = request.POST.get('ogrn', user.ogrn)
+            user.representative = request.POST.get('representative', user.representative)
+            user.basis = request.POST.get('basis', user.basis)
 
-    if request.method == 'POST' and can_edit:
-        user.first_name = request.POST.get('first_name')
-        user.last_name = request.POST.get('last_name')
-        user.phone = request.POST.get('phone')
+            # 🔒 Только админ может менять компанию и код клиента
+            if request.user.role == 'Admin':
+                company_id = request.POST.get('company_id')
+                if company_id:
+                    try:
+                        user.company = Company.objects.get(id=company_id)
+                    except Company.DoesNotExist:
+                        pass
 
-        if user.access_level == 'Company':
-            user.client_code = request.POST.get('client_code')
+                new_code = request.POST.get('client_code')
+                if new_code and new_code.strip():
+                    user.client_code = new_code.strip().upper()
 
         user.save()
         messages.success(request, 'Профиль успешно обновлён.')
         return redirect('profile')
 
-    return render(request, 'accounts/profile.html', context)
-
-
-@login_required
-def dashboard_view(request):
-    return render(request, 'cargo_acc/dashboard.html')
-
-
-# Вход пользователя
-def login_view(request):
-    if request.method == 'POST':
-        form = UserLoginForm(request, data=request.POST)
-        if form.is_valid():
-            email = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=email, password=password)
-            if user is not None:
-                login(request, user)
-                return redirect('profile')
-    else:
-        form = UserLoginForm()
-    return render(request, 'registration/login.html', {'form': form})
-
-
-@login_required
-def user_profile(request):
-    return render(request, 'accounts/profile.html', {'user': request.user})
-
-
-@api_view(['GET'])
-def user_list(request):
-    users = CustomUser.objects.all()
-    serializer = UserSerializer(users, many=True)
-    return Response(serializer.data)
+    return render(request, 'accounts/profile.html', {
+        'user': user,
+        'can_edit': can_edit,
+        'companies': Company.objects.all() if user.role == 'Admin' else []
+    })

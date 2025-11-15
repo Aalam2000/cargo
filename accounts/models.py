@@ -80,7 +80,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name='Часовой пояс',
         help_text='Например: Asia/Baku, Europe/Moscow, Asia/Shanghai'
     )
+    CLIENT_TYPE_CHOICES = [
+        ("individual", "Физическое лицо"),
+        ("company", "Юридическое лицо"),
+    ]
 
+    client_type = models.CharField(
+        max_length=20,
+        choices=CLIENT_TYPE_CHOICES,
+        default="individual",
+        verbose_name="Тип клиента"
+    )
     # Профиль
     first_name = models.CharField(max_length=30, blank=True, default="Не указано")
     last_name = models.CharField(max_length=30, blank=True, default="Не указано")
@@ -91,6 +101,21 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     country = models.CharField(max_length=50, blank=True, default="Не указано")
     city = models.CharField(max_length=50, blank=True, default="Не указано")
     address = models.CharField(max_length=255, blank=True, default="Не указано")
+    inn = models.CharField(max_length=50, blank=True, default="Не указан")
+    ogrn = models.CharField(max_length=50, blank=True, default="Не указан")
+    representative = models.CharField(max_length=255, blank=True, default="Не указан")
+    basis = models.CharField(max_length=255, blank=True, default="Не указан")
+    # добавить в CustomUser перед contract_signed
+    legal_address = models.CharField(max_length=255, blank=True, default="Не указан")
+    actual_address = models.CharField(max_length=255, blank=True, default="Не указан")
+    bank_name = models.CharField(max_length=255, blank=True, default="Не указан")
+    bic = models.CharField(max_length=50, blank=True, default="Не указан")
+    account = models.CharField(max_length=50, blank=True, default="Не указан")
+    corr_account = models.CharField(max_length=50, blank=True, default="Не указан")
+    company_name = models.CharField(max_length=255, blank=True, default="Не указано")
+
+    contract_signed = models.BooleanField(default=False)
+    sign_token = models.CharField(max_length=100, blank=True, null=True)
 
     # Статусы
     is_active = models.BooleanField(default=True)
@@ -102,6 +127,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     assigned_object = models.CharField(
         max_length=50, blank=True, default="",
         help_text="Привязка к филиалу/складу (идентификатор или код)."
+    )
+
+    # 🔗 Прямая связь с компанией
+    company = models.ForeignKey(
+        'cargo_acc.Company',
+        on_delete=models.PROTECT,
+        null=False,
+        blank=False,
+        related_name="users",
+        verbose_name="Компания",
+        help_text="Компания, к которой принадлежит пользователь (обязательное поле)"
     )
 
     # 🔗 Прямая связь с клиентом

@@ -106,4 +106,6 @@ urlpatterns = [
     path('references/', views.references_page, name='references_page'),
     # в cargo_acc/urls.py: добавить в urlpatterns
     path('products/', views.products_page, name='products_page'),
+    path("api/company/<int:pk>/", views.get_company, name="get_company"),
+    path("api/company/<int:pk>/update/", views.update_company, name="update_company"),
 ]

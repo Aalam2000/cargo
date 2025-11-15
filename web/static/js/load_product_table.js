@@ -364,14 +364,6 @@
         }
     }
 
-    function getCsrf() {
-        const name = 'csrftoken=';
-        const cookies = document.cookie.split(';').map(s => s.trim());
-        for (const c of cookies) if (c.startsWith(name)) return c.substring(name.length);
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        return meta ? meta.getAttribute('content') : '';
-    }
-
     // ---------------- Modal: create / edit product ----------------
     async function openProductModal(context = {}) {
         const product = context.__product || {};
@@ -561,13 +553,17 @@
             });
 
             try {
-                const csrftoken = typeof getCsrf === 'function' ? getCsrf() : '';
+                const csrftoken = window.getCsrf();
+
                 let res;
                 if (mode === 'create') {
                     res = await fetch(PRODUCTS_API, {
                         method: 'POST',
                         credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        },
                         body: JSON.stringify(payload)
                     });
                 } else {
@@ -575,24 +571,32 @@
                     res = await fetch(PRODUCTS_API + id + '/', {
                         method: 'PUT',
                         credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        },
                         body: JSON.stringify(payload)
                     });
                 }
+
                 if (!res.ok) {
                     const txt = await res.text().catch(() => null);
                     console.error('product save error', res.status, txt);
                     alert('Ошибка сохранения. Смотрите консоль.');
                     return;
                 }
+
                 inst.close();
                 cleanup();
+
                 if (typeof main === 'function') await main();
                 else if (typeof window.reloadProductsTable === 'function') window.reloadProductsTable();
+
             } catch (err) {
                 console.error('save product error', err);
                 alert('Ошибка сохранения. Смотрите консоль.');
             }
+
         }
 
         btnCancel.addEventListener('click', onCancel);

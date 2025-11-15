@@ -600,8 +600,55 @@ def sse_clients_stream(request):
 
 @login_required
 def references_page(request):
-    return render(request, 'cargo_acc/references.html')
+    return render(request, 'cargo_acc/references.html', {
+        "company_id": request.user.company.id
+    })
 
 @login_required
 def products_page(request):
     return render(request, "cargo_acc/product_table.html")
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def get_company(request, pk):
+    from .models import Company
+    try:
+        obj = Company.objects.get(id=pk)
+    except Company.DoesNotExist:
+        return JsonResponse({"error": "not found"}, status=404)
+
+    return JsonResponse({
+        "id": obj.id,
+        "name": obj.name,
+        "tax_id": obj.tax_id,
+        "ogrn": obj.ogrn,
+        "legal_address": obj.legal_address,
+        "actual_address": obj.actual_address,
+        "phone": obj.phone,
+        "email": obj.email,
+    })
+
+@csrf_exempt
+@login_required
+def update_company(request, pk):
+    if request.method != "PUT":
+        return JsonResponse({"error": "method"}, status=400)
+
+    from .models import Company
+    import json
+    data = json.loads(request.body.decode())
+
+    try:
+        obj = Company.objects.get(id=pk)
+    except Company.DoesNotExist:
+        return JsonResponse({"error": "not found"}, status=404)
+
+    for f in ["name", "inn", "ogrn", "legal_address", "actual_address", "phone", "email"]:
+        if f in data:
+            setattr(obj, f, data[f])
+
+    obj.save()
+    return JsonResponse({"status": "ok"})
