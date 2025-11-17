@@ -21,9 +21,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
-from .models import Client
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
-    CarrierCompany, Vehicle, TransportBill, CargoMovement
+    CarrierCompany, Vehicle, TransportBill, CargoMovement, Client
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, ProductSerializer, CargoSerializer, \
     CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
@@ -108,25 +107,6 @@ def get_clients(request):
     })
 
 
-@login_required
-def get_warehouses(request):
-    search_query = request.GET.get('search', '').lower()
-    warehouses = Warehouse.objects.filter(name__icontains=search_query).select_related('company')
-
-    # Пагинация
-    paginator = Paginator(warehouses, 10)
-    page = request.GET.get('page', 1)
-    try:
-        warehouses_page = paginator.page(page)
-    except EmptyPage:
-        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
-
-    result = [
-        {'id': warehouse.id, 'name': warehouse.name, 'address': warehouse.address, 'company': warehouse.company.name}
-        for warehouse in warehouses_page
-    ]
-    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
-
 
 @login_required
 def get_companies(request):
@@ -145,66 +125,6 @@ def get_companies(request):
         {'id': company.id, 'name': company.name, 'registration': company.registration,
          'description': company.description}
         for company in companies_page
-    ]
-    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
-
-
-@login_required
-def get_cargo_types(request):
-    search_query = request.GET.get('search', '').lower()
-    cargo_types = CargoType.objects.filter(name__icontains=search_query)
-
-    # Пагинация
-    paginator = Paginator(cargo_types, 10)
-    page = request.GET.get('page', 1)
-    try:
-        cargo_types_page = paginator.page(page)
-    except EmptyPage:
-        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
-
-    result = [
-        {'id': cargo_type.id, 'name': cargo_type.name, 'description': cargo_type.description}
-        for cargo_type in cargo_types_page
-    ]
-    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
-
-
-@login_required
-def get_cargo_statuses(request):
-    search_query = request.GET.get('search', '').lower()
-    cargo_statuses = CargoStatus.objects.filter(name__icontains=search_query)
-
-    # Пагинация
-    paginator = Paginator(cargo_statuses, 10)
-    page = request.GET.get('page', 1)
-    try:
-        cargo_statuses_page = paginator.page(page)
-    except EmptyPage:
-        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
-
-    result = [
-        {'id': cargo_status.id, 'name': cargo_status.name, 'description': cargo_status.description}
-        for cargo_status in cargo_statuses_page
-    ]
-    return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
-
-
-@login_required
-def get_packaging_types(request):
-    search_query = request.GET.get('search', '').lower()
-    packaging_types = PackagingType.objects.filter(name__icontains=search_query)
-
-    # Пагинация
-    paginator = Paginator(packaging_types, 10)
-    page = request.GET.get('page', 1)
-    try:
-        packaging_types_page = paginator.page(page)
-    except EmptyPage:
-        return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
-
-    result = [
-        {'id': packaging_type.id, 'name': packaging_type.name, 'description': packaging_type.description}
-        for packaging_type in packaging_types_page
     ]
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
 
@@ -351,88 +271,6 @@ class UniversalDeleteView(APIView):
             return JsonResponse({'error': 'Модель не найдена'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# === ViewSet модели ===
-# ViewSet для Компаний
-class CompanyViewSet(viewsets.ModelViewSet):
-    queryset = Company.objects.all()
-    serializer_class = CompanySerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Клиентов
-class ClientViewSet(viewsets.ModelViewSet):
-    queryset = Client.objects.all()
-    serializer_class = ClientSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'client_code')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Складов
-class WarehouseViewSet(viewsets.ModelViewSet):
-    queryset = Warehouse.objects.all()
-    serializer_class = WarehouseSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Типов Груза
-class CargoTypeViewSet(viewsets.ModelViewSet):
-    queryset = CargoType.objects.all()
-    serializer_class = CargoTypeSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Статусов Груза
-class CargoStatusViewSet(viewsets.ModelViewSet):
-    queryset = CargoStatus.objects.all()
-    serializer_class = CargoStatusSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Типов Упаковок
-class PackagingTypeViewSet(viewsets.ModelViewSet):
-    queryset = PackagingType.objects.all()
-    serializer_class = PackagingTypeSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
-
-
-# ViewSet для Изображений
-class ImageViewSet(viewsets.ModelViewSet):
-    queryset = Image.objects.all()
-    serializer_class = ImageSerializer
-
-    def perform_create(self, serializer):
-        image = self.request.FILES['image_file']
-        image.name = transliterate_filename(image.name)  # Применяем транслитерацию к имени файла
-        serializer.save(image_file=image)
-
-
-# ViewSet для Товаров
-class ProductPagination(PageNumberPagination):
-    page_size = 20  # Количество записей на странице
-    page_size_query_param = 'page_size'
 
 from django.contrib.auth.decorators import login_required
 
@@ -601,7 +439,8 @@ def sse_clients_stream(request):
 @login_required
 def references_page(request):
     return render(request, 'cargo_acc/references.html', {
-        "company_id": request.user.company.id
+        "company_id": request.user.company.id,
+        "company_name": request.user.company.name
     })
 
 @login_required

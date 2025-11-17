@@ -4,125 +4,123 @@
 {% block title %}Справочники{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
 
-<!-- Небольшое локальное исправление для гарантированного скролла страницы на мобильных -->
-<style>
-  /* Гарантируем, что документ может скроллиться */
-  html, body {
-    height: auto !important;
-    min-height: 100% !important;
-    overflow-y: auto !important;
-  }
-  /* Убираем любые ограничивающие высоту контейнеры */
-  .cargo-table-page, .refs-stack, .table-card, .table-wrapper {
-    height: auto !important;
-    max-height: none !important;
-  }
-  /* Отступы и адаптивность для мобильных */
-  .refs-stack { display:flex; flex-direction:column; gap:18px; padding-bottom:28px; }
-  .table-card { width:100%; box-sizing:border-box; }
-  .table-wrapper { overflow: visible !important; }
-</style>
+    <div class="cargo-table-page">
+        <div class="table-header-container">
+            <h3>📚 Справочники</h3>
+        </div>
 
-<!-- Компания (только для Admin/Operator) -->
-{% if user.role == 'Admin' or user.role == 'Operator' %}
-<div class="table-card table-container">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
-    <h4 style="margin:0;font-size:18px;">Компания</h4>
-    <button class="btn-table" id="btn-company-settings" style="font-size:16px;padding:8px 12px;border-radius:8px;">Открыть</button>
-  </div>
-</div>
-{% endif %}
+        <div class="refs-stack">
+
+            {# === Блок с компанией (Admin/Operator) === #}
+            {% if user.role == 'Admin' or user.role == 'Operator' %}
+                <div class="table-card table-container">
+                    <div class="table-card-header">
+                        <h4>Компания: {{ company_name }}</h4>
+                        <button class="btn-table" id="btn-company-settings">Открыть</button>
+                    </div>
+                </div>
+            {% endif %}
+
+            {# === Универсальные справочники === #}
+
+            <div class="table-card table-container"
+                 data-model="warehouses"
+                 data-api="/api/table/warehouses/"
+                 data-fields="name,address"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Склады</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
 
 
-<div class="cargo-table-page" style="padding:16px;">
-  <div class="table-header-container" style="margin-bottom:12px;">
-    <h3>📚 Справочники</h3>
-  </div>
+            <div class="table-card table-container"
+                 data-model="cargo-types"
+                 data-api="/api/table/cargo-types/"
+                 data-fields="name,description"
+                 data-page-size="10">
 
-  <div class="refs-stack">
+                <div class="table-card-header">
+                    <h4>Типы грузов</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
 
-    <!-- Warehouses -->
-    <div class="table-card table-container">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
-        <h4 style="margin:0;font-size:18px;">Склады</h4>
-        {% if user.role == 'Admin' or user.role == 'Operator' %}
-          <button class="btn-table btn-add" data-model="warehouses" title="Добавить" style="font-size:16px;padding:8px 12px;border-radius:8px;">Добавить</button>
-        {% endif %}
-      </div>
-      <div class="table-wrapper" style="padding:0 12px 12px 12px;">
-        <table class="table ref-table" data-model="warehouses" aria-label="warehouses" style="width:100%;">
-          <thead>
-            <tr><th>Название</th><th>Адрес</th><th>Компания</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
+
+
+            <div class="table-card table-container"
+                 data-model="cargo-statuses"
+                 data-api="/api/table/cargo-statuses/"
+                 data-fields="name,description"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Статусы грузов</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
+
+
+            <div class="table-card table-container"
+                 data-model="packaging-types"
+                 data-api="/api/table/packaging-types/"
+                 data-fields="name,description"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Типы упаковки</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
+
+
+        </div>
     </div>
 
-    <!-- Cargo types -->
-    <div class="table-card table-container">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
-        <h4 style="margin:0;font-size:18px;">Типы грузов</h4>
-        {% if user.role == 'Admin' or user.role == 'Operator' %}
-          <button class="btn-table btn-add" data-model="cargo-types" title="Добавить" style="font-size:16px;padding:8px 12px;border-radius:8px;">Добавить</button>
-        {% endif %}
-      </div>
-      <div class="table-wrapper" style="padding:0 12px 12px 12px;">
-        <table class="table ref-table" data-model="cargo-types" aria-label="cargo-types" style="width:100%;">
-          <thead>
-            <tr><th>Название</th><th>Примечание</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <div id="refs-modal-root"></div>
 
-    <!-- Cargo statuses -->
-    <div class="table-card table-container">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
-        <h4 style="margin:0;font-size:18px;">Статусы грузов</h4>
-        {% if user.role == 'Admin' or user.role == 'Operator' %}
-          <button class="btn-table btn-add" data-model="cargo-statuses" title="Добавить" style="font-size:16px;padding:8px 12px;border-radius:8px;">Добавить</button>
-        {% endif %}
-      </div>
-      <div class="table-wrapper" style="padding:0 12px 12px 12px;">
-        <table class="table ref-table" data-model="cargo-statuses" aria-label="cargo-statuses" style="width:100%;">
-          <thead>
-            <tr><th>Название</th><th>Примечание</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <script>
+        window.USER_COMPANY_ID = {{ company_id }};
+    </script>
+    <script>
+        window.USER_COMPANY_NAME = "{{ company_name }}";
+    </script>
 
-    <!-- Packaging types -->
-    <div class="table-card table-container">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;">
-        <h4 style="margin:0;font-size:18px;">Типы упаковки</h4>
-        {% if user.role == 'Admin' or user.role == 'Operator' %}
-          <button class="btn-table btn-add" data-model="packaging-types" title="Добавить" style="font-size:16px;padding:8px 12px;border-radius:8px;">Добавить</button>
-        {% endif %}
-      </div>
-      <div class="table-wrapper" style="padding:0 12px 12px 12px;">
-        <table class="table ref-table" data-model="packaging-types" aria-label="packaging-types" style="width:100%;">
-          <thead>
-            <tr><th>Название</th><th>Примечание</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<div id="refs-modal-root"></div>
-
-<script>
-    window.USER_COMPANY_ID = {{ company_id }};
-</script>
-<script src="{% static 'js/references.js' %}"></script>
+    <script src="{% static 'js/references.js' %}"></script>
 
 {% endblock %}

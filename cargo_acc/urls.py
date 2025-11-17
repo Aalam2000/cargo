@@ -1,20 +1,20 @@
 # cargo_acc/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views, views_payment
+from . import views, views_payment, views_table
 from cargodb import views as core_views
 
 # --------------------------------------------------------------------
 # 📦 ROUTER — стандартные ViewSet API (CRUD для моделей)
 # --------------------------------------------------------------------
 router = DefaultRouter()
-router.register(r'companies', views.CompanyViewSet)
-router.register(r'clients', views.ClientViewSet)
-router.register(r'warehouses', views.WarehouseViewSet)
-router.register(r'cargo-types', views.CargoTypeViewSet)
-router.register(r'cargo-statuses', views.CargoStatusViewSet)
-router.register(r'packaging-types', views.PackagingTypeViewSet)
-router.register(r'images', views.ImageViewSet)
+router.register(r'companies', views_table.CompanyViewSet)
+router.register(r'clients', views_table.ClientViewSet)
+router.register(r'warehouses', views_table.WarehouseViewSet)
+router.register(r'cargo-types', views_table.CargoTypeViewSet)
+router.register(r'cargo-statuses', views_table.CargoStatusViewSet)
+router.register(r'packaging-types', views_table.PackagingTypeViewSet)
+router.register(r'images', views_table.ImageViewSet)
 router.register(r'products', views.ProductViewSet)
 router.register(r'cargos', views.CargoViewSet)
 router.register(r'carrier-companies', views.CarrierCompanyViewSet)
@@ -56,11 +56,8 @@ urlpatterns = [
     # 🧠 Получение справочников (для фильтров, форм и селектов)
     # --------------------------------------------------------------
     path('api/get_clients/', views.get_clients, name='get_clients'),
-    path('api/get_warehouses/', views.get_warehouses, name='get_warehouses'),
+    path("api/table/<str:model_name>/", views_table.get_table, name="get_table"),
     path('api/get_companies/', views.get_companies, name='get_companies'),
-    path('api/get_cargo_types/', views.get_cargo_types, name='get_cargo_types'),
-    path('api/get_cargo_statuses/', views.get_cargo_statuses, name='get_cargo_statuses'),
-    path('api/get_packaging_types/', views.get_packaging_types, name='get_packaging_types'),
 
     # --------------------------------------------------------------
     # 🧾 Работа с продуктами и изображениями

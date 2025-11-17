@@ -51,13 +51,6 @@ html, body {
     transition: all 0.3s ease;
 }
 
-/* ====== Свернутая панель для ПК ====== */
-.sidebar.collapsed {
-    width: 60px; /* узкая панель */
-    overflow: visible; /* оставляем видимым бургер, выступающий за край */
-    transition: all 0.3s ease;
-}
-
 /* скрываем всё, включая логотип */
 .sidebar.collapsed .logo-block,
 .sidebar.collapsed .menu,

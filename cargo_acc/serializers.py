@@ -11,30 +11,19 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class ClientSerializer(serializers.ModelSerializer):
-    company = serializers.SlugRelatedField(queryset=Company.objects.all(), slug_field='name')
+    company = serializers.PrimaryKeyRelatedField(queryset=Company.objects.all())
 
     class Meta:
         model = Client
         fields = ['id', 'client_code', 'company', 'description']
 
-    def create(self, validated_data):
-        company_name = validated_data.pop('company')
-        company, created = Company.objects.get_or_create(name=company_name)
-        client = Client.objects.create(company=company, **validated_data)
-        return client
-
 
 class WarehouseSerializer(serializers.ModelSerializer):
-    company = serializers.SlugRelatedField(queryset=Company.objects.all(), slug_field='name')
+    company = serializers.PrimaryKeyRelatedField(queryset=Company.objects.all())
 
     class Meta:
         model = Warehouse
         fields = ['id', 'name', 'address', 'company']
-
-    def create(self, validated_data):
-        company = validated_data.pop('company')
-        warehouse = Warehouse.objects.create(company=company, **validated_data)
-        return warehouse
 
 
 class CargoTypeSerializer(serializers.ModelSerializer):

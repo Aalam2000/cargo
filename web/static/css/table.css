@@ -60,13 +60,6 @@
     transition: background 0.2s ease;
 }
 
-/* --- Скролл для больших таблиц --- */
-.table-wrapper {
-    max-height: 420px;
-    overflow-y: auto;
-    border-top: 1px solid #e6e9f0;
-}
-
 /* ====== Единый стиль для кнопок управления (плюс и шестерёнка) ====== */
 .btn-table, .settings-button {
     background: none;            /* как у settings-button */
@@ -101,6 +94,39 @@
 .table-header-container h3 {
     margin: 0;
     margin-right: auto; /* <-- ключевой момент для выравнивания кнопок справа */
+}
+
+/* чтобы внутри card работал скролл таблицы */
+.table-card {
+    display: flex;
+    flex-direction: column;
+    max-height: 45vh;     /* высота каждого справочника */
+    overflow: hidden;     /* обязательно */
+}
+
+.table-card .table-wrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.table-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* заголовок слева, кнопка справа */
+    padding: 12px 16px;             /* нормальные отступы */
+    border-bottom: 1px solid #e4e6eb;
+}
+
+.table-card-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #004aad;
+}
+
+.table-card-header .btn-table {
+    margin-left: auto;  /* если нужны дополнительные поправки */
 }
 
 /* --- Delete-иконка --- */
@@ -201,29 +227,11 @@
 }
 
 /* === Полноэкранная адаптация таблицы === */
-.cargo-table-page {
-    height: calc(100vh - 100px); /* чтобы таблица занимала экран минус шапка */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
 
 .table-container {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-}
-
-.table-wrapper {
-    flex-grow: 1;
-    overflow-y: auto;
-    overflow-x: auto;
-    height: 100%;
-}
-
-/* убираем двойной вертикальный скролл страницы */
-.content {
     overflow: hidden;
 }
 
@@ -232,7 +240,6 @@
     height: calc(100vh - 100px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
 }
 
 .table-container {
@@ -242,6 +249,7 @@
     overflow: hidden;
 }
 
+/* --- Скролл для больших таблиц --- */
 .table-wrapper {
     flex-grow: 1;
     overflow-y: auto;
