@@ -105,4 +105,7 @@ urlpatterns = [
     path('products/', views.products_page, name='products_page'),
     path("api/company/<int:pk>/", views.get_company, name="get_company"),
     path("api/company/<int:pk>/update/", views.update_company, name="update_company"),
+    path("api/products_table/", views_table.products_table, name="products_table"),
+    path("api/client_balance/", views_payment.client_balance, name="client_balance"),
+    path("api/payments_table/", views_payment.payments_table, name="payments_table"),
 ]

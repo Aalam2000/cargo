@@ -296,3 +296,20 @@ window.getCsrf = function () {
         });
     });
 })();
+
+// ===============================
+//  ЛЕВАЯ ПАНЕЛЬ — КОЛЛАПС/ОТКРЫТИЕ
+// ===============================
+window.toggleSidebar = function () {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    // Мобильная версия (<900px) — используем класс .open
+    if (window.innerWidth <= 900) {
+        sidebar.classList.toggle('open');
+        return;
+    }
+
+    // ПК версия — используем .collapsed
+    sidebar.classList.toggle('collapsed');
+};

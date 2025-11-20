@@ -31,7 +31,6 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),    # http://localhost:8000/accounts/...
     path('login/', auth_views.LoginView.as_view(), name='login'),     # http://localhost:8000/login/
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # http://localhost:8000/logout/
-    path("home/data/", views.home_data, name="home_data"),
     path("home/balance/", views.client_balance, name="client_balance"),
     path('', include('cargo_acc.urls')),
     path("api/user_role/", views.api_user_role, name="api_user_role"),

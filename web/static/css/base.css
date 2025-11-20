@@ -354,18 +354,36 @@ button:hover, .btn:hover {
 
     /* Раскрытая панель */
     .sidebar.open {
-        width: 260px !important; /* раскрытие */
-        padding: 24px !important; /* вернуть отступы при открытой панели */
+        width: 260px !important;
+        padding: 24px !important;
         overflow-y: auto !important;
     }
 
-    /* Во время закрытой панели содержимое скрываем (на всякий случай) */
-    .sidebar:not(.open) .logo-block,
-    .sidebar:not(.open) .menu,
-    .sidebar:not(.open) .user-info,
-    .sidebar:not(.open) .login-form,
-    .sidebar:not(.open) .admin-block {
-        display: none !important;
+    .sidebar.open .logo-block,
+    .sidebar.open .menu,
+    .sidebar.open .user-info,
+    .sidebar.open .login-form,
+    .sidebar.open .admin-block {
+        display: block !important;
+    }
+
+    /* ======== ФИКС УДОБНОГО КАСАНИЯ ССЫЛОК ======== */
+    .menu-item {
+        padding: 14px 18px !important; /* крупная зона нажатия */
+        font-size: 1.05rem !important;
+        border-radius: 10px !important;
+        display: block !important;
+        width: calc(100% - 16px) !important; /* учёт левого отступа */
+        margin-bottom: 6px !important; /* расстояние между ссылками */
+    }
+
+    /* логотип и инфо блока — чтобы не прилипали */
+    .logo-block {
+        margin-bottom: 20px !important;
+    }
+
+    .user-info {
+        margin-bottom: 16px !important;
     }
 
     /* ========= БУРГЕР =========

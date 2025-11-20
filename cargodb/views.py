@@ -5,15 +5,18 @@ import sys
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.db import connection
+from django.db.models import Q
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Sum, Count
-from cargo_acc.models import Product, Payment, Client
 
 from cargo_acc.models import Cargo
+from cargo_acc.models import Client
+from cargo_acc.models import Product, Payment
 from .forms import UserLoginForm
+
 
 # @login_required
 # def profile_view(request):
@@ -214,7 +217,6 @@ def cargo_table_data(request):
     next_offset = offset + qs.count()
     has_more = next_offset < total
 
-
     # --- Формат вывода ---
     def fmt(d):
         try:
@@ -339,67 +341,10 @@ def home_view(request):
         "selected_client": client_id,
     })
 
-@login_required
-def home_data(request):
-    tab = request.GET.get("tab")
-    client_code = request.GET.get("client_code", "").strip()
-    product_code = request.GET.get("product_code", "").strip()
 
-    products = Product.objects.select_related("cargo_status", "client", "warehouse", "company")
-    payments = Payment.objects.select_related("client", "company")
+# cargodb/views.py
 
-    user = request.user
-    if user.role == "Client":
-        client_obj = getattr(user, "linked_client", None)
-        if client_obj:
-            products = products.filter(client_id=client_obj.id)
-            payments = payments.filter(client_id=client_obj.id)
-    elif user.role in ["Operator", "Admin"] and client_code:
-        products = products.filter(client__client_code__icontains=client_code)
-        payments = payments.filter(client__client_code__icontains=client_code)
 
-    if product_code:
-        products = products.filter(product_code__icontains=product_code)
-
-    def fmt(d):
-        return d.strftime("%d.%m.%Y") if d else ""
-
-    if tab in ["in_transit", "delivered"]:
-        delivered = products.filter(cargo_status__name__icontains="достав") | products.filter(
-            cargo_status__name__icontains="выдан"
-        )
-        queryset = delivered if tab == "delivered" else products.exclude(id__in=delivered)
-        results = [
-            {
-                "Код": p.product_code,
-                "Описание": p.cargo_description,
-                "Склад": p.warehouse.name if p.warehouse else "",
-                "Назначение": p.destination_place or "",
-                "Вес": p.weight or "",
-                "Стоимость": p.cost or "",
-                "Статус": p.cargo_status.name if p.cargo_status else "",
-            }
-            for p in queryset.order_by("-id")[:50]
-        ]
-    elif tab == "payments":
-        if client_code:
-            payments = payments.filter(client__client_code__icontains=client_code)
-
-        results = [
-            {
-                "id": p.id,
-                "Дата": fmt(p.payment_date),
-                "Клиент": p.client.client_code if p.client else "",
-                "Сумма (USD)": p.amount_total,
-                "Метод": p.method,
-                "Комментарий": p.comment or "",
-            }
-            for p in payments.order_by("-payment_date")[:50]
-        ]
-    else:
-        results = []
-
-    return JsonResponse({"results": results})
 
 # ==============================
 #  Расчет баланса клиента + последний платеж
@@ -446,6 +391,7 @@ def client_balance(request):
     }
 
     return JsonResponse(result)
+
 
 @login_required
 def api_user_role(request):

@@ -167,3 +167,141 @@ def get_currency_rate(request):
         "source": source,
         "date": rate_obj.date.strftime("%Y-%m-%d"),
     })
+
+# ================================
+#  API: Баланс клиента
+# ================================
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from cargo_acc.models import Client, Payment
+
+
+@login_required
+def client_balance(request):
+    user = request.user
+    role = getattr(user, "role", "")
+
+    # --- 1. Определяем клиента ---
+    if role == "Client":
+        linked = getattr(user, "linked_client", None)
+        if not linked:
+            return JsonResponse({
+                "total_paid": 0,
+                "last_payment_date": "",
+                "last_payment_amount": 0
+            })
+        client = linked
+
+    elif role in ("Admin", "Operator"):
+        code = request.GET.get("client_code", "").strip()
+        if not code:
+            return JsonResponse({
+                "total_paid": 0,
+                "last_payment_date": "",
+                "last_payment_amount": 0
+            })
+
+        try:
+            client = Client.objects.get(client_code=code)
+        except Client.DoesNotExist:
+            return JsonResponse({
+                "total_paid": 0,
+                "last_payment_date": "",
+                "last_payment_amount": 0
+            })
+    else:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    # --- 2. Считаем баланс ---
+    payments = Payment.objects.filter(client=client).order_by("-payment_date")
+
+    total_paid = sum(p.amount_total for p in payments)
+
+    last_payment_date = payments[0].payment_date.strftime("%d.%m.%Y") if payments else ""
+    last_payment_amount = float(payments[0].amount_total) if payments else 0
+
+    return JsonResponse({
+        "total_paid": float(total_paid),
+        "last_payment_date": last_payment_date,
+        "last_payment_amount": last_payment_amount
+    })
+
+# =============================================
+#        API: ПЛАТЕЖИ (АНАЛОГ products_table)
+# =============================================
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from cargo_acc.models import Payment, Client
+from django.db.models import Q
+from django.forms.models import model_to_dict
+
+@login_required
+def payments_table(request):
+    user = request.user
+    role = getattr(user, "role", "")
+
+    # --- PAGINATION ---
+    offset = int(request.GET.get("offset", 0))
+    limit = int(request.GET.get("limit", 50))
+    sort_by = request.GET.get("sort_by", "payment_date")
+    sort_dir = request.GET.get("sort_dir", "desc")
+
+    # --- BASE QUERY ---
+    qs = Payment.objects.select_related("client", "company").all()
+
+    # --- ROLE: Client ---
+    if role == "Client":
+        linked = getattr(user, "linked_client", None)
+        if linked:
+            qs = qs.filter(client=linked)
+
+    # --- GLOBAL CLIENT FILTER (home.html input=clientFilter) ---
+    client_filter = request.GET.get("client_code", "").strip()
+    if client_filter and role in ("Admin", "Operator"):
+        qs = qs.filter(client__client_code__icontains=client_filter)
+
+    # --- GENERIC FILTERS ---
+    #   filter[field]=value  →  field__icontains=value
+    for key, value in request.GET.items():
+        if key.startswith("filter[") and key.endswith("]") and value:
+            field = key[7:-1]  # всё внутри []
+            qs = qs.filter(**{f"{field}__icontains": value})
+
+    # --- SORTING ---
+    if sort_dir == "desc":
+        sort_by = f"-{sort_by}"
+    qs = qs.order_by(sort_by)
+
+    # --- TOTAL / EMPTY ---
+    total = qs.count()
+    if offset >= total:
+        return JsonResponse({"results": [], "has_more": False})
+
+    qs = qs[offset:offset + limit]
+    has_more = (offset + qs.count()) < total
+
+    # --- FORMAT OUTPUT ---
+    results = []
+    for pay in qs:
+        row = model_to_dict(pay)
+
+        row["id"] = pay.id
+        row["_id"] = pay.id
+
+        # русские подписи
+        row["Дата"] = pay.payment_date.strftime("%d.%m.%Y") if pay.payment_date else ""
+        row["Клиент"] = pay.client.client_code if pay.client else ""
+        row["Сумма"] = float(pay.amount_total) if pay.amount_total else 0
+        row["Валюта"] = pay.currency
+        row["Курс"] = float(pay.exchange_rate)
+        row["USD"] = float(pay.amount_usd)
+        row["Метод"] = pay.method
+        row["Комментарий"] = pay.comment or ""
+        row["Тип"] = pay.payment_type
+
+        results.append(row)
+
+    return JsonResponse({
+        "results": results,
+        "has_more": has_more
+    })

@@ -215,3 +215,228 @@ class ImageViewSet(viewsets.ModelViewSet):
 class ProductPagination(PageNumberPagination):
     page_size = 20  # Количество записей на странице
     page_size_query_param = 'page_size'
+
+# ================================
+#  НОВЫЙ API ДЛЯ ТАБЛИЦЫ ТОВАРОВ
+#  /api/products_table/
+# ================================
+from django.db.models import Q
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from cargo_acc.models import Product
+
+
+@login_required
+def products_table(request):
+    """
+    Универсальный API таблицы товаров:
+    • tab: in_transit / delivered
+    • fields: список полей через запятую
+    • фильтры filter[field]=value
+    • сортировка sort_by / sort_dir
+    • пагинация offset / limit
+    • контроль ролей: Клиент видит только свои товары
+    """
+
+    # -----------------------------
+    # 1. ПАРАМЕТРЫ
+    # -----------------------------
+    tab = request.GET.get("tab", "").strip()
+
+    try:
+        limit = int(request.GET.get("limit", 50))
+        offset = int(request.GET.get("offset", 0))
+    except:
+        return JsonResponse({"error": "bad pagination"}, status=400)
+
+    sort_by = request.GET.get("sort_by", "id").strip()
+    sort_dir = request.GET.get("sort_dir", "desc").strip()
+
+    requested_fields = [
+        f.strip() for f in request.GET.get("fields", "").split(",") if f.strip()
+    ]
+
+    # -----------------------------
+    # 2. БАЗОВЫЙ QUERYSET
+    # -----------------------------
+    qs = Product.objects.select_related(
+        "client", "company", "warehouse", "cargo_type",
+        "cargo_status", "packaging_type"
+    )
+
+    # -----------------------------
+    # 3. КОНТРОЛЬ РОЛЕЙ
+    # -----------------------------
+    user = request.user
+    role = getattr(user, "role", "")
+
+    if role == "Client":
+        linked = getattr(user, "linked_client", None)
+        if not linked:
+            return JsonResponse({"results": [], "has_more": False, "total": 0})
+        qs = qs.filter(client_id=linked.id)
+
+    elif role in ["Admin", "Operator"]:
+        pass  # видят всё
+
+    else:
+        return JsonResponse({"results": [], "has_more": False, "total": 0})
+
+    # -----------------------------
+    # 4. РАЗДЕЛЕНИЕ "В ПУТИ" / "ОТДАН"
+    # -----------------------------
+    delivered_filter = (
+        Q(cargo_status__name__icontains="отдан") |
+        Q(cargo_status__name__icontains="выдан") |
+        Q(delivery_date__isnull=False)
+    )
+
+    if tab == "delivered":
+        qs = qs.filter(delivered_filter)
+    elif tab == "in_transit":
+        qs = qs.exclude(delivered_filter)
+    else:
+        return JsonResponse({"error": "bad tab"}, status=400)
+
+    # -----------------------------
+    # 5. ФИЛЬТРАЦИЯ
+    # -----------------------------
+    for key, value in request.GET.items():
+        if key.startswith("filter[") and key.endswith("]") and value.strip():
+            field = key[7:-1]  # filter[field]
+            qs = qs.filter(**{f"{field}__icontains": value.strip()})
+
+    # -----------------------------
+    # 6. СОРТИРОВКА
+    # -----------------------------
+    if sort_by:
+        if sort_dir == "desc":
+            sort_by = "-" + sort_by
+        qs = qs.order_by(sort_by)
+
+    # -----------------------------
+    # 7. ПАГИНАЦИЯ
+    # -----------------------------
+    total = qs.count()
+    qs = qs[offset:offset + limit]
+    has_more = offset + limit < total
+
+    # -----------------------------
+    # 8. СПИСОК ВСЕХ ДОСТУПНЫХ ПОЛЕЙ
+    # -----------------------------
+    AVAILABLE_FIELDS = {
+        # простые поля Product
+        "id": "simple",
+        "product_code": "simple",
+        "cargo_description": "simple",
+        "comment": "simple",
+        "departure_place": "simple",
+        "destination_place": "simple",
+        "weight": "simple",
+        "volume": "simple",
+        "cost": "simple",
+        "insurance": "simple",
+        "delivery_time": "simple",
+        "record_date": "date",
+        "shipping_date": "date",
+        "delivery_date": "date",
+        "qr_code": "simple",
+        "qr_created_at": "date",
+
+        # связи
+        "client": "related_client",
+        "company": "related_company",
+        "warehouse": "related_warehouse",
+        "cargo_type": "related_cargo_type",
+        "cargo_status": "related_cargo_status",
+        "packaging_type": "related_packaging_type",
+    }
+
+    # -----------------------------
+    # 9. РУСИФИЦИРОВАННОЕ ФОРМИРОВАНИЕ ОТВЕТА
+    # -----------------------------
+
+    # Маппинг: английское поле → русское название колонки
+    RUS_LABELS = {
+        "id": "ID",
+        "product_code": "Код товара",
+        "cargo_description": "Описание",
+        "comment": "Комментарий",
+        "departure_place": "Пункт отправления",
+        "destination_place": "Пункт назначения",
+        "weight": "Вес",
+        "volume": "Объём",
+        "cost": "Стоимость",
+        "insurance": "Страховка",
+        "delivery_time": "Срок доставки",
+        "record_date": "Дата записи",
+        "shipping_date": "Дата отправки",
+        "delivery_date": "Дата доставки",
+        "qr_code": "QR-код",
+        "qr_created_at": "Дата QR",
+
+        # связи
+        "client": "Клиент",
+        "company": "Компания",
+        "warehouse": "Склад",
+        "cargo_type": "Тип груза",
+        "cargo_status": "Статус",
+        "packaging_type": "Тип упаковки",
+    }
+
+    results = []
+
+    for p in qs:
+        row = {}
+
+        for f in requested_fields:
+            f_type = AVAILABLE_FIELDS.get(f)
+            if not f_type:
+                continue
+
+            # ---- простые ----
+            if f_type == "simple":
+                val = getattr(p, f, "")
+
+            # ---- даты ----
+            elif f_type == "date":
+                d = getattr(p, f, None)
+                val = d.strftime("%d.%m.%Y") if d else ""
+
+            # ---- связи ----
+            elif f_type == "related_client":
+                val = p.client.client_code if p.client else ""
+
+            elif f_type == "related_company":
+                val = p.company.name if p.company else ""
+
+            elif f_type == "related_warehouse":
+                val = p.warehouse.name if p.warehouse else ""
+
+            elif f_type == "related_cargo_type":
+                val = p.cargo_type.name if p.cargo_type else ""
+
+            elif f_type == "related_cargo_status":
+                val = p.cargo_status.name if p.cargo_status else ""
+
+            elif f_type == "related_packaging_type":
+                val = p.packaging_type.name if p.packaging_type else ""
+
+            else:
+                val = ""
+
+            # -----------------------
+            # Русифицированный ключ
+            # -----------------------
+            rus_key = RUS_LABELS.get(f, f)
+
+            row[rus_key] = val
+
+        results.append(row)
+
+    return JsonResponse({
+        "results": results,
+        "has_more": has_more,
+        "total": total
+    })
+
