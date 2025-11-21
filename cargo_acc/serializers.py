@@ -43,6 +43,11 @@ class PackagingTypeSerializer(serializers.ModelSerializer):
         model = PackagingType
         fields = '__all__'
 
+class AccrualTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccrualType
+        fields = '__all__'
+
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:

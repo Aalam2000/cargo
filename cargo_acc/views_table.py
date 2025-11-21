@@ -12,11 +12,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework import viewsets
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, ProductSerializer, CargoSerializer, \
-    CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
+    CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer, AccrualTypeSerializer
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
-    CarrierCompany, Vehicle, TransportBill, CargoMovement, Client
-
-
+    CarrierCompany, Vehicle, TransportBill, CargoMovement, Client, AccrualType
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +38,11 @@ TABLES = {
     "packaging-types": {
         "model": "cargo_acc.PackagingType",
         "fields": ["name", "description"],
+        "search_field": "name",
+    },
+    "accrual-types": {
+        "model": "cargo_acc.AccrualType",
+        "fields": ["name", "description", "default_amount"],
         "search_field": "name",
     },
 }
@@ -199,6 +202,13 @@ class PackagingTypeViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
         return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
 
+class AccrualTypeViewSet(viewsets.ModelViewSet):
+    queryset = AccrualType.objects.all()
+    serializer_class = AccrualTypeSerializer
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        sort_by = self.request.query_params.get('sort_by', 'name')
+        return queryset.order_by(sort_by)
 
 # ViewSet для Изображений
 class ImageViewSet(viewsets.ModelViewSet):

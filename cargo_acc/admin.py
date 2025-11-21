@@ -7,6 +7,7 @@ from .models import (
     CargoType,
     CargoStatus,
     PackagingType,
+    AccrualType,
     Image,
     QRScan,
     Product,
@@ -43,6 +44,7 @@ models_list = [
     CargoType,
     CargoStatus,
     PackagingType,
+    AccrualType,   # ← вот это добавили
     Image,
     QRScan,
     Product,
@@ -57,6 +59,7 @@ models_list = [
     CargoMovement,
     CargoStatusLog,
 ]
+
 
 # 🔹 Универсальная регистрация с DefaultAdmin
 for model in models_list:

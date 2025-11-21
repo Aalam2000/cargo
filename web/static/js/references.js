@@ -437,5 +437,6 @@ function prettify(f) {
     if (f === "address") return "Адрес";
     if (f === "company") return "Компания";
     if (f === "description") return "Примечание";
+    if (f === "default_amount") return "Сумма по умолчанию";
     return f;
 }

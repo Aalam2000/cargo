@@ -100,6 +100,20 @@ class PackagingType(models.Model):
         return self.name
 
 
+class AccrualType(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    default_amount = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Вид начисления"
+        verbose_name_plural = "Виды начислений"
+
+    def __str__(self):
+        return self.name
+
+
 # === ИЗОБРАЖЕНИЯ и QR ===
 class Image(models.Model):
     image_file = models.ImageField(upload_to='img/', default='img/default_image.jpg')
