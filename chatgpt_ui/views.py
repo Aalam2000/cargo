@@ -1,3 +1,4 @@
+# chatgpt_ui/views.py
 import json
 import os
 import re
@@ -9,6 +10,11 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from dotenv import load_dotenv
 from openai import OpenAI
+from django.utils.timezone import now
+import requests
+from .models import ChatSession, ChatMessage
+
+
 
 # Загрузка ключа OpenAI
 load_dotenv()
@@ -253,3 +259,68 @@ def dialog_view(request):
             return JsonResponse({"error": f"Ошибка OpenAI: {str(e)}"}, status=500)
 
     return render(request, 'chatgpt_ui/dialog.html')
+
+
+@csrf_exempt
+def tg_webhook(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "ok"})
+
+    data = json.loads(request.body.decode("utf-8"))
+
+    # 1. Достаём телеграм-текст
+    message = data.get("message", {})
+    chat = message.get("chat", {})
+    telegram_id = str(chat.get("id"))
+    text = message.get("text", "")
+
+    if not telegram_id or not text:
+        return JsonResponse({"status": "ignored"})
+
+    # 2. Ищем или создаём сессию
+    session, created = ChatSession.objects.get_or_create(
+        telegram_id=telegram_id,
+        defaults={"created_at": now()}
+    )
+
+    # 3. Сохраняем входящее сообщение
+    ChatMessage.objects.create(
+        session=session,
+        role="user",
+        content=text
+    )
+
+    # 4. Формируем историю для OpenAI
+    history = []
+    msgs = ChatMessage.objects.filter(session=session).order_by("created_at")[-10:]
+
+    for m in msgs:
+        history.append({"role": m.role, "content": m.content})
+
+    # 5. Запрос в OpenAI
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=history
+        )
+        answer = response.choices[0].message.content
+    except Exception as e:
+        answer = f"Ошибка OpenAI: {e}"
+
+    # 6. Сохраняем ответ ассистента
+    ChatMessage.objects.create(
+        session=session,
+        role="assistant",
+        content=answer
+    )
+
+    # 7. Отправляем сообщение обратно в Telegram
+    bot_token = os.getenv("ADMIN_BOT_TG")
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+    requests.post(url, json={
+        "chat_id": telegram_id,
+        "text": answer
+    })
+
+    return JsonResponse({"status": "sent"})
