@@ -107,6 +107,7 @@
                     <table class="table dynamic-table"></table>
                 </div>
             </div>
+
             <div class="table-card table-container"
                  data-model="accrual-types"
                  data-api="/api/table/accrual-types/"
@@ -115,6 +116,26 @@
 
                 <div class="table-card-header">
                     <h4>Виды начислений</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
+
+            <div class="table-card table-container"
+                 data-model="payment-types"
+                 data-api="/api/table/payment-types/"
+                 data-fields="name,description"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Типы оплат</h4>
                     {% if user.role == 'Admin' or user.role == 'Operator' %}
                         <button class="btn-table btn-add" data-action="add-record">Добавить</button>
                     {% endif %}

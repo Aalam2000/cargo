@@ -1,3 +1,4 @@
+# accounts/views_profile.py
 import os
 import io
 import base64

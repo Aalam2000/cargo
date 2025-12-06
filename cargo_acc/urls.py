@@ -1,27 +1,31 @@
 # cargo_acc/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views, views_payment, views_table
+
 from cargodb import views as core_views
+from . import views, views_payment, views_table
+from .views_invoice import product_invoice_pdf
 
 # --------------------------------------------------------------------
 # 📦 ROUTER — стандартные ViewSet API (CRUD для моделей)
 # --------------------------------------------------------------------
 router = DefaultRouter()
-router.register(r'companies', views_table.CompanyViewSet)
-router.register(r'clients', views_table.ClientViewSet)
-router.register(r'warehouses', views_table.WarehouseViewSet)
-router.register(r'cargo-types', views_table.CargoTypeViewSet)
-router.register(r'cargo-statuses', views_table.CargoStatusViewSet)
-router.register(r'packaging-types', views_table.PackagingTypeViewSet)
-router.register(r'accrual-types', views_table.AccrualTypeViewSet)
-router.register(r'images', views_table.ImageViewSet)
-router.register(r'products', views.ProductViewSet)
-router.register(r'cargos', views.CargoViewSet)
-router.register(r'carrier-companies', views.CarrierCompanyViewSet)
-router.register(r'vehicles', views.VehicleViewSet)
-router.register(r'transport-bills', views.TransportBillViewSet)
-router.register(r'cargo-movements', views.CargoMovementViewSet)
+router.register(r'companies', views_table.CompanyViewSet, basename='company')
+router.register(r'clients', views_table.ClientViewSet, basename='client')
+router.register(r'warehouses', views_table.WarehouseViewSet, basename='warehouse')
+router.register(r'cargo-types', views_table.CargoTypeViewSet, basename='cargotype')
+router.register(r'cargo-statuses', views_table.CargoStatusViewSet, basename='cargostatus')
+router.register(r'packaging-types', views_table.PackagingTypeViewSet, basename='packagingtype')
+router.register(r'accrual-types', views_table.AccrualTypeViewSet, basename='accrualtype')
+router.register(r'images', views_table.ImageViewSet, basename='image')
+router.register(r'products', views.ProductViewSet, basename='product')
+router.register(r'cargos', views.CargoViewSet, basename='cargo')
+router.register(r'carrier-companies', views.CarrierCompanyViewSet, basename='carriercompany')
+router.register(r'vehicles', views.VehicleViewSet, basename='vehicle')
+router.register(r'transport-bills', views.TransportBillViewSet, basename='transportbill')
+router.register(r'cargo-movements', views.CargoMovementViewSet, basename='cargomovement')
+router.register(r'payment-types', views_table.PaymentTypeViewSet, basename='paymenttype')
+router.register(r'products-table', views_table.ProductsTableViewSet, basename='products-table')
 
 # --------------------------------------------------------------------
 # 🌐 URLPATTERNS — основные маршруты приложения cargo_acc
@@ -104,9 +108,13 @@ urlpatterns = [
     path('references/', views.references_page, name='references_page'),
     # в cargo_acc/urls.py: добавить в urlpatterns
     path('products/', views.products_page, name='products_page'),
-    path("api/company/<int:pk>/", views.get_company, name="get_company"),
-    path("api/company/<int:pk>/update/", views.update_company, name="update_company"),
-    path("api/products_table/", views_table.products_table, name="products_table"),
+    path("api/company/<int:pk>/", views_table.get_company, name="get_company"),
+    path("api/company/<int:pk>/update/", views_table.update_company, name="update_company"),
+    path("api/products_table/", views_table.products_table_view, name="products_table"),
     path("api/client_balance/", views_payment.client_balance, name="client_balance"),
     path("api/payments_table/", views_payment.payments_table, name="payments_table"),
+    path("api/product/<int:pk>/invoice/", product_invoice_pdf, name="product_invoice"),
+    path("api/generate/client/", views_table.api_generate_client_code),
+    path("api/generate/product/", views_table.api_generate_product_code),
+    path("api/generate/cargo/", views_table.api_generate_cargo_code),
 ]

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/static/css/invoice.css">
+    <title>Накладная {{ product.product_code }}</title>
+</head>
+
+<body>
+
+<table width="100%" style="border-collapse: collapse;">
+    <tr>
+        <td style="width:70%; vertical-align:top;">
+            <h2 style="margin:0 0 10px 0;">Транспортная накладная на отправку Карго №1</h2>
+
+            <div style="font-size:14px; line-height:20px;">
+                <b>Город отправки:</b> {{ product.departure_place }} <br>
+                <b>Город доставки:</b> {{ product.destination_place }} <br>
+                <b>Отправитель:</b> {{ product.client.client_code }} <br>
+                <b>Получатель:</b> {{ product.client.client_code }} <br>
+            </div>
+        </td>
+
+        <td style="width:30%; text-align:right;">
+            <div style="font-size:14px;">{{ product.shipping_date }}</div>
+
+            <!-- ЛОГО КОМПАНИИ -->
+            <img src="/static/img/logo.png"
+                 style="width:160px; margin-top:10px;">
+        </td>
+    </tr>
+</table>
+
+<br>
+
+<table border="1" cellspacing="0" cellpadding="6" width="100%" style="font-size:13px;">
+    <thead style="text-align:center; font-weight:bold;">
+    <tr>
+        <td>НОМЕР ГРУЗА</td>
+        <td>Кол.</td>
+        <td>Категория товара</td>
+        <td>Дата от-ки</td>
+        <td>Дата доставки</td>
+        <td>Вес (kg)</td>
+        <td>Объём</td>
+        <td>Цена ($)</td>
+        <td>ТАРИФ</td>
+        <td>Страховка ($)</td>
+        <td>Уп-ка ($)</td>
+        <td>Срок доставки</td>
+        <td>Общая к оплате ($)</td>
+        <td>Оплата переводом</td>
+    </tr>
+    </thead>
+
+    <tbody>
+    <tr style="text-align:center;">
+        <td>{{ product.product_code }}</td>
+        <td>1</td>
+        <td>{{ product.cargo_description }}</td>
+        <td>{{ product.shipping_date }}</td>
+        <td>{{ product.delivery_date }}</td>
+        <td>{{ product.weight }}</td>
+        <td>{{ product.volume }}</td>
+        <td>{{ product.cost }}</td>
+        <td>ТАРИФ</td>
+        <td>{{ product.insurance }}</td>
+        <td>{{ product.packaging_type.name }}</td>
+        <td>{{ product.delivery_time }}</td>
+        <td>
+            {% if product.cost %}
+                {{ product.cost }}
+            {% else %}
+                —
+            {% endif %}
+        </td>
+        <td>2%</td>
+    </tr>
+    </tbody>
+</table>
+
+</body>
+</html>

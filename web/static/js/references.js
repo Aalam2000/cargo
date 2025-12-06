@@ -331,44 +331,76 @@ function openCompanyModal(data) {
 
             <div class="modal-body">
                 <form id="company-edit-form">
-
+                
                     <div class="modal-row">
                         <label>Название</label>
                         <input name="name" class="modal-input" type="text" value="${data.name ?? ''}">
                     </div>
-
+                
                     <div class="modal-row">
-                        <label>ИНН</label>
-                        <input name="inn" class="modal-input" type="text" value="${data.inn ?? ''}">
+                        <label>Регистрационный номер</label>
+                        <input name="registration" class="modal-input" type="text" value="${data.registration ?? ''}">
                     </div>
-
+                
                     <div class="modal-row">
-                        <label>ОГРН</label>
+                        <label>ИНН / Tax ID</label>
+                        <input name="tax_id" class="modal-input" type="text" value="${data.tax_id ?? ''}">
+                    </div>
+                
+                    <div class="modal-row">
+                        <label>ОГРН / Registration №</label>
                         <input name="ogrn" class="modal-input" type="text" value="${data.ogrn ?? ''}">
                     </div>
-
+                
                     <div class="modal-row">
-                        <label>Юр. адрес</label>
+                        <label>Юридический адрес</label>
                         <input name="legal_address" class="modal-input" type="text" value="${data.legal_address ?? ''}">
                     </div>
-
+                
                     <div class="modal-row">
-                        <label>Факт. адрес</label>
+                        <label>Фактический адрес</label>
                         <input name="actual_address" class="modal-input" type="text" value="${data.actual_address ?? ''}">
                     </div>
-
+                
+                    <div class="modal-row">
+                        <label>Ф.И.О. представителя</label>
+                        <input name="representative_fullname" class="modal-input" type="text" value="${data.representative_fullname ?? ''}">
+                    </div>
+                
+                    <div class="modal-row">
+                        <label>Действует на основании</label>
+                        <input name="representative_basis" class="modal-input" type="text" value="${data.representative_basis ?? ''}">
+                    </div>
+                
                     <div class="modal-row">
                         <label>Телефон</label>
                         <input name="phone" class="modal-input" type="text" value="${data.phone ?? ''}">
                     </div>
-
+                
                     <div class="modal-row">
                         <label>Email</label>
                         <input name="email" class="modal-input" type="text" value="${data.email ?? ''}">
                     </div>
-
+                
+                    <div class="modal-row">
+                        <label>Описание</label>
+                        <textarea name="description" class="modal-input">${data.description ?? ''}</textarea>
+                    </div>
+                
+                    <div class="modal-row">
+                        <label>Префикс компании (2 буквы)</label>
+                        <input name="prefix" maxlength="2" class="modal-input" type="text" value="${data.prefix ?? ''}">
+                    </div>
+                             
+                    <div class="modal-row">
+                        <label>Ф.И.О. директора</label>
+                        <input name="director_fullname" class="modal-input" type="text" value="${data.director_fullname ?? ''}">
+                    </div>
+                
                 </form>
+
             </div>
+
 
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-modal-close>Отмена</button>

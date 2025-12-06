@@ -1,17 +1,16 @@
-# ==============================
 #  cargodb/urls.py
-# ==============================
 
-from django.contrib import admin
-from django.urls import path, include
-from . import views
-from django.contrib.auth import views as auth_views
 import logging
+
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.contrib.auth import views as auth_views
+from django.urls import path, include
+
+from . import views
 
 logger = logging.getLogger(__name__)
-
 
 # ==============================
 #  🔹 ОСНОВНЫЕ МАРШРУТЫ ПРОЕКТА
@@ -25,17 +24,16 @@ urlpatterns = [
     path("cargo_table/", views.cargo_table_view, name="cargo_table"),  # страница таблицы грузов
 
     # === Админ-панель Django ===
-    path("admin/", admin.site.urls),                # http://localhost:8000/admin/
+    path("admin/", admin.site.urls),  # http://localhost:8000/admin/
 
     # === Аккаунты и авторизация ===
-    path('accounts/', include('accounts.urls')),    # http://localhost:8000/accounts/...
-    path('login/', auth_views.LoginView.as_view(), name='login'),     # http://localhost:8000/login/
+    path('accounts/', include('accounts.urls')),  # http://localhost:8000/accounts/...
+    path('login/', auth_views.LoginView.as_view(), name='login'),  # http://localhost:8000/login/
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # http://localhost:8000/logout/
     path("home/balance/", views.client_balance, name="client_balance"),
     path('', include('cargo_acc.urls')),
     path("api/user_role/", views.api_user_role, name="api_user_role"),
 ]
-
 
 # ==============================
 #  🔹 ОБРАБОТКА СТАТИКИ И МЕДИА
@@ -43,8 +41,6 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-
 # ==============================
 #  🔹 ЛОГИРОВАНИЕ
 # ==============================
-logger.info("Файл cargodb/urls.py успешно загружен — маршруты активны.")

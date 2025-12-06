@@ -8,6 +8,7 @@ from .models import (
     CargoStatus,
     PackagingType,
     AccrualType,
+    PaymentType,
     Image,
     QRScan,
     Product,
@@ -15,12 +16,13 @@ from .models import (
     ExtraCost,
     ExtraCostAllocation,
     Payment,
-    PaymentProduct,
+    Snapshot,
     CarrierCompany,
     Vehicle,
     TransportBill,
     CargoMovement,
-    CargoStatusLog,
+    SystemActionLog,
+    CurrencyRate,
 )
 
 # 🔹 Универсальный класс администратора с ID
@@ -44,7 +46,8 @@ models_list = [
     CargoType,
     CargoStatus,
     PackagingType,
-    AccrualType,   # ← вот это добавили
+    AccrualType,
+    PaymentType,
     Image,
     QRScan,
     Product,
@@ -52,12 +55,13 @@ models_list = [
     ExtraCost,
     ExtraCostAllocation,
     Payment,
-    PaymentProduct,
+    Snapshot,
     CarrierCompany,
     Vehicle,
     TransportBill,
     CargoMovement,
-    CargoStatusLog,
+    SystemActionLog,
+    CurrencyRate,
 ]
 
 

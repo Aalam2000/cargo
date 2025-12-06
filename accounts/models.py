@@ -91,6 +91,42 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         default="individual",
         verbose_name="Тип клиента"
     )
+    default_warehouse = models.ForeignKey(
+        'cargo_acc.Warehouse',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users_default_warehouse',
+        verbose_name="Склад по умолчанию"
+    )
+
+    default_cargo_type = models.ForeignKey(
+        'cargo_acc.CargoType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users_default_cargo_type',
+        verbose_name="Тип груза по умолчанию"
+    )
+
+    default_cargo_status = models.ForeignKey(
+        'cargo_acc.CargoStatus',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users_default_cargo_status',
+        verbose_name="Статус груза по умолчанию"
+    )
+
+    default_packaging_type = models.ForeignKey(
+        'cargo_acc.PackagingType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users_default_packaging_type',
+        verbose_name="Упаковка по умолчанию"
+    )
+
     # Профиль
     first_name = models.CharField(max_length=30, blank=True, default="Не указано")
     last_name = models.CharField(max_length=30, blank=True, default="Не указано")

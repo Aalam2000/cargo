@@ -3,51 +3,42 @@
 {% block title %}Товары — Cargo{% endblock %}
 
 {% block content %}
+
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
+<script defer src="{% static 'js/products_table.js' %}"></script>
+<script defer src="{% static 'js/products_table_modals.js' %}"></script>
 
 <div class="cargo-table-page">
-  <div class="table-container">
-    <!-- header: название + кнопки справа (использует .table-header-container) -->
-    <div class="table-header-container" style="padding:12px 16px;">
-      <h3>Товары</h3>
-      <div class="d-flex gap-2">
-        <!-- настройки колонок -->
-        <button id="btn-table-settings" class="btn-table settings-button" title="Настройка колонок">⚙</button>
-        <!-- кнопка добавления (если нужно) -->
-        <button id="btn-add-product" class="btn-table" title="Добавить товар">＋</button>
-      </div>
+
+    <div class="table-header-container">
+        <h3>Товары</h3>
+        <div style="display:flex; gap:12px;">
+            <button id="btnAddProduct" class="btn-table">＋</button>
+        </div>
     </div>
 
-    <!-- обёртка таблицы чтобы работал скролл и стили из table.css -->
-    <div class="table-wrapper" id="product-table-wrap">
-      <table id="product-table" class="table" role="table" aria-label="Таблица товаров">
-        <thead></thead>
-        <tbody></tbody>
-      </table>
-
-      <div id="product-table-empty" class="balance-box" style="display:none; margin:12px;">
-        <div class="balance-label">Нет данных</div>
-      </div>
-
-      <div id="loader" style="display:none;">Загрузка...</div>
+    <!-- Фильтр -->
+    <div class="filter-bar">
+        <input id="filterProductCode" class="input-filter" placeholder="Код товара" type="text">
+        <input id="filterClient" class="input-filter" placeholder="Клиент" type="text">
+        <input id="filterCargo" class="input-filter" placeholder="Груз" type="text">
+        <input id="filterWarehouse" class="input-filter" placeholder="Склад" type="text">
     </div>
-  </div>
+
+    <div class="table-card table-container">
+        <div class="table-wrapper" id="product-table-wrapper" data-tab="products">
+            <table id="product-table" class="table">
+                <thead id="product-head"></thead>
+                <tbody id="product-body"></tbody>
+            </table>
+
+            <div id="product-loader" class="loader hidden"></div>
+            <div id="product-empty" class="balance-box hidden">
+                <div class="balance-label">Нет данных</div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
-<!-- модалка простая для загрузки изображений (заглушка) -->
-<div id="image-upload-modal" class="modal-overlay" style="display:none;">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="image-upload-title">
-    <div class="modal-header"><h3 id="image-upload-title">Загрузить изображение</h3></div>
-    <div class="modal-body">
-      <input type="file" id="image-file-input" accept="image/*">
-      <div id="image-upload-status" style="margin-top:8px;"></div>
-    </div>
-    <div class="modal-footer">
-      <button id="image-upload-send" class="btn">Загрузить</button>
-      <button id="image-upload-cancel" class="btn btn-cancel">Отмена</button>
-    </div>
-  </div>
-</div>
-
-<script defer src="{% static 'js/load_product_table.js' %}"></script>
 {% endblock %}

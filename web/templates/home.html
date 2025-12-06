@@ -20,9 +20,10 @@
         </div>
 
         <!-- Фильтр -->
-        <div class="filter-bar global-filters">
+        <div class="filter-bar global-filters" id="clientFilterBlock">
             <input id="clientFilter" class="input-filter" placeholder="Код клиента"
                    type="text" oninput="updateClientBalance(this.value)">
+            <div id="clientInfo" class="client-info"></div>
         </div>
         <!-- Вкладки -->
         <div class="tabs">

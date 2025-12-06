@@ -1,6 +1,5 @@
 # cargo_acc/serializers.py
 from rest_framework import serializers
-
 from .models import *
 
 
@@ -11,7 +10,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class ClientSerializer(serializers.ModelSerializer):
-    company = serializers.PrimaryKeyRelatedField(queryset=Company.objects.all())
+    company = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Client
@@ -19,7 +18,7 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class WarehouseSerializer(serializers.ModelSerializer):
-    company = serializers.PrimaryKeyRelatedField(queryset=Company.objects.all())
+    company = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Warehouse
@@ -30,23 +29,34 @@ class CargoTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoType
         fields = '__all__'
+        read_only_fields = ["company"]
 
 
 class CargoStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoStatus
         fields = '__all__'
+        read_only_fields = ["company"]
 
 
 class PackagingTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PackagingType
         fields = '__all__'
+        read_only_fields = ["company"]
 
 class AccrualTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccrualType
         fields = '__all__'
+        read_only_fields = ["company"]
+
+class PaymentTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentType
+        fields = '__all__'
+        read_only_fields = ["id", "created_at", "company"]
+
 
 
 class ImageSerializer(serializers.ModelSerializer):
@@ -66,9 +76,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Клиент
     client_id = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(),
-        source='client',
-        required=False
+        read_only=True
     )
     client_code = serializers.SlugRelatedField(
         slug_field='client_code',
@@ -78,9 +86,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Компания
     company_id = serializers.PrimaryKeyRelatedField(
-        queryset=Company.objects.all(),
-        source='company',
-        required=False
+        read_only=True
     )
     company_name = serializers.SlugRelatedField(
         slug_field='name',
@@ -90,9 +96,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Склад
     warehouse_id = serializers.PrimaryKeyRelatedField(
-        queryset=Warehouse.objects.all(),
-        source='warehouse',
-        required=False
+        read_only=True
     )
     warehouse_name = serializers.SlugRelatedField(
         slug_field='name',
@@ -102,9 +106,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Тип груза
     cargo_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=CargoType.objects.all(),
-        source='cargo_type',
-        required=False
+        read_only=True
     )
     cargo_type_name = serializers.SlugRelatedField(
         slug_field='name',
@@ -114,9 +116,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Статус груза
     cargo_status_id = serializers.PrimaryKeyRelatedField(
-        queryset=CargoStatus.objects.all(),
-        source='cargo_status',
-        required=False
+        read_only=True
     )
     cargo_status_name = serializers.SlugRelatedField(
         slug_field='name',
@@ -126,9 +126,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Тип упаковки
     packaging_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=PackagingType.objects.all(),
-        source='packaging_type',
-        required=False
+        read_only=True
     )
     packaging_type_name = serializers.SlugRelatedField(
         slug_field='name',
@@ -175,12 +173,14 @@ class CargoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cargo
         fields = '__all__'
+        read_only_fields = ["company"]
 
 
 class CarrierCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = CarrierCompany
         fields = '__all__'
+        read_only_fields = ["company"]
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -199,14 +199,17 @@ class TransportBillSerializer(serializers.ModelSerializer):
     class Meta:
         model = TransportBill
         fields = '__all__'
+        read_only_fields = ["company"]
 
 
 class CargoMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoMovement
         fields = '__all__'
+        read_only_fields = ["company"]
 
-class CargoStatusLogSerializer(serializers.ModelSerializer):
+class SystemActionLogSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CargoStatusLog
+        model = SystemActionLog
         fields = '__all__'
+        read_only_fields = ["company"]
