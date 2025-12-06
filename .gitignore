@@ -66,5 +66,4 @@ Thumbs.db
 index.nginx-debian.html
 .env*
 
-**/migrations/*
 !**/migrations/__init__.py
