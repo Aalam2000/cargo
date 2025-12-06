@@ -23,6 +23,8 @@ urlpatterns = [
     path('home/', views.home_view, name='home'),  # http://localhost:8000/home/ → home.html (только после входа)
     path("cargo_table/", views.cargo_table_view, name="cargo_table"),  # страница таблицы грузов
 
+    # === Подключение модулей ===
+    path('bot/', include('chatgpt_ui.urls')),
     # === Админ-панель Django ===
     path("admin/", admin.site.urls),  # http://localhost:8000/admin/
 

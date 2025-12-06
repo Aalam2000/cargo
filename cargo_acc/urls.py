@@ -92,9 +92,6 @@ urlpatterns = [
     # === Оплаты клиентов ===
     path("api/add_payment/", views_payment.add_or_edit_payment, name="add_payment"),
 
-    # === Подключение модулей ===
-    path('chatgpt_ui/', include('chatgpt_ui.urls')),  # внутренний модуль ChatGPT UI
-
     # === Таблицы и API-грузов ===
     path("api/cargo_table/data/", core_views.cargo_table_data, name="cargo_table_data"),
     path("api/cargo_table/config/", core_views.cargo_table_config, name="cargo_table_config"),
