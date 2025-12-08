@@ -212,6 +212,10 @@ class AccrualTypeViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get('sort_by', 'name')
         return AccrualType.objects.filter(company=company).order_by(sort_by)
 
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
 
 class PaymentTypeViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentTypeSerializer
