@@ -1,7 +1,6 @@
 # ==========================
 # Файлы конфигурации и секретов
 # ==========================
-.env*
 *.key
 *.pem
 docker-compose.dev.yml
@@ -64,6 +63,5 @@ Thumbs.db
 # Nginx дефолт
 # ==========================
 index.nginx-debian.html
-.env*
-
+.env.*
 !**/migrations/__init__.py
