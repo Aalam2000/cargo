@@ -1,5 +1,6 @@
 # cargo_acc/serializers.py
 from rest_framework import serializers
+
 from .models import *
 
 
@@ -45,11 +46,13 @@ class PackagingTypeSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ["company"]
 
+
 class AccrualTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccrualType
         fields = '__all__'
         read_only_fields = ["company"]
+
 
 class PaymentTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -58,11 +61,11 @@ class PaymentTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at", "company"]
 
 
-
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
         fields = '__all__'
+
 
 class QRScanSerializer(serializers.ModelSerializer):
     class Meta:
@@ -207,6 +210,7 @@ class CargoMovementSerializer(serializers.ModelSerializer):
         model = CargoMovement
         fields = '__all__'
         read_only_fields = ["company"]
+
 
 class SystemActionLogSerializer(serializers.ModelSerializer):
     class Meta:
