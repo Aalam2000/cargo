@@ -1,9 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/static/css/invoice.css">
-    <title>Накладная {{ product.product_code }}</title>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="{% static 'css/invoice.css' %}">
+<title>Накладная</title>
 </head>
 
 <body>
@@ -25,8 +26,8 @@
             <div style="font-size:14px;">{{ product.shipping_date }}</div>
 
             <!-- ЛОГО КОМПАНИИ -->
-            <img src="/static/img/logo.png"
-                 style="width:160px; margin-top:10px;">
+            <img src="{{ request.build_absolute_uri }}static/img/logo.png"
+                style="width:160px; margin-top:10px;">
         </td>
     </tr>
 </table>
