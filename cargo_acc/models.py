@@ -320,9 +320,9 @@ class ExtraCostAllocation(models.Model):
         return f"{self.extra_cost.cost_type} → {self.product.product_code} ({self.amount})"
 
 
-# ===============
-# === ПЛАТЕЖИ ===
-# ===============
+# ================
+# === ПЛАТЕЖИ ====
+# ================
 # === Оплаты и Начисления клиентов ===
 class Payment(models.Model):
     company = models.ForeignKey("Company", on_delete=models.CASCADE, related_name="payments")
