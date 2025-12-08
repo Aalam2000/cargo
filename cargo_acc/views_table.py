@@ -2,25 +2,25 @@
 
 import logging
 import os
+
 import transliterate
 from django.apps import apps
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, EmptyPage
 from django.db.models import Q
+from django.forms.models import model_to_dict
 from django.http import JsonResponse
-from cargo_acc.company_utils import get_user_company, get_log_meta
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
+
+from cargo_acc.company_utils import get_user_company, get_log_meta
+from cargo_acc.models import SystemActionLog
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Client, AccrualType, \
     PaymentType
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, AccrualTypeSerializer, PaymentTypeSerializer
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import permission_classes
-from django.forms.models import model_to_dict
-from cargo_acc.models import SystemActionLog
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +157,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         return Company.objects.filter(id=company.id)
 
+
 # ViewSet для Клиентов
 class ClientViewSet(viewsets.ModelViewSet):
     serializer_class = ClientSerializer
@@ -165,6 +166,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         sort_by = self.request.query_params.get("sort_by", "client_code")
         return Client.objects.filter(company=company).order_by(sort_by)
+
 
 # ViewSet для Складов
 class WarehouseViewSet(viewsets.ModelViewSet):
@@ -176,6 +178,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get("sort_by", "name")
         return Warehouse.objects.filter(company=company).order_by(sort_by)
 
+
 # ViewSet для Типов Груза
 class CargoTypeViewSet(viewsets.ModelViewSet):
     serializer_class = CargoTypeSerializer
@@ -185,6 +188,7 @@ class CargoTypeViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get('sort_by', 'name')
         return CargoType.objects.filter(company=company).order_by(sort_by)
 
+
 # ViewSet для Статусов Груза
 class CargoStatusViewSet(viewsets.ModelViewSet):
     serializer_class = CargoStatusSerializer
@@ -193,6 +197,7 @@ class CargoStatusViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         sort_by = self.request.query_params.get('sort_by', 'name')
         return CargoStatus.objects.filter(company=company).order_by(sort_by)
+
 
 # ViewSet для Типов Упаковок
 class PackagingTypeViewSet(viewsets.ModelViewSet):
@@ -224,6 +229,21 @@ class PaymentTypeViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         sort_by = self.request.query_params.get("sort_by", "name")
         return PaymentType.objects.filter(company=company).order_by(sort_by)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.serializer_class(instance)
+        return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+
 
 # ViewSet для Изображений
 class ImageViewSet(viewsets.ModelViewSet):
@@ -454,7 +474,6 @@ class ProductsTableViewSet(ViewSet):
         return Response({"status": "ok"})
 
 
-
 # ================================
 #  НОВЫЙ API ДЛЯ ТАБЛИЦЫ ТОВАРОВ
 #  /api/products_table/
@@ -492,9 +511,9 @@ def products_table_view(request):
         return JsonResponse({"results": [], "total": 0, "has_more": False})
 
     delivered_filter = (
-        Q(cargo_status__name__icontains="отдан") |
-        Q(cargo_status__name__icontains="выдан") |
-        Q(delivery_date__isnull=False)
+            Q(cargo_status__name__icontains="отдан") |
+            Q(cargo_status__name__icontains="выдан") |
+            Q(delivery_date__isnull=False)
     )
 
     if tab == "delivered":
@@ -598,7 +617,6 @@ def get_company(request, pk):
 @login_required
 def update_company(request, pk):
     from .models import Company
-    import json
 
     if request.method != "PUT":
         return JsonResponse({"error": "method not allowed"}, status=405)

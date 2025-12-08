@@ -55,7 +55,7 @@ class PaymentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentType
         fields = '__all__'
-        read_only_fields = ["id", "created_at", "company"]
+        read_only_fields = ["created_at", "company"]
 
 
 
