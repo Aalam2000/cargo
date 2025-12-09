@@ -1,5 +1,4 @@
-version: "3.9"
-
+# docker-compose.prod.yml
 services:
 
   cargo_app:
