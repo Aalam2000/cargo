@@ -2,7 +2,7 @@
 
 import logging
 import os
-
+import json
 import transliterate
 from django.apps import apps
 from django.contrib.auth.decorators import login_required
@@ -14,7 +14,6 @@ from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
-
 from cargo_acc.company_utils import get_user_company, get_log_meta
 from cargo_acc.models import SystemActionLog
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Client, AccrualType, \
@@ -632,7 +631,7 @@ def update_company(request, pk):
     except Company.DoesNotExist:
         return JsonResponse({"error": "not found"}, status=404)
 
-    data = request.data
+    data = json.loads(request.body)
     logger.error(f"CREATE PARSED DATA: {data}")
 
     # Перебираем только существующие поля модели
