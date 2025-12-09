@@ -1,17 +1,30 @@
-# docker-compose.prod.yml
 services:
-
   cargo_app:
+    container_name: cargo_app
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cargo_app
-    command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000
-    ports:
-      - "8000:8000"
+
+    command: >
+      gunicorn cargodb.wsgi:application
+      --bind 0.0.0.0:8000
+
+    # 🔥 Подключаем твои .env файлы, лежащие на диске сервера
     env_file:
       - .env.prod
+      - .env.secrets
+
+    ports:
+      - "8000:8000"
+
     volumes:
+      # статика и медиа должны сохраняться между пересборками
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
 
+    networks:
+      - default
+
+networks:
+  default:
+    name: cargodb_default
