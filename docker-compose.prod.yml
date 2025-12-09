@@ -28,6 +28,3 @@ services:
       - /var/www/cargodb/media:/app/media                # (если есть)
     depends_on:
       - cargo_app
-
-volumes:
-  # (могут не понадобиться, так как мы используем прямой bind)
