@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-import requests
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.templatetags.static import static
@@ -52,28 +51,6 @@ def product_invoice_pdf(request, pk):
     logger.debug(html)
     logger.debug("=== HTML END ===")
 
-    start = time.time()
-    try:
-        r_css = requests.get(request.build_absolute_uri(static_css), timeout=10)
-        logger.debug(
-            f"[CSS CHECK] status={r_css.status_code}, "
-            f"len={len(r_css.content)}, "
-            f"time={(time.time() - start):.2f}s"
-        )
-    except Exception as e:
-        logger.debug(f"[CSS CHECK] ERROR: {e}")
-
-    start = time.time()
-    try:
-        r_logo = requests.get(request.build_absolute_uri(static_logo), timeout=10)
-        logger.debug(
-            f"[LOGO CHECK] status={r_logo.status_code}, "
-            f"len={len(r_logo.content)}, "
-            f"time={(time.time() - start):.2f}s"
-        )
-    except Exception as e:
-        logger.debug(f"[LOGO CHECK] ERROR: {e}")
-
     try:
         logger.debug("Calling WeasyPrint HTML.write_pdf()...")
 
@@ -92,6 +69,6 @@ def product_invoice_pdf(request, pk):
 
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = (
-        f'inline; filename="invoice_{product.product_code}.pdf"'
+        f'inline; filename=\"invoice_{product.product_code}.pdf\"'
     )
     return response
