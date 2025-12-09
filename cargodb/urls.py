@@ -7,7 +7,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-
+from django.views.generic import RedirectView
 from . import views
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,10 @@ urlpatterns = [
     path("home/balance/", views.client_balance, name="client_balance"),
     path('', include('cargo_acc.urls')),
     path("api/user_role/", views.api_user_role, name="api_user_role"),
+    path('favicon.ico', RedirectView.as_view(
+        url=settings.STATIC_URL + 'favicon.ico',
+        permanent=True
+    )),
 ]
 
 # ==============================
