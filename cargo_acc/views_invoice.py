@@ -10,9 +10,6 @@ from weasyprint import HTML
 from .models import Product
 
 
-# ---------------------------------------------------------
-# ЛОГ ФАЙЛ
-# ---------------------------------------------------------
 LOG_PATH = "/var/log/invoice_debug.log"
 with open(LOG_PATH, "w", encoding="utf-8") as f:
     f.write("=== NEW PDF GENERATION SESSION ===\n")
@@ -29,20 +26,15 @@ if not logger.handlers:
     logger.addHandler(fh)
 
 
-# ---------------------------------------------------------
-# ГЕНЕРАЦИЯ ПДФ
-# ---------------------------------------------------------
 def product_invoice_pdf(request, pk):
     logger.debug("=== START PDF GENERATION ===")
 
     product = get_object_or_404(Product, pk=pk)
     logger.debug(f"Product loaded: id={product.id}, code={product.product_code}")
 
-    domain = request.build_absolute_uri("/")
-    static_logo = domain + static('img/logo.png')
-    static_css = domain + static('css/invoice.css')
+    static_logo = static('img/logo.png')
+    static_css = static('css/invoice.css')
 
-    logger.debug(f"domain = {domain}")
     logger.debug(f"static_logo = {static_logo}")
     logger.debug(f"static_css = {static_css}")
 
@@ -60,12 +52,9 @@ def product_invoice_pdf(request, pk):
     logger.debug(html)
     logger.debug("=== HTML END ===")
 
-    # ---------------------------------------------------------
-    # ПРОВЕРКА CSS
-    # ---------------------------------------------------------
     start = time.time()
     try:
-        r_css = requests.get(static_css, timeout=10)
+        r_css = requests.get(request.build_absolute_uri(static_css), timeout=10)
         logger.debug(
             f"[CSS CHECK] status={r_css.status_code}, "
             f"len={len(r_css.content)}, "
@@ -74,12 +63,9 @@ def product_invoice_pdf(request, pk):
     except Exception as e:
         logger.debug(f"[CSS CHECK] ERROR: {e}")
 
-    # ---------------------------------------------------------
-    # ПРОВЕРКА LOGO
-    # ---------------------------------------------------------
     start = time.time()
     try:
-        r_logo = requests.get(static_logo, timeout=10)
+        r_logo = requests.get(request.build_absolute_uri(static_logo), timeout=10)
         logger.debug(
             f"[LOGO CHECK] status={r_logo.status_code}, "
             f"len={len(r_logo.content)}, "
@@ -88,9 +74,6 @@ def product_invoice_pdf(request, pk):
     except Exception as e:
         logger.debug(f"[LOGO CHECK] ERROR: {e}")
 
-    # ---------------------------------------------------------
-    # PDF
-    # ---------------------------------------------------------
     try:
         logger.debug("Calling WeasyPrint HTML.write_pdf()...")
 
@@ -109,6 +92,6 @@ def product_invoice_pdf(request, pk):
 
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = (
-        f'inline; filename=\"invoice_{product.product_code}.pdf\"'
+        f'inline; filename="invoice_{product.product_code}.pdf"'
     )
     return response
