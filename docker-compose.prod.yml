@@ -15,16 +15,3 @@ services:
     volumes:
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
-
-  nginx:
-    image: nginx:latest
-    container_name: cargo_nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx:/etc/nginx/conf.d
-      - /var/www/cargodb/staticfiles:/app/staticfiles
-      - /var/www/cargodb/media:/app/media
-    depends_on:
-      - cargo_app
