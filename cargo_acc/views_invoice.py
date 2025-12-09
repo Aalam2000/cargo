@@ -1,5 +1,7 @@
 import os
+import time
 import logging
+import requests
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.templatetags.static import static
@@ -8,12 +10,10 @@ from weasyprint import HTML
 from .models import Product
 
 
-# ============================================================
-#  НАСТРОЙКА ОТДЕЛЬНОГО ЛОГА ДЛЯ PDF
-# ============================================================
+# ---------------------------------------------------------
+# ЛОГ ФАЙЛ
+# ---------------------------------------------------------
 LOG_PATH = "/var/log/invoice_debug.log"
-
-# Полная перезапись лога при каждом открытии PDF
 with open(LOG_PATH, "w", encoding="utf-8") as f:
     f.write("=== NEW PDF GENERATION SESSION ===\n")
 
@@ -25,22 +25,19 @@ fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 fh.setFormatter(formatter)
 
-# чтобы не добавлялись дубль-хендлеры
 if not logger.handlers:
     logger.addHandler(fh)
 
 
-# ============================================================
-#  ОСНОВНАЯ ФУНКЦИЯ
-# ============================================================
+# ---------------------------------------------------------
+# ГЕНЕРАЦИЯ ПДФ
+# ---------------------------------------------------------
 def product_invoice_pdf(request, pk):
     logger.debug("=== START PDF GENERATION ===")
 
-    # 1. Получаем товар
     product = get_object_or_404(Product, pk=pk)
     logger.debug(f"Product loaded: id={product.id}, code={product.product_code}")
 
-    # 2. Формируем URL для статики
     domain = request.build_absolute_uri("/")
     static_logo = domain + static('img/logo.png')
     static_css = domain + static('css/invoice.css')
@@ -49,7 +46,6 @@ def product_invoice_pdf(request, pk):
     logger.debug(f"static_logo = {static_logo}")
     logger.debug(f"static_css = {static_css}")
 
-    # 3. Рендер HTML
     html = render_to_string(
         "invoice/product_invoice.html",
         {
@@ -58,14 +54,43 @@ def product_invoice_pdf(request, pk):
             "css_url": static_css,
         }
     )
-    logger.debug("HTML rendered successfully")
 
-    # 4. Логируем HTML
+    logger.debug("HTML rendered successfully")
     logger.debug("=== HTML START ===")
     logger.debug(html)
     logger.debug("=== HTML END ===")
 
-    # 5. Генерация PDF
+    # ---------------------------------------------------------
+    # ПРОВЕРКА CSS
+    # ---------------------------------------------------------
+    start = time.time()
+    try:
+        r_css = requests.get(static_css, timeout=10)
+        logger.debug(
+            f"[CSS CHECK] status={r_css.status_code}, "
+            f"len={len(r_css.content)}, "
+            f"time={(time.time() - start):.2f}s"
+        )
+    except Exception as e:
+        logger.debug(f"[CSS CHECK] ERROR: {e}")
+
+    # ---------------------------------------------------------
+    # ПРОВЕРКА LOGO
+    # ---------------------------------------------------------
+    start = time.time()
+    try:
+        r_logo = requests.get(static_logo, timeout=10)
+        logger.debug(
+            f"[LOGO CHECK] status={r_logo.status_code}, "
+            f"len={len(r_logo.content)}, "
+            f"time={(time.time() - start):.2f}s"
+        )
+    except Exception as e:
+        logger.debug(f"[LOGO CHECK] ERROR: {e}")
+
+    # ---------------------------------------------------------
+    # PDF
+    # ---------------------------------------------------------
     try:
         logger.debug("Calling WeasyPrint HTML.write_pdf()...")
 
@@ -80,9 +105,10 @@ def product_invoice_pdf(request, pk):
         logger.error("PDF generation failed", exc_info=True)
         raise
 
-    # 6. Возвращаем PDF
     logger.debug("=== END PDF GENERATION ===")
 
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="invoice_{product.product_code}.pdf"'
+    response["Content-Disposition"] = (
+        f'inline; filename=\"invoice_{product.product_code}.pdf\"'
+    )
     return response
