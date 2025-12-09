@@ -21,26 +21,25 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            echo "🚀 Starting deploy on production server..."
+            echo "🚀 Starting deploy..."
             cd /var/www/cargodb
 
-            echo "📦 Updating code from master branch..."
+            echo "📦 Updating code from master..."
             git fetch origin master
             git reset --hard origin/master
 
-            echo "🧩 Generating fresh migrations on production..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps app python manage.py makemigrations --noinput
-            
-            echo "🐍 Applying new migrations..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps app python manage.py migrate --noinput
+            echo "🧩 Running migrations..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py makemigrations --noinput
+            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py migrate --noinput
 
-            echo "🧱 Collecting static files..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps app python manage.py collectstatic --noinput
+            echo "🎨 Collecting static files..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py collectstatic --noinput
 
-            echo "🔁 Rebuilding and restarting containers..."
+            echo "🔁 Rebuilding containers..."
+            docker compose -f docker-compose.prod.yml down --remove-orphans
             docker compose -f docker-compose.prod.yml up -d --build
 
-            echo "🧩 Checking logs for app container (last 50 lines)..."
-            docker compose -f docker-compose.prod.yml logs -t --tail=50 app
+            echo "📜 Last 50 logs:"
+            docker compose -f docker-compose.prod.yml logs -t --tail=50 cargo_app
 
-            echo "✅ Deploy completed successfully!"
+            echo "✅ Deploy DONE"
