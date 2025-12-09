@@ -15,3 +15,4 @@ services:
     volumes:
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
+
