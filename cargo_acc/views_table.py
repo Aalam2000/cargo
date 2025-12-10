@@ -1,8 +1,9 @@
 # cargo_acc/views_table.py
 
+import json
 import logging
 import os
-import json
+
 import transliterate
 from django.apps import apps
 from django.contrib.auth.decorators import login_required
@@ -14,6 +15,7 @@ from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
+
 from cargo_acc.company_utils import get_user_company, get_log_meta
 from cargo_acc.models import SystemActionLog
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Client, AccrualType, \
@@ -167,72 +169,23 @@ class ClientViewSet(viewsets.ModelViewSet):
         return Client.objects.filter(company=company).order_by(sort_by)
 
 
-# ViewSet для Складов
+# ================================
+#     ЕДИНЫЕ ПРАВИЛЬНЫЕ СПРАВОЧНИКИ
+# ================================
+
+# --- СКЛАДЫ ---
 class WarehouseViewSet(viewsets.ModelViewSet):
     serializer_class = WarehouseSerializer
 
     def get_queryset(self):
-        from cargo_acc.company_utils import get_user_company
         company = get_user_company(self.request)
         sort_by = self.request.query_params.get("sort_by", "name")
         return Warehouse.objects.filter(company=company).order_by(sort_by)
 
-
-# ViewSet для Типов Груза
-class CargoTypeViewSet(viewsets.ModelViewSet):
-    serializer_class = CargoTypeSerializer
-
-    def get_queryset(self):
-        company = get_user_company(self.request)
-        sort_by = self.request.query_params.get('sort_by', 'name')
-        return CargoType.objects.filter(company=company).order_by(sort_by)
-
-
-# ViewSet для Статусов Груза
-class CargoStatusViewSet(viewsets.ModelViewSet):
-    serializer_class = CargoStatusSerializer
-
-    def get_queryset(self):
-        company = get_user_company(self.request)
-        sort_by = self.request.query_params.get('sort_by', 'name')
-        return CargoStatus.objects.filter(company=company).order_by(sort_by)
-
-
-# ViewSet для Типов Упаковок
-class PackagingTypeViewSet(viewsets.ModelViewSet):
-    serializer_class = PackagingTypeSerializer
-
-    def get_queryset(self):
-        company = get_user_company(self.request)
-        sort_by = self.request.query_params.get("sort_by", "name")
-        return PackagingType.objects.filter(company=company).order_by(sort_by)
-
-
-class AccrualTypeViewSet(viewsets.ModelViewSet):
-    serializer_class = AccrualTypeSerializer
-
-    def get_queryset(self):
-        company = get_user_company(self.request)
-        sort_by = self.request.query_params.get('sort_by', 'name')
-        return AccrualType.objects.filter(company=company).order_by(sort_by)
-
-    def perform_create(self, serializer):
-        company = get_user_company(self.request)
-        serializer.save(company=company)
-
-
-class PaymentTypeViewSet(viewsets.ModelViewSet):
-    serializer_class = PaymentTypeSerializer
-
-    def get_queryset(self):
-        company = get_user_company(self.request)
-        sort_by = self.request.query_params.get("sort_by", "name")
-        return PaymentType.objects.filter(company=company).order_by(sort_by)
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.serializer_class(instance)
-        return Response(serializer.data)
+    # важнейшая строка — иначе DRF требует ВСЕ поля
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         company = get_user_company(self.request)
@@ -242,6 +195,115 @@ class PaymentTypeViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         serializer.save(company=company)
 
+
+# --- ТИПЫ ГРУЗОВ ---
+class CargoTypeViewSet(viewsets.ModelViewSet):
+    serializer_class = CargoTypeSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        sort_by = self.request.query_params.get("sort_by", "name")
+        return CargoType.objects.filter(company=company).order_by(sort_by)
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+
+# --- СТАТУСЫ ГРУЗОВ ---
+class CargoStatusViewSet(viewsets.ModelViewSet):
+    serializer_class = CargoStatusSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        sort_by = self.request.query_params.get("sort_by", "name")
+        return CargoStatus.objects.filter(company=company).order_by(sort_by)
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+
+# --- ТИПЫ УПАКОВКИ ---
+class PackagingTypeViewSet(viewsets.ModelViewSet):
+    serializer_class = PackagingTypeSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        sort_by = self.request.query_params.get("sort_by", "name")
+        return PackagingType.objects.filter(company=company).order_by(sort_by)
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+
+# --- ТИПЫ НАЧИСЛЕНИЙ ---
+class AccrualTypeViewSet(viewsets.ModelViewSet):
+    serializer_class = AccrualTypeSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        sort_by = self.request.query_params.get("sort_by", "name")
+        return AccrualType.objects.filter(company=company).order_by(sort_by)
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+
+# --- ТИПЫ ПЛАТЕЖЕЙ ---
+class PaymentTypeViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentTypeSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        sort_by = self.request.query_params.get("sort_by", "name")
+        return PaymentType.objects.filter(company=company).order_by(sort_by)
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
 
 
 # ViewSet для Изображений
