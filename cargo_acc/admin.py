@@ -1,5 +1,6 @@
 # cargo_acc/admin.py
 from django.contrib import admin
+
 from .models import (
     Company,
     Client,
@@ -23,7 +24,9 @@ from .models import (
     CargoMovement,
     SystemActionLog,
     CurrencyRate,
+    Tariff,
 )
+
 
 # 🔹 Универсальный класс администратора с ID
 class DefaultAdmin(admin.ModelAdmin):
@@ -37,6 +40,7 @@ class DefaultAdmin(admin.ModelAdmin):
 
     list_display_links = ("id",)
     ordering = ("-id",)
+
 
 # 🔹 Список всех моделей для регистрации
 models_list = [
@@ -62,7 +66,15 @@ models_list = [
     CargoMovement,
     SystemActionLog,
     CurrencyRate,
+    Tariff,
 ]
+
+
+@admin.register(Tariff)
+class TariffAdmin(admin.ModelAdmin):
+    list_display = ("name", "company", "cargo_type", "calc_mode", "base_rate")
+    list_filter = ("company", "cargo_type", "calc_mode")
+    search_fields = ("name",)
 
 
 # 🔹 Универсальная регистрация с DefaultAdmin

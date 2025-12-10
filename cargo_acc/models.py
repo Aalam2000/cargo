@@ -71,6 +71,7 @@ class Warehouse(models.Model):
     class Meta:
         verbose_name = "Склад"
         verbose_name_plural = "Склады"
+        unique_together = ("company", "name")
 
     def __str__(self):
         return self.name
@@ -85,6 +86,7 @@ class CargoType(models.Model):
     class Meta:
         verbose_name = "Тип груза"
         verbose_name_plural = "Типы грузов"
+        unique_together = ("company", "name")
 
     def __str__(self):
         return self.name
@@ -98,6 +100,7 @@ class CargoStatus(models.Model):
     class Meta:
         verbose_name = "Статус груза"
         verbose_name_plural = "Статусы грузов"
+        unique_together = ("company", "name")
 
     def __str__(self):
         return self.name
@@ -112,6 +115,7 @@ class PackagingType(models.Model):
     class Meta:
         verbose_name = "Тип упаковки"
         verbose_name_plural = "Типы упаковки"
+        unique_together = ("company", "name")
 
     def __str__(self):
         return self.name
@@ -127,6 +131,7 @@ class AccrualType(models.Model):
     class Meta:
         verbose_name = "Вид начисления"
         verbose_name_plural = "Виды начислений"
+        unique_together = ("company", "name")
 
     def __str__(self):
         return self.name
@@ -452,6 +457,7 @@ class CarrierCompany(models.Model):
         return self.name
 
 
+# === Транспорт перевозки ===
 class Vehicle(models.Model):
     license_plate = models.CharField(max_length=20, unique=True)
     model = models.CharField(max_length=100, blank=True, null=True)
@@ -567,3 +573,35 @@ class CurrencyRate(models.Model):
 
     def __str__(self):
         return f"{self.date} — {self.currency} = {self.rate}"
+
+
+# === Тариф Доставки ===
+class Tariff(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="tariffs")
+    name = models.CharField(max_length=50)
+
+    # Тариф для определённого типа товара
+    cargo_type = models.ForeignKey(CargoType, on_delete=models.CASCADE)
+
+    # weight / volume / density
+    calc_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ("weight", "По весу"),
+            ("volume", "По объёму"),
+            ("density", "По плотности"),
+        ]
+    )
+
+    base_rate = models.DecimalField(max_digits=14, decimal_places=4)  # ставка за кг/куб
+    packaging_rate = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    insurance_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    minimal_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Тариф"
+        verbose_name_plural = "Тарифы"
+        unique_together = ("company", "name")
+
+    def __str__(self):
+        return self.name
