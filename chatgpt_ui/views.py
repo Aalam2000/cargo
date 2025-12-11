@@ -336,7 +336,7 @@ def tg_webhook(request):
             "Укажите одно из значений:\n"
             f"• {show_username}\n"
             f"• {show_id}\n\n"
-            "Ссылка на платформу:\nhttps://cargo-admin.az\n\n"
+            "Ссылка на платформу:\nhttps://bonablog.ru\n\n"
             "Ваши данные:\n"
             f"ID: {show_id}\n"
             f"Username: {show_username}\n"
