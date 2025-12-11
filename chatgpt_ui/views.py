@@ -295,59 +295,73 @@ def tg_webhook(request):
 
     matched_user = None
 
-    # возможные варианты того, что может прислать Telegram:
-    incoming_telegram_values = set()
+    # нормализуем вход
+    incoming = set()
+
     if username:
-        incoming_telegram_values.add(username.lower())
+        incoming.add(username.lower())
     if telegram_id:
-        incoming_telegram_values.add(telegram_id.lower())
+        incoming.add(telegram_id.lower())
 
-    # получаем ВСЕХ пользователей
-    all_users = CustomUser.objects.all()
-
-    # ищем совпадение по полю "telegram"
-    for u in all_users:
+    # перебираем всех пользователей
+    for u in CustomUser.objects.all():
         if not u.telegram:
             continue
-        value = u.telegram.strip().lower()
-        if value in incoming_telegram_values:
+
+        # нормализуем значение в БД
+        val = u.telegram.strip().lower().replace("@", "")
+
+        # проверяем совпадение username или ID
+        if val in incoming:
             matched_user = u
             break
 
-    # если нашли — привязываем к сессии
     if matched_user and not session.user:
         session.user = matched_user
         session.save()
 
     # Если пользователь не привязан — шлём подробности
     # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
+    # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
     if not session.user:
+        # данные, которые пользователь должен вставить в свой профиль
+        show_username = f"@{username}" if username else "нет"
+        show_id = telegram_id
+
         details = (
             "Добро пожаловать в CargoAdmin Bot!\n\n"
             "Ваш Telegram ещё не привязан к системе.\n"
-            "Чтобы система могла вас узнать — откройте платформу CargoAdmin и "
+            "Чтобы система могла вас узнать — откройте CargoAdmin и "
             "в своей карточке пользователя заполните поле «Telegram».\n\n"
-            "Туда можно вставить ЛЮБОЕ значение:\n"
-            "• ваш @username\n"
-            "• или ваш Telegram ID\n\n"
+            "Укажите одно из значений:\n"
+            f"• {show_username}\n"
+            f"• {show_id}\n\n"
             "Ссылка на платформу:\nhttps://cargo-admin.az\n\n"
-            "Ваши данные для привязки:\n"
-            f"ID: {telegram_id}\n"
-            f"Username: @{username if username else 'нет'}\n"
-            f"Имя: {first_name if first_name else 'нет'}\n"
-            f"Фамилия: {last_name if last_name else 'нет'}\n"
-            f"Язык: {language if language else 'нет'}\n"
-            f"Ваше сообщение: {text}"
+            "Ваши данные:\n"
+            f"ID: {show_id}\n"
+            f"Username: {show_username}\n"
+            f"Имя: {first_name or 'нет'}\n"
+            f"Фамилия: {last_name or 'нет'}"
         )
+
         return send_tg_reply(telegram_id, details)
 
     # Пользователь привязан — пока молчим
-    return send_tg_reply(
-        telegram_id,
-        "Привет! 🎉\nСкоро здесь появится автоматическая регистрация новых клиентов, "
+    # Формируем обращение
+    if first_name or last_name:
+        name_block = f"{first_name or ''} {last_name or ''}".strip()
+    elif username:
+        name_block = f"@{username}"
+    else:
+        name_block = f"ID {telegram_id}"
+
+    welcome_text = (
+        f"Привет, {name_block}! 🎉\n\n"
+        "Скоро здесь появится автоматическая регистрация новых клиентов, "
         "создание компаний и многое другое!"
     )
 
+    return send_tg_reply(telegram_id, welcome_text)
 
 
 # --- Функция отправки сообщений в Telegram ---
