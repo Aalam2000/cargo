@@ -295,21 +295,14 @@ def tg_webhook(request):
     if not session.user:
         details = (
             "Вы не привязаны к системе CargoAdmin. Обратитесь к администратору.\n\n"
-            "Данные Telegram:\n"
-            f"• ID: {telegram_id}\n"
-            f"• Username: @{username if username else 'нет'}\n"
-            f"• Имя: {first_name if first_name else 'нет'}\n"
-            f"• Фамилия: {last_name if last_name else 'нет'}\n"
-            f"• Язык: {language if language else 'нет'}\n"
-            f"• Сообщение: {text}"
+            f"ID: {telegram_id}\nUsername: @{username if username else 'нет'}\n"
+            f"Имя: {first_name if first_name else 'нет'}\n"
+            f"Фамилия: {last_name if last_name else 'нет'}\n"
+            f"Язык: {language if language else 'нет'}\n"
+            f"Сообщение: {text}"
         )
 
-        ChatMessage.objects.create(
-            session=session,
-            role="assistant",
-            content=details
-        )
-
+        # ❗ НЕ СОХРАНЯЕМ ChatMessage для НЕОПОЗНАННОГО пользователя
         return send_tg_reply(telegram_id, details)
 
     # Пользователь привязан — пока молчим
