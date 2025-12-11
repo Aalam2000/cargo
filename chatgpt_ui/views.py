@@ -290,23 +290,63 @@ def tg_webhook(request):
     session, created = ChatSession.objects.get_or_create(
         telegram_id=telegram_id
     )
+    # ---------- ОПРЕДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ПО ПОЛЮ accounts_customuser.telegram ----------
+    from accounts.models import CustomUser
+
+    matched_user = None
+
+    # возможные варианты того, что может прислать Telegram:
+    incoming_telegram_values = set()
+    if username:
+        incoming_telegram_values.add(username.lower())
+    if telegram_id:
+        incoming_telegram_values.add(telegram_id.lower())
+
+    # получаем ВСЕХ пользователей
+    all_users = CustomUser.objects.all()
+
+    # ищем совпадение по полю "telegram"
+    for u in all_users:
+        if not u.telegram:
+            continue
+        value = u.telegram.strip().lower()
+        if value in incoming_telegram_values:
+            matched_user = u
+            break
+
+    # если нашли — привязываем к сессии
+    if matched_user and not session.user:
+        session.user = matched_user
+        session.save()
 
     # Если пользователь не привязан — шлём подробности
+    # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
     if not session.user:
         details = (
-            "Вы не привязаны к системе CargoAdmin. Обратитесь к администратору.\n\n"
-            f"ID: {telegram_id}\nUsername: @{username if username else 'нет'}\n"
+            "Добро пожаловать в CargoAdmin Bot!\n\n"
+            "Ваш Telegram ещё не привязан к системе.\n"
+            "Чтобы система могла вас узнать — откройте платформу CargoAdmin и "
+            "в своей карточке пользователя заполните поле «Telegram».\n\n"
+            "Туда можно вставить ЛЮБОЕ значение:\n"
+            "• ваш @username\n"
+            "• или ваш Telegram ID\n\n"
+            "Ссылка на платформу:\nhttps://cargo-admin.az\n\n"
+            "Ваши данные для привязки:\n"
+            f"ID: {telegram_id}\n"
+            f"Username: @{username if username else 'нет'}\n"
             f"Имя: {first_name if first_name else 'нет'}\n"
             f"Фамилия: {last_name if last_name else 'нет'}\n"
             f"Язык: {language if language else 'нет'}\n"
-            f"Сообщение: {text}"
+            f"Ваше сообщение: {text}"
         )
-
-        # ❗ НЕ СОХРАНЯЕМ ChatMessage для НЕОПОЗНАННОГО пользователя
         return send_tg_reply(telegram_id, details)
 
     # Пользователь привязан — пока молчим
-    return send_tg_reply(telegram_id, "OK")
+    return send_tg_reply(
+        telegram_id,
+        "Привет! 🎉\nСкоро здесь появится автоматическая регистрация новых клиентов, "
+        "создание компаний и многое другое!"
+    )
 
 
 
