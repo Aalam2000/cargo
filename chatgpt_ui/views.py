@@ -1,9 +1,9 @@
 # chatgpt_ui/views.py
+
 import json
 import os
 import re
 import uuid
-
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -261,66 +261,79 @@ def dialog_view(request):
     return render(request, 'chatgpt_ui/dialog.html')
 
 
+
+
 @csrf_exempt
 def tg_webhook(request):
     if request.method != "POST":
         return JsonResponse({"status": "ok"})
 
-    data = json.loads(request.body.decode("utf-8"))
+    # Парсим JSON от Telegram
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except:
+        return JsonResponse({"status": "invalid_json"})
 
-    # 1. Достаём телеграм-текст
     message = data.get("message", {})
-    chat = message.get("chat", {})
-    telegram_id = str(chat.get("id"))
     text = message.get("text", "")
+    chat = message.get("chat", {})
+    telegram_id = str(chat.get("id")) if chat else None
 
+    # Если пусто — выходим
     if not telegram_id or not text:
         return JsonResponse({"status": "ignored"})
 
-    # 2. Ищем или создаём сессию
+    # 1) Ищем или создаём ChatSession
     session, created = ChatSession.objects.get_or_create(
-        telegram_id=telegram_id,
-        defaults={"created_at": now()}
+        telegram_id=telegram_id
     )
 
-    # 3. Сохраняем входящее сообщение
+    # 2) Если пользователь не привязан — не отвечаем
+    if not session.user:
+        ChatMessage.objects.create(
+            session=session,
+            role="assistant",
+            content="Вы не привязаны к системе CargoAdmin. Обратитесь к администратору."
+        )
+        return send_tg_reply(telegram_id, "⛔ Доступ запрещён. Вы не привязаны к системе.")
+
+    # 3) Проверяем роль пользователя
+    if session.user.role not in ("Admin", "Operator"):
+        ChatMessage.objects.create(
+            session=session,
+            role="assistant",
+            content="У вас нет прав на использование бота."
+        )
+        return send_tg_reply(telegram_id, "⛔ У вас нет прав на использование этого бота.")
+
+    # 4) Записываем входящее сообщение
     ChatMessage.objects.create(
         session=session,
         role="user",
         content=text
     )
 
-    # 4. Формируем историю для OpenAI
-    history = []
-    msgs = ChatMessage.objects.filter(session=session).order_by("created_at")[-10:]
+    # 5) ECHO — просто возвращаем то, что прислали
+    reply = f"Echo: {text}"
 
-    for m in msgs:
-        history.append({"role": m.role, "content": m.content})
-
-    # 5. Запрос в OpenAI
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=history
-        )
-        answer = response.choices[0].message.content
-    except Exception as e:
-        answer = f"Ошибка OpenAI: {e}"
-
-    # 6. Сохраняем ответ ассистента
     ChatMessage.objects.create(
         session=session,
         role="assistant",
-        content=answer
+        content=reply
     )
 
-    # 7. Отправляем сообщение обратно в Telegram
-    bot_token = os.getenv("ADMIN_BOT_TG")
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # 6) Отправляем ответ в Telegram
+    return send_tg_reply(telegram_id, reply)
 
-    requests.post(url, json={
-        "chat_id": telegram_id,
-        "text": answer
-    })
+
+# --- Функция отправки сообщений в Telegram ---
+def send_tg_reply(chat_id, text):
+    token = os.getenv("ADMIN_BOT_TG")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    try:
+        requests.post(url, json={"chat_id": chat_id, "text": text})
+    except Exception as e:
+        print("Telegram sendMessage error:", e)
 
     return JsonResponse({"status": "sent"})

@@ -61,6 +61,20 @@ class PaymentTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at", "company"]
 
 
+class TariffSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tariff
+        fields = "__all__"
+        read_only_fields = ["company"]
+
+
+class CurrencyRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CurrencyRate
+        fields = "__all__"
+
+
+
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image

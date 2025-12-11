@@ -210,6 +210,25 @@ function highlightSort(table, state) {
     });
 }
 
+
+// === указание для модалки: какие поля должны быть SELECT ===
+const FK_SELECTS = {
+    "cargo_type": "/api/table/cargo-types/",
+    "cargo_status": "/api/cargo-statuses/",
+    "packaging_type": "/api/packaging-types/",
+    "payment_type": "/api/payment-types/",
+    "accrual_type": "/api/accrual-types/",
+};
+
+const CHOICE_SELECTS = {
+    "calc_mode": [
+        {value: "weight", label: "По весу"},
+        {value: "volume", label: "По объёму"},
+        {value: "density", label: "По плотности"},
+    ]
+};
+
+
 // =========================================
 //      МОДАЛКА РЕДАКТИРОВАНИЯ / ДОБАВЛЕНИЯ
 //      (через window.openModal из base.js)
@@ -228,15 +247,42 @@ function openEditModal(context) {
         const value = context[key] ?? "";
         const isLong = typeof value === "string" && value.length > 60;
 
+        // --- SELECT для FK таблиц ---
+        if (FK_SELECTS[key]) {
+            fieldsHtml += `
+                <div class="modal-row">
+                    <label>${prettify(key)}</label>
+                    <select name="${key}" class="modal-input" data-select="${key}">
+                        <option value="">— выберите —</option>
+                    </select>
+                </div>`;
+            continue;
+        }
+
+        // --- SELECT для choices ---
+        if (CHOICE_SELECTS[key]) {
+            let opts = CHOICE_SELECTS[key]
+                .map(opt => `<option value="${opt.value}" ${opt.value === value ? "selected" : ""}>${opt.label}</option>`)
+                .join("");
+
+            fieldsHtml += `
+                <div class="modal-row">
+                    <label>${prettify(key)}</label>
+                    <select name="${key}" class="modal-input">
+                        ${opts}
+                    </select>
+                </div>`;
+            continue;
+        }
+        // --- Обычное текстовое поле (универсальное) ---
         fieldsHtml += `
             <div class="modal-row">
                 <label>${prettify(key)}</label>
-                ${isLong
-            ? `<textarea name="${key}" class="modal-input" rows="3">${value}</textarea>`
-            : `<input type="text" name="${key}" class="modal-input" value="${value}">`
-        }
+                <input type="text" name="${key}" class="modal-input" value="${value}">
             </div>
         `;
+        continue;
+
     }
 
     const html = `
@@ -263,6 +309,25 @@ function openEditModal(context) {
         html,
         modalName: `edit-${model}`,
         closable: true
+    });
+    // === загружаем данные в FK SELECT ===
+    Object.keys(FK_SELECTS).forEach(async field => {
+        const sel = inst.modal.querySelector(`select[data-select="${field}"]`);
+        if (!sel) return;
+
+        const api = FK_SELECTS[field];
+        const res = await fetch(api).then(r => r.json());
+
+        res.results?.forEach(item => {
+            const id = item.id;
+            const name = item.name || item.client_code || "—";
+
+            const opt = document.createElement("option");
+            opt.value = id;
+            if (context[field] == id) opt.selected = true;
+            opt.textContent = name;
+            sel.appendChild(opt);
+        });
     });
 
     // Обрабатываем сохранение
@@ -470,5 +535,18 @@ function prettify(f) {
     if (f === "company") return "Компания";
     if (f === "description") return "Примечание";
     if (f === "default_amount") return "Сумма по умолчанию";
+    if (f === "cargo_type") return "Тип товара";
+    if (f === "calc_mode") return "Метод расчёта";
+    if (f === "base_rate") return "Базовая ставка";
+    if (f === "packaging_rate") return "Ставка упаковки";
+    if (f === "insurance_percent") return "Страховка (%)";
+    if (f === "minimal_cost") return "Минимальная стоимость";
+
+    if (f === "date") return "Дата";
+    if (f === "currency") return "Валюта";
+    if (f === "rate") return "Курс";
+    if (f === "custom_rate") return "Наш курс";
+    if (f === "conversion_percent") return "Коррекция (%)";
+
     return f;
 }

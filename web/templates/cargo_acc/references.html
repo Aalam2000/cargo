@@ -148,6 +148,45 @@
                 </div>
             </div>
 
+            <div class="table-card table-container"
+                 data-model="tariffs"
+                 data-api="/api/table/tariffs/"
+                 data-fields="name,cargo_type,calc_mode,base_rate,packaging_rate,insurance_percent,minimal_cost"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Тарифы</h4>
+                    {% if user.role == 'Admin' or user.role == 'Operator' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
+
+            <div class="table-card table-container"
+                 data-model="currency-rates"
+                 data-api="/api/table/currency-rates/"
+                 data-fields="date,currency,rate,custom_rate,conversion_percent"
+                 data-page-size="10">
+
+                <div class="table-card-header">
+                    <h4>Курсы валют</h4>
+                    {% if user.role == 'Admin' %}
+                        <button class="btn-table btn-add" data-action="add-record">Добавить</button>
+                    {% endif %}
+                </div>
+
+                <input type="text" class="input-filter" placeholder="Поиск..." data-filter>
+
+                <div class="table-wrapper">
+                    <table class="table dynamic-table"></table>
+                </div>
+            </div>
 
         </div>
     </div>

@@ -26,6 +26,9 @@ router.register(r'transport-bills', views.TransportBillViewSet, basename='transp
 router.register(r'cargo-movements', views.CargoMovementViewSet, basename='cargomovement')
 router.register(r'payment-types', views_table.PaymentTypeViewSet, basename='paymenttype')
 router.register(r'products-table', views_table.ProductsTableViewSet, basename='products-table')
+router.register(r'tariffs', views_table.TariffViewSet, basename='tariff')
+router.register(r'currency-rates', views_table.CurrencyRateViewSet, basename='currencyrate')
+
 
 # --------------------------------------------------------------------
 # 🌐 URLPATTERNS — основные маршруты приложения cargo_acc

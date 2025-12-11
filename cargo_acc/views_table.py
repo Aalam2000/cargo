@@ -19,9 +19,12 @@ from rest_framework.viewsets import ViewSet
 from cargo_acc.company_utils import get_user_company, get_log_meta
 from cargo_acc.models import SystemActionLog
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Client, AccrualType, \
-    PaymentType
+    PaymentType, CurrencyRate, Tariff
 from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
-    CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, AccrualTypeSerializer, PaymentTypeSerializer
+    CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, AccrualTypeSerializer, PaymentTypeSerializer, \
+    CurrencyRateSerializer, TariffSerializer
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,34 @@ TABLES = {
         "fields": ["name", "description"],
         "search_field": "name",
     },
+    "tariffs": {
+        "model": "cargo_acc.Tariff",
+        "fields": [
+            "id",
+            "name",
+            "cargo_type",
+            "calc_mode",
+            "base_rate",
+            "packaging_rate",
+            "insurance_percent",
+            "minimal_cost",
+        ],
+        "search_field": "name",
+    },
+
+    "currency-rates": {
+        "model": "cargo_acc.CurrencyRate",
+        "fields": [
+            "id",
+            "date",
+            "currency",
+            "rate",
+            "custom_rate",
+            "conversion_percent",
+        ],
+        "search_field": "currency",
+    },
+
 }
 
 
@@ -98,7 +129,7 @@ def get_table(request, model_name):
 
     # === база queryset ===
     company = get_user_company(request)
-    qs = Model.objects.filter(company=company)
+    qs = Model.objects.all() if not hasattr(Model, "company") else Model.objects.filter(company=company)
     # === search ===
     search_field = cfg["search_field"]
     if search_query:
@@ -304,6 +335,37 @@ class PaymentTypeViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         company = get_user_company(self.request)
         serializer.save(company=company)
+
+# --- ТАРИФЫ ---
+class TariffViewSet(viewsets.ModelViewSet):
+    serializer_class = TariffSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request)
+        return Tariff.objects.filter(company=company).order_by("name")
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        company = get_user_company(self.request)
+        serializer.save(company=company)
+
+# --- КУРСЫ ВАЛЮТ ---
+class CurrencyRateViewSet(viewsets.ModelViewSet):
+    serializer_class = CurrencyRateSerializer
+
+    def get_queryset(self):
+        return CurrencyRate.objects.all().order_by("-date")
+
+    def update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
 
 
 # ViewSet для Изображений
