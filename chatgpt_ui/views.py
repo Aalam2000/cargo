@@ -268,7 +268,6 @@ def tg_webhook(request):
     if request.method != "POST":
         return JsonResponse({"status": "ok"})
 
-    # Парсим JSON от Telegram
     try:
         data = json.loads(request.body.decode("utf-8"))
     except:
@@ -277,53 +276,45 @@ def tg_webhook(request):
     message = data.get("message", {})
     text = message.get("text", "")
     chat = message.get("chat", {})
-    telegram_id = str(chat.get("id")) if chat else None
 
-    # Если пусто — выходим
+    telegram_id = str(chat.get("id")) if chat else None
+    username = chat.get("username")
+    first_name = chat.get("first_name")
+    last_name = chat.get("last_name")
+    language = chat.get("language_code")
+
     if not telegram_id or not text:
         return JsonResponse({"status": "ignored"})
 
-    # 1) Ищем или создаём ChatSession
+    # Сессия Telegram
     session, created = ChatSession.objects.get_or_create(
         telegram_id=telegram_id
     )
 
-    # 2) Если пользователь не привязан — не отвечаем
+    # Если пользователь не привязан — шлём подробности
     if not session.user:
+        details = (
+            "Вы не привязаны к системе CargoAdmin. Обратитесь к администратору.\n\n"
+            "Данные Telegram:\n"
+            f"• ID: {telegram_id}\n"
+            f"• Username: @{username if username else 'нет'}\n"
+            f"• Имя: {first_name if first_name else 'нет'}\n"
+            f"• Фамилия: {last_name if last_name else 'нет'}\n"
+            f"• Язык: {language if language else 'нет'}\n"
+            f"• Сообщение: {text}"
+        )
+
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content="Вы не привязаны к системе CargoAdmin. Обратитесь к администратору."
+            content=details
         )
-        return send_tg_reply(telegram_id, "⛔ Доступ запрещён. Вы не привязаны к системе.")
 
-    # 3) Проверяем роль пользователя
-    if session.user.role not in ("Admin", "Operator"):
-        ChatMessage.objects.create(
-            session=session,
-            role="assistant",
-            content="У вас нет прав на использование бота."
-        )
-        return send_tg_reply(telegram_id, "⛔ У вас нет прав на использование этого бота.")
+        return send_tg_reply(telegram_id, details)
 
-    # 4) Записываем входящее сообщение
-    ChatMessage.objects.create(
-        session=session,
-        role="user",
-        content=text
-    )
+    # Пользователь привязан — пока молчим
+    return send_tg_reply(telegram_id, "OK")
 
-    # 5) ECHO — просто возвращаем то, что прислали
-    reply = f"Echo: {text}"
-
-    ChatMessage.objects.create(
-        session=session,
-        role="assistant",
-        content=reply
-    )
-
-    # 6) Отправляем ответ в Telegram
-    return send_tg_reply(telegram_id, reply)
 
 
 # --- Функция отправки сообщений в Telegram ---
