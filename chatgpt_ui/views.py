@@ -410,19 +410,7 @@ def tg_webhook(request):
         raw_text = text[2:].strip()
 
         # Системный промпт, который пойдёт в OpenAI
-        debug_prompt = """
-            Вы — парсер команд CargoAdmin.
-            Ваше задание: анализировать текст пользователя и возвращать ТОЛЬКО JSON.
-            Никакого текста вне JSON.
-            Формат:
-            {
-              "action": "...",
-              "email": "...",
-              "name": "...",
-              "company": "..."
-            }
-            Если действие не распознано — верните {"action": "unknown"}.
-            """
+        debug_prompt = build_client_parser_prompt()
 
         try:
             messages = cast(
