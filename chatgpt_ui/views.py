@@ -4,17 +4,16 @@ import json
 import os
 import re
 import uuid
+
+import requests
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from dotenv import load_dotenv
 from openai import OpenAI
-from django.utils.timezone import now
-import requests
-from .models import ChatSession, ChatMessage
 
-
+from .models import ChatSession
 
 # Загрузка ключа OpenAI
 load_dotenv()
@@ -244,7 +243,7 @@ def dialog_view(request):
 
             # Стандартный процесс обработки запросов
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.1",
                 messages=conversation
             )
 
@@ -259,8 +258,6 @@ def dialog_view(request):
             return JsonResponse({"error": f"Ошибка OpenAI: {str(e)}"}, status=500)
 
     return render(request, 'chatgpt_ui/dialog.html')
-
-
 
 
 @csrf_exempt
@@ -345,6 +342,55 @@ def tg_webhook(request):
         )
 
         return send_tg_reply(telegram_id, details)
+
+    # ============================================================
+    # 🔥 РЕЖИМ DEBUG OPENAI — если сообщение начинается с "15"
+    # ============================================================
+    if text.startswith("15"):
+        raw_text = text[2:].strip()
+
+        # Системный промпт, который пойдёт в OpenAI
+        debug_prompt = """
+            Вы — парсер команд CargoAdmin.
+            Ваше задание: анализировать текст пользователя и возвращать ТОЛЬКО JSON.
+            Никакого текста вне JSON.
+            Формат:
+            {
+              "action": "...",
+              "email": "...",
+              "name": "...",
+              "company": "..."
+            }
+            Если действие не распознано — верните {"action": "unknown"}.
+            """
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": debug_prompt},
+                    {"role": "user", "content": raw_text},
+                ],
+            )
+            ai_answer = response.choices[0].message.content
+
+
+        except Exception as e:
+            ai_answer = f"Ошибка OpenAI: {str(e)}"
+
+        # Отправляем оператору полный лог
+        debug_reply = (
+            "🔧 *DEBUG OpenAI*\n\n"
+            "*PROMPT:*\n"
+            f"{debug_prompt}\n\n"
+            "*INPUT:*\n"
+            f"{raw_text}\n\n"
+            "*RESPONSE:*\n"
+            f"{ai_answer}"
+        )
+
+        send_tg_reply(telegram_id, debug_reply)
+        return JsonResponse({"status": "debug_sent"})
 
     # Пользователь привязан — пока молчим
     # Формируем обращение
