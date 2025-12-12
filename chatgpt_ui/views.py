@@ -4,6 +4,7 @@ import json
 import os
 import re
 import uuid
+from typing import List, cast
 
 import requests
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from dotenv import load_dotenv
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from .models import ChatSession
 
@@ -19,16 +21,12 @@ from .models import ChatSession
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("OpenAI API ключ не найден. Проверьте файл .env.")
+    raise ValueError("OpenAI API ключ не найден. Проверьте файл .env.secrets")
 
 client = OpenAI(api_key=api_key)
 
 # История диалога
 conversation = []
-
-
-# def dialog_view(request):
-#     return render(request, 'chatgpt_ui/dialog.html')
 
 
 def get_mac_address(request):
@@ -211,6 +209,68 @@ def add_message(role, content):
 load_history()
 
 
+def build_client_parser_prompt() -> str:
+    return """
+Вы — парсер команд CargoAdmin.
+
+Вам приходит ТЕКСТ пользователя на ЛЮБОМ языке (любой формат).
+Нужно определить, просит ли пользователь СОЗДАТЬ/ПРИГЛАСИТЬ КЛИЕНТА по e-mail.
+
+ДОСТУПНЫЕ ДЕЙСТВИЯ:
+- "create_client" — пользователь явно хочет создать/пригласить клиента
+  (сообщение про клиента и в нём есть e-mail: слова типа
+   "клиент", "client", "customer", "müşteri" и т.п., либо по смыслу
+   понятно, что это новый клиент платформы).
+- "unknown" — все остальные случаи.
+
+ОТВЕЧАЙТЕ ТОЛЬКО JSON, БЕЗ ТЕКСТА ВНЕ JSON:
+
+{
+  "action": "...",
+  "email": "...",
+  "name": "..."
+}
+
+ПРАВИЛА ФОРМИРОВАНИЯ:
+- email — первый найденный корректный e-mail или пустая строка.
+- name — имя/название клиента, если явно указано в тексте, иначе пустая строка.
+- Если НЕТ валидного e-mail ИЛИ не видно запроса на создание/приглашение клиента —
+  верните:
+
+{
+  "action": "unknown",
+  "email": "",
+  "name": ""
+}
+
+ПРИМЕРЫ:
+
+INPUT: "клиент motopara@gmail.com"
+OUTPUT:
+{
+  "action": "create_client",
+  "email": "motopara@gmail.com",
+  "name": ""
+}
+
+INPUT: "создай нового клиента Иван Иванов, почта ivan@example.com"
+OUTPUT:
+{
+  "action": "create_client",
+  "email": "ivan@example.com",
+  "name": "Иван Иванов"
+}
+
+INPUT: "привет, какая сегодня погода?"
+OUTPUT:
+{
+  "action": "unknown",
+  "email": "",
+  "name": ""
+}
+"""
+
+
 @csrf_exempt
 def dialog_view(request):
     if request.method == 'POST':
@@ -365,15 +425,19 @@ def tg_webhook(request):
             """
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
+            messages = cast(
+                List[ChatCompletionMessageParam],
+                [
                     {"role": "system", "content": debug_prompt},
                     {"role": "user", "content": raw_text},
                 ],
             )
-            ai_answer = response.choices[0].message.content
 
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+            )
+            ai_answer = response.choices[0].message.content
 
         except Exception as e:
             ai_answer = f"Ошибка OpenAI: {str(e)}"
