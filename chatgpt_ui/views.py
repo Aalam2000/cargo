@@ -271,6 +271,23 @@ OUTPUT:
 """
 
 
+def call_openai_with_prompt(system_prompt: str, user_text: str) -> str:
+    messages = cast(
+        List[ChatCompletionMessageParam],
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_text},
+        ],
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+    )
+    content = response.choices[0].message.content
+    return content or ""
+
+
 @csrf_exempt
 def dialog_view(request):
     if request.method == 'POST':
@@ -404,45 +421,22 @@ def tg_webhook(request):
         return send_tg_reply(telegram_id, details)
 
     # ============================================================
-    # 🔥 РЕЖИМ DEBUG OPENAI — если сообщение начинается с "15"
+    # 🔥 РЕЖИМ ПАРСЕРА КЛИЕНТОВ — если сообщение начинается с "15"
     # ============================================================
     if text.startswith("15"):
         raw_text = text[2:].strip()
 
-        # Системный промпт, который пойдёт в OpenAI
-        debug_prompt = build_client_parser_prompt()
+        # Системный промпт для парсера создания клиента
+        parser_prompt = build_client_parser_prompt()
 
         try:
-            messages = cast(
-                List[ChatCompletionMessageParam],
-                [
-                    {"role": "system", "content": debug_prompt},
-                    {"role": "user", "content": raw_text},
-                ],
-            )
-
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-            )
-            ai_answer = response.choices[0].message.content
-
+            ai_answer = call_openai_with_prompt(parser_prompt, raw_text)
         except Exception as e:
             ai_answer = f"Ошибка OpenAI: {str(e)}"
 
-        # Отправляем оператору полный лог
-        debug_reply = (
-            "🔧 *DEBUG OpenAI*\n\n"
-            "*PROMPT:*\n"
-            f"{debug_prompt}\n\n"
-            "*INPUT:*\n"
-            f"{raw_text}\n\n"
-            "*RESPONSE:*\n"
-            f"{ai_answer}"
-        )
-
-        send_tg_reply(telegram_id, debug_reply)
-        return JsonResponse({"status": "debug_sent"})
+        # Отправляем пользователю ЧИСТЫЙ ответ OpenAI (JSON)
+        send_tg_reply(telegram_id, ai_answer)
+        return JsonResponse({"status": "ai_sent"})
 
     # Пользователь привязан — пока молчим
     # Формируем обращение
