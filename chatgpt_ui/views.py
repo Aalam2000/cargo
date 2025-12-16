@@ -14,7 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-
+from accounts.services.client_actions import safe_parse_ai_json, preview_client_search
 from accounts.services.client_actions import build_client_action_preview
 from .models import ChatSession
 
@@ -436,7 +436,10 @@ def tg_webhook(request):
             ai_answer = f'{{"action": "unknown", "email": "", "name": ""}}'
 
         # 👉 здесь используем функцию разбора и строим текст для оператора
-        preview_text = build_client_action_preview(ai_answer)
+
+
+        data = safe_parse_ai_json(ai_answer)
+        preview_text = preview_client_search(data)
         send_tg_reply(telegram_id, preview_text)
 
         return JsonResponse({"status": "ai_preview"})
