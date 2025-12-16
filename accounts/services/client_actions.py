@@ -9,9 +9,8 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.utils.crypto import get_random_string
 
-from accounts.models import CustomUser
-from cargo_acc.models import Client
-from cargo_acc.services.code_generator import generate_client_code
+logger = logging.getLogger("tg_bot")
+
 from .client_actions import send_client_email_notification
 
 logger = logging.getLogger("pol")
@@ -82,99 +81,73 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
         return {"action": "unknown", "email": "", "name": ""}
 
 
-# accounts/services/client_actions.py
-
 @transaction.atomic
-def create_client_with_user(
-    *,
-    email: str,
-    operator_user: CustomUser,
-    name: str = "",
-) -> str:
-    """
-    Ищет пользователя по e-mail.
-    Если найден — отправляет приглашение войти.
-    Если нет — создаёт пользователя + клиента и отправляет приглашение.
-    Возвращает текст для Telegram-ответа оператору.
-    """
-    email = (email or "").strip().lower()
-    if not email:
-        return "❗ Не указан e-mail."
+def create_client_with_user(*, email, operator_user, name=""):
+    logger.info("=== CREATE CLIENT START ===")
+    logger.info(f"Email={email}, Operator={operator_user.id}")
 
-    if not operator_user or not operator_user.company_id:
-        return "❗ Ошибка: у оператора нет привязанной компании."
+    email = email.strip().lower()
 
-    # --- 1. Поиск пользователя ---
+    from accounts.models import CustomUser
+    from cargo_acc.models import Client
+    from cargo_acc.services.code_generator import generate_client_code
+
     user = CustomUser.objects.filter(email__iexact=email).first()
 
     if user:
+        logger.info(f"User EXISTS id={user.id}")
         send_client_email_notification(
             email=email,
             notification_type="invite_visit",
             operator_user=operator_user,
         )
+        logger.info("Invite_visit email sent")
+        return f"Клиент уже существует. Приглашение отправлено: {email}"
 
-        return (
-            "📧 Клиент уже существует.\n\n"
-            f"E-mail: {email}\n"
-            f"ID пользователя: {user.id}\n"
-            f"Роль: {user.role}\n\n"
-            "Клиенту отправлено письмо с приглашением "
-            "войти в личный кабинет."
-        )
+    logger.info("User NOT found → creating")
 
-    # --- 2. Создание нового пользователя ---
-    raw_password = get_random_string(10)
+    password = get_random_string(10)
 
     user = CustomUser.objects.create_user(
         email=email,
-        password=raw_password,
+        password=password,
         role="Client",
         company=operator_user.company,
         first_name=name or "",
         is_active=True,
     )
+    logger.info(f"User created id={user.id}")
 
-    # --- 3. Генерация client_code ---
-    company = operator_user.company
-    client_code = generate_client_code(company)
+    client_code = generate_client_code(operator_user.company)
+    logger.info(f"Generated client_code={client_code}")
 
-    # --- 4. Создание клиента ---
     client = Client.objects.create(
         client_code=client_code,
-        company=company,
+        company=operator_user.company,
     )
+    logger.info(f"Client created id={client.id}")
 
-    # --- 5. Привязка пользователя к клиенту ---
     user.linked_client = client
     user.client_code = client_code
     user.save(update_fields=["linked_client", "client_code"])
+    logger.info("User linked to client")
 
-    # --- 6. Письмо новому клиенту ---
     send_client_email_notification(
         email=email,
         notification_type="invite_register",
         operator_user=operator_user,
-        password_reset_token=None,
     )
+    logger.info("Invite_register email sent")
 
-    return (
-        "✅ Клиент успешно создан.\n\n"
-        f"E-mail: {email}\n"
-        f"Код клиента: {client_code}\n\n"
-        "Клиенту отправлено письмо с инструкциями:\n"
-        "• задать пароль;\n"
-        "• заполнить профиль;\n"
-        "• подписать договор-оферту."
-    )
+    return f"Клиент создан: {email}, код {client_code}"
 
 
 def send_client_email_notification(
-    *,
-    email: str,
-    notification_type: str,
-    operator_user=None,
-    password_reset_token: str | None = None,
+        *,
+        email: str,
+        notification_type: str,
+        operator_user=None,
+        password_reset_token: str | None = None,
 ) -> None:
     """
     Универсальная отправка e-mail клиенту.
