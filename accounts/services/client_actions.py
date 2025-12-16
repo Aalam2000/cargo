@@ -221,7 +221,7 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
     # 1) Пользователь существует?
     user = CustomUser.objects.filter(email__iexact=email).first()
     if user:
-        send_client_email_notification(email=email, notification_type="invite_visit")
+        send_client_email_notification(email=email, notification_type="invite_visit", operator_user=None)
         return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
 
     # 2) Создаём нового пользователя
@@ -249,7 +249,7 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
     user.save(update_fields=["linked_client", "client_code"])
 
     # 6) Письмо новому
-    send_client_email_notification(email=email, notification_type="invite_register")
+    send_client_email_notification(email=email, notification_type="invite_register", operator_user=None, password_reset_token=None)
 
     return f"✅ Клиент создан: {email}\n👤 Код клиента: {client_code}\n📩 Приглашение отправлено."
 
