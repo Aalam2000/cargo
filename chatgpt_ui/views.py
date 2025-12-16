@@ -422,7 +422,6 @@ def tg_webhook(request):
 
     # --- Реакция только на create_client ---
     if (data.get("action") or "").strip() == "create_client" and (data.get("email") or "").strip():
-        # Пока используем существующий preview (по текущему проекту)
         result_text = create_client_with_user(
             email=data["email"],
             name=data.get("name", ""),
