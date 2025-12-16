@@ -83,6 +83,9 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
 
 @transaction.atomic
 def create_client_with_user(*, email, operator_user, name=""):
+    import logging
+    logger = logging.getLogger("pol")
+
     logger.info("=== CREATE CLIENT START ===")
     logger.info(f"Email={email}, Operator={operator_user.id}")
 
@@ -101,7 +104,7 @@ def create_client_with_user(*, email, operator_user, name=""):
             notification_type="invite_visit",
             operator_user=operator_user,
         )
-        logger.info("Invite_visit email sent")
+        logger.info("invite_visit email sent")
         return f"Клиент уже существует. Приглашение отправлено: {email}"
 
     logger.info("User NOT found → creating")
@@ -137,9 +140,10 @@ def create_client_with_user(*, email, operator_user, name=""):
         notification_type="invite_register",
         operator_user=operator_user,
     )
-    logger.info("Invite_register email sent")
+    logger.info("invite_register email sent")
 
     return f"Клиент создан: {email}, код {client_code}"
+
 
 
 def send_client_email_notification(

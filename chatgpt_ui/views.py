@@ -343,6 +343,10 @@ def dialog_view(request):
 
 @csrf_exempt
 def tg_webhook(request):
+    import json
+    import logging
+
+    logger = logging.getLogger("pol")
     logger.info("=== TG WEBHOOK CALLED ===")
 
     if request.method != "POST":
@@ -353,7 +357,7 @@ def tg_webhook(request):
         raw_body = request.body.decode("utf-8")
         logger.info(f"RAW BODY: {raw_body}")
         data = json.loads(raw_body)
-    except Exception as e:
+    except Exception:
         logger.exception("JSON decode error")
         return JsonResponse({"status": "invalid_json"})
 
@@ -369,21 +373,19 @@ def tg_webhook(request):
     logger.info(f"telegram_id={telegram_id}, text='{text}'")
 
     if not telegram_id or not text:
-        logger.info("Ignored: no telegram_id or no text")
+        logger.info("Ignored: empty telegram_id or text")
         return JsonResponse({"status": "ignored"})
 
-    # --- Сессия ---
     session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
     logger.info(f"ChatSession id={session.id}")
 
-    # --- Поиск пользователя ---
     from accounts.models import CustomUser
 
     matched_user = None
     incoming = set()
 
     if username:
-        incoming.add(username.lower().replace("@", "").strip())
+        incoming.add(username.lower().replace("@", ""))
     if telegram_id:
         incoming.add(telegram_id.lower())
 
@@ -401,31 +403,28 @@ def tg_webhook(request):
     if matched_user and not session.user:
         session.user = matched_user
         session.save(update_fields=["user"])
-        logger.info("Session user linked")
+        logger.info("Session linked to user")
 
-    # --- Не опознан ---
     if not session.user:
-        logger.info("User NOT recognized")
+        logger.warning("User NOT recognized")
         return send_tg_reply(
             telegram_id,
-            "Ваш Telegram не привязан к пользователю. Заполните поле Telegram в профиле."
+            "Ваш Telegram не привязан. Укажите его в профиле CargoAdmin."
         )
 
     logger.info(f"Recognized user id={session.user.id}, role={session.user.role}")
 
-    # --- Проверка прав ---
     if session.user.role not in ("Admin", "Operator"):
-        logger.info("Permission denied")
+        logger.warning("Permission denied")
         return send_tg_reply(telegram_id, "Недостаточно прав.")
 
-    # --- OpenAI ---
-    from accounts.services.client_actions import safe_parse_ai_json, create_client_with_user
+    from accounts.services.client_actions import create_client_with_user, safe_parse_ai_json
 
-    logger.info("Sending text to OpenAI")
+    logger.info("Calling OpenAI parser")
     try:
         parser_prompt = build_client_parser_prompt()
         ai_answer = call_openai_with_prompt(parser_prompt, text)
-        logger.info(f"AI ANSWER RAW: {ai_answer}")
+        logger.info(f"AI RAW ANSWER: {ai_answer}")
     except Exception:
         logger.exception("OpenAI call failed")
         return send_tg_reply(telegram_id, "Ошибка анализа команды.")
@@ -440,24 +439,24 @@ def tg_webhook(request):
     logger.info(f"Action={action}, Email={email}, Name={name}")
 
     if action == "create_client" and email:
-        logger.info("Calling create_client_with_user")
+        logger.info("create_client action detected")
         try:
             result_text = create_client_with_user(
                 email=email,
                 operator_user=session.user,
                 name=name,
             )
-            logger.info("create_client_with_user finished")
+            logger.info("create_client_with_user finished OK")
         except Exception:
             logger.exception("create_client_with_user crashed")
-            result_text = "Ошибка при создании клиента (см. лог)."
+            result_text = "Ошибка при создании клиента. См. police.log"
 
         return send_tg_reply(telegram_id, result_text)
 
-    logger.info("No actionable command detected")
+    logger.info("No actionable command")
     return send_tg_reply(
         telegram_id,
-        "Команда не распознана. Укажите e-mail клиента."
+        "Команда не распознана. Напишите e-mail клиента."
     )
 
 
