@@ -346,118 +346,37 @@ def tg_webhook(request):
     import json
     import logging
 
-    logger = logging.getLogger("pol")
-    logger.info("=== TG WEBHOOK CALLED ===")
+    logger = logging.getLogger()  # ROOT
+    logger.error("TG_WEBHOOK ENTERED")
 
     if request.method != "POST":
-        logger.info("Non-POST request")
+        logger.error("NON POST")
         return JsonResponse({"status": "ok"})
 
     try:
-        raw_body = request.body.decode("utf-8")
-        logger.info(f"RAW BODY: {raw_body}")
-        data = json.loads(raw_body)
-    except Exception:
-        logger.exception("JSON decode error")
-        return JsonResponse({"status": "invalid_json"})
+        raw = request.body.decode("utf-8")
+        logger.error(f"RAW BODY: {raw}")
+        data = json.loads(raw)
+    except Exception as e:
+        logger.exception("JSON ERROR")
+        return JsonResponse({"status": "bad_json"})
 
     message = data.get("message", {})
-    text = (message.get("text") or "").strip()
+    text = message.get("text")
     chat = message.get("chat", {})
+    telegram_id = chat.get("id")
 
-    telegram_id = str(chat.get("id")) if chat else None
-    username = chat.get("username")
-    first_name = chat.get("first_name")
-    last_name = chat.get("last_name")
+    logger.error(f"text={text}, telegram_id={telegram_id}")
 
-    logger.info(f"telegram_id={telegram_id}, text='{text}'")
-
-    if not telegram_id or not text:
-        logger.info("Ignored: empty telegram_id or text")
+    if not text or not telegram_id:
+        logger.error("NO TEXT OR ID")
         return JsonResponse({"status": "ignored"})
 
-    session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
-    logger.info(f"ChatSession id={session.id}")
+    # ПРОСТЕЙШИЙ ТЕСТ — без OpenAI, без БД
+    send_tg_reply(str(telegram_id), "TG_WEBHOOK WORKS")
+    logger.error("REPLY SENT")
 
-    from accounts.models import CustomUser
-
-    matched_user = None
-    incoming = set()
-
-    if username:
-        incoming.add(username.lower().replace("@", ""))
-    if telegram_id:
-        incoming.add(telegram_id.lower())
-
-    logger.info(f"Incoming identifiers: {incoming}")
-
-    for u in CustomUser.objects.all():
-        if not u.telegram:
-            continue
-        val = u.telegram.strip().lower().replace("@", "")
-        if val in incoming:
-            matched_user = u
-            logger.info(f"Matched user id={u.id}, email={u.email}")
-            break
-
-    if matched_user and not session.user:
-        session.user = matched_user
-        session.save(update_fields=["user"])
-        logger.info("Session linked to user")
-
-    if not session.user:
-        logger.warning("User NOT recognized")
-        return send_tg_reply(
-            telegram_id,
-            "Ваш Telegram не привязан. Укажите его в профиле CargoAdmin."
-        )
-
-    logger.info(f"Recognized user id={session.user.id}, role={session.user.role}")
-
-    if session.user.role not in ("Admin", "Operator"):
-        logger.warning("Permission denied")
-        return send_tg_reply(telegram_id, "Недостаточно прав.")
-
-    from accounts.services.client_actions import create_client_with_user, safe_parse_ai_json
-
-    logger.info("Calling OpenAI parser")
-    try:
-        parser_prompt = build_client_parser_prompt()
-        ai_answer = call_openai_with_prompt(parser_prompt, text)
-        logger.info(f"AI RAW ANSWER: {ai_answer}")
-    except Exception:
-        logger.exception("OpenAI call failed")
-        return send_tg_reply(telegram_id, "Ошибка анализа команды.")
-
-    cmd = safe_parse_ai_json(ai_answer)
-    logger.info(f"AI PARSED: {cmd}")
-
-    action = (cmd.get("action") or "").strip()
-    email = (cmd.get("email") or "").strip()
-    name = (cmd.get("name") or "").strip()
-
-    logger.info(f"Action={action}, Email={email}, Name={name}")
-
-    if action == "create_client" and email:
-        logger.info("create_client action detected")
-        try:
-            result_text = create_client_with_user(
-                email=email,
-                operator_user=session.user,
-                name=name,
-            )
-            logger.info("create_client_with_user finished OK")
-        except Exception:
-            logger.exception("create_client_with_user crashed")
-            result_text = "Ошибка при создании клиента. См. police.log"
-
-        return send_tg_reply(telegram_id, result_text)
-
-    logger.info("No actionable command")
-    return send_tg_reply(
-        telegram_id,
-        "Команда не распознана. Напишите e-mail клиента."
-    )
+    return JsonResponse({"status": "ok"})
 
 
 # --- Функция отправки сообщений в Telegram ---
