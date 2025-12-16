@@ -84,23 +84,22 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
 
 @transaction.atomic
 def create_client_with_user(
-        *,
-        email: str,
-        operator_user: CustomUser,
-        name: str = "",
+    *,
+    email: str,
+    operator_user: CustomUser,
+    name: str = "",
 ) -> str:
     """
     Ищет пользователя по e-mail.
-    Если найден — шлёт приглашение войти.
-    Если нет — создаёт пользователя + клиента и шлёт приглашение.
-    Возвращает ТЕКСТ для Telegram-ответа оператору.
+    Если найден — отправляет приглашение войти.
+    Если нет — создаёт пользователя + клиента и отправляет приглашение.
+    Возвращает текст для Telegram-ответа оператору.
     """
 
     # --- 1. Поиск пользователя ---
     user = CustomUser.objects.filter(email__iexact=email).first()
 
     if user:
-        # 🔔 ПИСЬМО НАЙДЕННОМУ ПОЛЬЗОВАТЕЛЮ
         send_client_email_notification(
             email=email,
             notification_type="invite_visit",
@@ -116,7 +115,7 @@ def create_client_with_user(
             "войти в личный кабинет."
         )
 
-    # --- 2. Создание нового пользователя ---
+    # --- 2. Создание пользователя ---
     raw_password = get_random_string(10)
 
     user = CustomUser.objects.create_user(
@@ -138,17 +137,16 @@ def create_client_with_user(
         company=company,
     )
 
-    # --- 5. Привязка пользователя к клиенту ---
+    # --- 5. Привязка ---
     user.linked_client = client
     user.client_code = client_code
     user.save(update_fields=["linked_client", "client_code"])
 
-    # 🔔 ПИСЬМО НОВОМУ ПОЛЬЗОВАТЕЛЮ
+    # --- 6. Письмо новому клиенту ---
     send_client_email_notification(
         email=email,
         notification_type="invite_register",
         operator_user=operator_user,
-        password_reset_token=None,
     )
 
     return (
