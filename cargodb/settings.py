@@ -174,4 +174,4 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = EMAIL_HOST_USER
 
-SITE_URL = "https://cargonumber1.ru"
+SITE_URL = "https://bonablog.ru/"
