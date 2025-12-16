@@ -172,15 +172,19 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
         send_client_email_notification(email=email, notification_type="invite_visit", operator_user=None)
         return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
 
-    # 2) Создаём нового пользователя
-    user = CustomUser.objects.create_user(
+    # 2) Создаём нового пользователя (БЕЗ create_user)
+    raw_password = CustomUser.objects.make_random_password()
+
+    user = CustomUser.objects.create(
         email=email,
-        password=CustomUser.objects.make_random_password(),
         role="Client",
         company=operator_user.company,
         first_name=name or "",
         is_active=True,
     )
+
+    user.set_password(raw_password)
+    user.save(update_fields=["password"])
 
     # 3) Генерируем код клиента (нумератор)
     client_code = generate_client_code(operator_user.company)
