@@ -1,17 +1,13 @@
 # accounts/services/client_actions.py
 import json
-import logging
 import re
 from typing import Dict, Any
-
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import transaction
-from django.utils.crypto import get_random_string
+from django.urls import reverse
+from accounts.models import CustomUser
 
-logger = logging.getLogger("tg_bot")
-
-from .client_actions import send_client_email_notification
+import logging
 
 logger = logging.getLogger("pol")
 
@@ -81,77 +77,64 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
         return {"action": "unknown", "email": "", "name": ""}
 
 
-@transaction.atomic
-def create_client_with_user(*, email, operator_user, name=""):
-    import logging
-    logger = logging.getLogger("pol")
 
-    logger.info("=== CREATE CLIENT START ===")
-    logger.info(f"Email={email}, Operator={operator_user.id}")
+def preview_client_search(data: dict) -> str:
+    """
+    Отладочный поиск клиента по e-mail.
+    НИЧЕГО не создаёт.
+    """
+    action = (data.get("action") or "").strip()
+    email = (data.get("email") or "").strip()
+    name = (data.get("name") or "").strip()
 
-    email = email.strip().lower()
-
-    from accounts.models import CustomUser
-    from cargo_acc.models import Client
-    from cargo_acc.services.code_generator import generate_client_code
+    if action != "create_client" or not email:
+        return (
+            "Команда не распознана или отсутствует e-mail.\n"
+            "Поиск клиента не выполнялся."
+        )
 
     user = CustomUser.objects.filter(email__iexact=email).first()
 
     if user:
-        logger.info(f"User EXISTS id={user.id}")
+        # найден существующий пользователь → приглашение войти
         send_client_email_notification(
             email=email,
             notification_type="invite_visit",
-            operator_user=operator_user,
+            operator_user=None,
         )
-        logger.info("invite_visit email sent")
-        return f"Клиент уже существует. Приглашение отправлено: {email}"
 
-    logger.info("User NOT found → creating")
+        return (
+            "📧 Клиент найден.\n\n"
+            f"E-mail: {email}\n"
+            f"ID пользователя: {user.id}\n"
+            f"Роль: {user.role}\n\n"
+            "Клиенту отправлено письмо с приглашением "
+            "в личный кабинет."
+        )
 
-    password = get_random_string(10)
-
-    user = CustomUser.objects.create_user(
-        email=email,
-        password=password,
-        role="Client",
-        company=operator_user.company,
-        first_name=name or "",
-        is_active=True,
-    )
-    logger.info(f"User created id={user.id}")
-
-    client_code = generate_client_code(operator_user.company)
-    logger.info(f"Generated client_code={client_code}")
-
-    client = Client.objects.create(
-        client_code=client_code,
-        company=operator_user.company,
-    )
-    logger.info(f"Client created id={client.id}")
-
-    user.linked_client = client
-    user.client_code = client_code
-    user.save(update_fields=["linked_client", "client_code"])
-    logger.info("User linked to client")
-
+    # пользователь не найден → письмо о регистрации
     send_client_email_notification(
         email=email,
         notification_type="invite_register",
-        operator_user=operator_user,
+        operator_user=None,
+        password_reset_token=None,  # пока заглушка
     )
-    logger.info("invite_register email sent")
 
-    return f"Клиент создан: {email}, код {client_code}"
-
+    return (
+        "📧 Клиент не найден.\n\n"
+        f"E-mail: {email}\n\n"
+        "Пользователь будет создан на следующем шаге.\n"
+        "Клиенту отправлено письмо о регистрации "
+        "и необходимости авторизации в системе."
+    )
 
 
 def send_client_email_notification(
-        *,
-        email: str,
-        notification_type: str,
-        operator_user=None,
-        password_reset_token: str | None = None,
+    *,
+    email: str,
+    notification_type: str,
+    operator_user=None,
+    password_reset_token: str | None = None,
 ) -> None:
     """
     Универсальная отправка e-mail клиенту.
@@ -160,9 +143,6 @@ def send_client_email_notification(
     - invite_visit
     - invite_register
     """
-    email = (email or "").strip()
-    if not email:
-        return
 
     base_url = settings.SITE_URL.rstrip("/")
 
@@ -195,7 +175,8 @@ def send_client_email_notification(
         )
 
     else:
-        return
+        return  # неизвестный тип — молча выходим
+
 
     try:
         send_mail(
@@ -207,3 +188,4 @@ def send_client_email_notification(
         )
     except Exception as e:
         logger.exception(f"EMAIL SEND ERROR to {email}: {e}")
+
