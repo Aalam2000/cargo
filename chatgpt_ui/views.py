@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from accounts.services.client_actions import build_client_action_preview
 from .models import ChatSession
 
 # Загрузка ключа OpenAI
@@ -423,20 +424,22 @@ def tg_webhook(request):
     # ============================================================
     # 🔥 РЕЖИМ ПАРСЕРА КЛИЕНТОВ — если сообщение начинается с "15"
     # ============================================================
+    # 🔥 РЕЖИМ ПАРСЕРА КЛИЕНТОВ — если сообщение начинается с "15"
     if text.startswith("15"):
         raw_text = text[2:].strip()
 
-        # Системный промпт для парсера создания клиента
         parser_prompt = build_client_parser_prompt()
 
         try:
             ai_answer = call_openai_with_prompt(parser_prompt, raw_text)
         except Exception as e:
-            ai_answer = f"Ошибка OpenAI: {str(e)}"
+            ai_answer = f'{{"action": "unknown", "email": "", "name": ""}}'
 
-        # Отправляем пользователю ЧИСТЫЙ ответ OpenAI (JSON)
-        send_tg_reply(telegram_id, ai_answer)
-        return JsonResponse({"status": "ai_sent"})
+        # 👉 здесь используем функцию разбора и строим текст для оператора
+        preview_text = build_client_action_preview(ai_answer)
+        send_tg_reply(telegram_id, preview_text)
+
+        return JsonResponse({"status": "ai_preview"})
 
     # Пользователь привязан — пока молчим
     # Формируем обращение
