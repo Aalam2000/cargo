@@ -17,7 +17,7 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 from accounts.models import CustomUser
-from accounts.services.client_actions import safe_parse_ai_json, preview_client_search
+from accounts.services.client_actions import safe_parse_ai_json
 from .models import ChatSession
 
 # Загрузка ключа OpenAI

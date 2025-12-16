@@ -84,58 +84,6 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
         return {"action": "unknown", "email": "", "name": ""}
 
 
-
-def preview_client_search(data: dict) -> str:
-    """
-    Отладочный поиск клиента по e-mail.
-    НИЧЕГО не создаёт.
-    """
-    action = (data.get("action") or "").strip()
-    email = (data.get("email") or "").strip()
-    name = (data.get("name") or "").strip()
-
-    if action != "create_client" or not email:
-        return (
-            "Команда не распознана или отсутствует e-mail.\n"
-            "Поиск клиента не выполнялся."
-        )
-
-    user = CustomUser.objects.filter(email__iexact=email).first()
-
-    if user:
-        # найден существующий пользователь → приглашение войти
-        send_client_email_notification(
-            email=email,
-            notification_type="invite_visit",
-            operator_user=None,
-        )
-
-        return (
-            "📧 Клиент найден.\n\n"
-            f"E-mail: {email}\n"
-            f"ID пользователя: {user.id}\n"
-            f"Роль: {user.role}\n\n"
-            "Клиенту отправлено письмо с приглашением "
-            "в личный кабинет."
-        )
-
-    # пользователь не найден → письмо о регистрации
-    send_client_email_notification(
-        email=email,
-        notification_type="invite_register",
-        operator_user=None,
-        password_reset_token=None,  # пока заглушка
-    )
-
-    return (
-        "📧 Клиент не найден.\n\n"
-        f"E-mail: {email}\n\n"
-        "Пользователь будет создан на следующем шаге.\n"
-        "Клиенту отправлено письмо о регистрации "
-        "и необходимости авторизации в системе."
-    )
-
-
 def send_client_email_notification(
     *,
     email: str,
