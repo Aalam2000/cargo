@@ -7,6 +7,9 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from accounts.models import CustomUser
 
+import logging
+
+logger = logging.getLogger("pol")
 
 
 def build_client_action_preview(ai_json: str) -> str:
@@ -174,10 +177,14 @@ def send_client_email_notification(
     else:
         return  # неизвестный тип — молча выходим
 
-    send_mail(
-        subject=subject,
-        message=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[email],
-        fail_silently=False,
-    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        logger.exception(f"EMAIL SEND ERROR to {email}: {e}")
