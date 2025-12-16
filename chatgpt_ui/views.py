@@ -338,6 +338,8 @@ def dialog_view(request):
     return render(request, 'chatgpt_ui/dialog.html')
 
 
+# chatgpt_ui/views.py
+
 @csrf_exempt
 def tg_webhook(request):
     if request.method != "POST":
@@ -356,22 +358,24 @@ def tg_webhook(request):
     username = chat.get("username")
     first_name = chat.get("first_name")
     last_name = chat.get("last_name")
+    language = chat.get("language_code")
 
     if not telegram_id or not text:
         return JsonResponse({"status": "ignored"})
 
-    # --- Сессия Telegram ---
-    session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
+    # Сессия Telegram
+    session, created = ChatSession.objects.get_or_create(telegram_id=telegram_id)
 
-    # --- Определение пользователя по accounts_customuser.telegram ---
+    # ---------- ОПРЕДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ПО ПОЛЮ accounts_customuser.telegram ----------
     from accounts.models import CustomUser
 
     matched_user = None
     incoming = set()
+
     if username:
-        incoming.add(username.lower())
+        incoming.add(username.lower().replace("@", "").strip())
     if telegram_id:
-        incoming.add(telegram_id.lower())
+        incoming.add(str(telegram_id).lower().strip())
 
     for u in CustomUser.objects.all():
         if not u.telegram:
@@ -383,53 +387,57 @@ def tg_webhook(request):
 
     if matched_user and not session.user:
         session.user = matched_user
-        session.save()
+        session.save(update_fields=["user"])
 
-    # --- Пользователь не опознан ---
+    # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
     if not session.user:
         show_username = f"@{username}" if username else "нет"
+        show_id = telegram_id
+
         details = (
             "Добро пожаловать в CargoAdmin Bot!\n\n"
             "Ваш Telegram ещё не привязан к системе.\n"
-            "Откройте CargoAdmin и заполните поле «Telegram» в карточке пользователя.\n\n"
+            "Чтобы система могла вас узнать — откройте CargoAdmin и "
+            "в своей карточке пользователя заполните поле «Telegram».\n\n"
             "Укажите одно из значений:\n"
             f"• {show_username}\n"
-            f"• {telegram_id}\n\n"
+            f"• {show_id}\n\n"
             "Ссылка на платформу:\nhttps://bonablog.ru\n\n"
             "Ваши данные:\n"
-            f"ID: {telegram_id}\n"
+            f"ID: {show_id}\n"
             f"Username: {show_username}\n"
             f"Имя: {first_name or 'нет'}\n"
             f"Фамилия: {last_name or 'нет'}"
         )
         return send_tg_reply(telegram_id, details)
 
-    # --- Права ---
+    # ---------- ТОЛЬКО ДЛЯ АДМИНА/ОПЕРАТОРА ----------
     if session.user.role not in ("Admin", "Operator"):
-        return send_tg_reply(
-            telegram_id,
-            "У вас нет прав для создания или приглашения клиентов."
-        )
+        return send_tg_reply(telegram_id, "Доступ запрещён. Команды бота доступны только Admin/Operator.")
 
-    # --- Парсинг сообщения через OpenAI (ВСЕГДА) ---
+    # ---------- OPENAI: распознаём команду (любой язык/формат) ----------
+    from accounts.services.client_actions import safe_parse_ai_json, create_client_with_user
+
     parser_prompt = build_client_parser_prompt()
+
     try:
         ai_answer = call_openai_with_prompt(parser_prompt, text)
     except Exception:
-        ai_answer = '{"action":"unknown","email":"","name":""}'
+        ai_answer = ""
 
-    data = safe_parse_ai_json(ai_answer)
+    cmd = safe_parse_ai_json(ai_answer)
+    action = (cmd.get("action") or "").strip()
+    email = (cmd.get("email") or "").strip()
+    name = (cmd.get("name") or "").strip()
 
-    # --- Реакция только на create_client ---
-    if (data.get("action") or "").strip() == "create_client" and (data.get("email") or "").strip():
-        result_text = create_client_with_user(
-            email=data["email"],
-            name=data.get("name", ""),
-            operator_user=session.user,
-        )
+    if action == "create_client" and email:
+        try:
+            result_text = create_client_with_user(email=email, operator_user=session.user, name=name)
+        except Exception as e:
+            result_text = f"❗ Ошибка при создании/проверке клиента: {e}"
         return send_tg_reply(telegram_id, result_text)
 
-    # --- Иначе — нейтральный ответ ---
+    # ---------- если не команда — отвечаем нейтрально ----------
     if first_name or last_name:
         name_block = f"{first_name or ''} {last_name or ''}".strip()
     elif username:
@@ -437,10 +445,13 @@ def tg_webhook(request):
     else:
         name_block = f"ID {telegram_id}"
 
-    return send_tg_reply(
-        telegram_id,
-        f"Принял, {name_block}. Если нужно создать клиента — напишите сообщение с e-mail клиента."
+    welcome_text = (
+        f"Привет, {name_block}! 🎉\n\n"
+        "Напишите команду в свободной форме, например:\n"
+        "• «сделай клиента Нина nina@example.com»\n"
+        "• «create client nina@example.com»"
     )
+    return send_tg_reply(telegram_id, welcome_text)
 
 
 

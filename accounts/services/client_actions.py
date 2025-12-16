@@ -82,6 +82,8 @@ def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
         return {"action": "unknown", "email": "", "name": ""}
 
 
+# accounts/services/client_actions.py
+
 @transaction.atomic
 def create_client_with_user(
     *,
@@ -95,6 +97,12 @@ def create_client_with_user(
     Если нет — создаёт пользователя + клиента и отправляет приглашение.
     Возвращает текст для Telegram-ответа оператору.
     """
+    email = (email or "").strip().lower()
+    if not email:
+        return "❗ Не указан e-mail."
+
+    if not operator_user or not operator_user.company_id:
+        return "❗ Ошибка: у оператора нет привязанной компании."
 
     # --- 1. Поиск пользователя ---
     user = CustomUser.objects.filter(email__iexact=email).first()
@@ -115,7 +123,7 @@ def create_client_with_user(
             "войти в личный кабинет."
         )
 
-    # --- 2. Создание пользователя ---
+    # --- 2. Создание нового пользователя ---
     raw_password = get_random_string(10)
 
     user = CustomUser.objects.create_user(
@@ -137,7 +145,7 @@ def create_client_with_user(
         company=company,
     )
 
-    # --- 5. Привязка ---
+    # --- 5. Привязка пользователя к клиенту ---
     user.linked_client = client
     user.client_code = client_code
     user.save(update_fields=["linked_client", "client_code"])
@@ -147,6 +155,7 @@ def create_client_with_user(
         email=email,
         notification_type="invite_register",
         operator_user=operator_user,
+        password_reset_token=None,
     )
 
     return (
@@ -161,11 +170,11 @@ def create_client_with_user(
 
 
 def send_client_email_notification(
-        *,
-        email: str,
-        notification_type: str,
-        operator_user=None,
-        password_reset_token: str | None = None,
+    *,
+    email: str,
+    notification_type: str,
+    operator_user=None,
+    password_reset_token: str | None = None,
 ) -> None:
     """
     Универсальная отправка e-mail клиенту.
@@ -174,6 +183,9 @@ def send_client_email_notification(
     - invite_visit
     - invite_register
     """
+    email = (email or "").strip()
+    if not email:
+        return
 
     base_url = settings.SITE_URL.rstrip("/")
 
@@ -206,7 +218,7 @@ def send_client_email_notification(
         )
 
     else:
-        return  # неизвестный тип — молча выходим
+        return
 
     try:
         send_mail(
