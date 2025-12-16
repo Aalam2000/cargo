@@ -1,5 +1,6 @@
 # accounts/services/client_actions.py
 import json
+import re
 from typing import Dict, Any
 
 
@@ -10,7 +11,7 @@ def build_client_action_preview(ai_json: str) -> str:
     собирается сделать.
     """
     try:
-        data: Dict[str, Any] = json.loads(ai_json)
+        data = safe_parse_ai_json(ai_json)
     except json.JSONDecodeError:
         return "❗ Команда не распознана: получен некорректный JSON от OpenAI."
 
@@ -41,3 +42,28 @@ def build_client_action_preview(ai_json: str) -> str:
     )
 
     return "\n".join(parts)
+
+
+def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
+    """
+    Гарантированно извлекает JSON из ответа OpenAI
+    """
+    if not ai_text:
+        return {"action": "unknown", "email": "", "name": ""}
+
+    # убираем ```json ``` и ```
+    cleaned = re.sub(r"```json|```", "", ai_text).strip()
+
+    # берём JSON между первой { и последней }
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+
+    if start == -1 or end == -1 or end <= start:
+        return {"action": "unknown", "email": "", "name": ""}
+
+    json_text = cleaned[start: end + 1]
+
+    try:
+        return json.loads(json_text)
+    except Exception:
+        return {"action": "unknown", "email": "", "name": ""}
