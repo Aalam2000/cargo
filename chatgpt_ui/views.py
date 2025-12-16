@@ -8,6 +8,7 @@ from typing import List, cast
 
 import requests
 from django.conf import settings
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from accounts.models import CustomUser
 from accounts.services.client_actions import safe_parse_ai_json, preview_client_search
 from .models import ChatSession
 
@@ -229,12 +231,17 @@ def build_client_parser_prompt() -> str:
 {
   "action": "...",
   "email": "...",
-  "name": "..."
+  "name": "...",
+  "lang": "...",
+  "reply": "..."
 }
 
 ПРАВИЛА ФОРМИРОВАНИЯ:
 - email — первый найденный корректный e-mail или пустая строка.
 - name — имя/название клиента, если явно указано в тексте, иначе пустая строка.
+- lang — язык сообщения пользователя (например: "ru", "az", "en", "tr", "zh").
+- reply — короткий ответ пользователю НА ЕГО ЯЗЫКЕ, что команда принята и будет выполнена.
+  Если action="unknown" — reply должен вежливо объяснить, что команда не распознана.
 - Если НЕТ валидного e-mail ИЛИ не видно запроса на создание/приглашение клиента —
   верните:
 
@@ -364,22 +371,20 @@ def tg_webhook(request):
     session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
 
     # --- Определение пользователя по accounts_customuser.telegram ---
-    from accounts.models import CustomUser
 
     matched_user = None
-    incoming = set()
-    if username:
-        incoming.add(username.lower())
-    if telegram_id:
-        incoming.add(telegram_id.lower())
 
-    for u in CustomUser.objects.all():
-        if not u.telegram:
-            continue
-        val = u.telegram.strip().lower().replace("@", "")
-        if val in incoming:
-            matched_user = u
-            break
+    candidates = Q()
+    if username:
+        u1 = username.strip()
+        candidates |= Q(telegram__iexact=u1) | Q(telegram__iexact=f"@{u1}") | Q(telegram__iexact=u1.lower()) | Q(
+            telegram__iexact=f"@{u1.lower()}")
+    if telegram_id:
+        t1 = str(telegram_id).strip()
+        candidates |= Q(telegram__iexact=t1)
+
+    if candidates:
+        matched_user = CustomUser.objects.filter(candidates).first()
 
     if matched_user and not session.user:
         session.user = matched_user
@@ -420,11 +425,25 @@ def tg_webhook(request):
 
     data = safe_parse_ai_json(ai_answer)
 
-    # --- Реакция только на create_client ---
-    if (data.get("action") or "").strip() == "create_client" and (data.get("email") or "").strip():
-        # Пока используем существующий preview (по текущему проекту)
-        preview_text = preview_client_search(data)
-        return send_tg_reply(telegram_id, preview_text)
+    action = (data.get("action") or "").strip()
+    email = (data.get("email") or "").strip()
+    name = (data.get("name") or "").strip()
+    reply = (data.get("reply") or "").strip() or "Принято. Выполняю."
+    lang = (data.get("lang") or "").strip()
+
+    # 1) Сразу отвечаем пользователю (на его языке — это делает OpenAI через reply)
+    # 2) Если нужно действие — запускаем в фоне
+    if action == "create_client" and email:
+        from accounts.services.client_actions import enqueue_create_client_action
+        enqueue_create_client_action(
+            telegram_id=telegram_id,
+            operator_user_id=session.user_id,
+            email=email,
+            name=name,
+            lang=lang,
+        )
+
+    return send_tg_reply(telegram_id, reply)
 
     # --- Иначе — нейтральный ответ ---
     if first_name or last_name:
@@ -438,7 +457,6 @@ def tg_webhook(request):
         telegram_id,
         f"Принял, {name_block}. Если нужно создать клиента — напишите сообщение с e-mail клиента."
     )
-
 
 
 # --- Функция отправки сообщений в Telegram ---

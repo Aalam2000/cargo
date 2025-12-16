@@ -7,6 +7,13 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from accounts.models import CustomUser
 
+import os
+import threading
+import requests
+from django.db import transaction
+from cargo_acc.models import Client
+from cargo_acc.services.code_generator import generate_client_code
+
 import logging
 
 logger = logging.getLogger("pol")
@@ -189,3 +196,73 @@ def send_client_email_notification(
     except Exception as e:
         logger.exception(f"EMAIL SEND ERROR to {email}: {e}")
 
+
+def send_tg_message(chat_id: str, text: str) -> None:
+    token = os.getenv("ADMIN_BOT_TG")
+    if not token:
+        logger.error("ADMIN_BOT_TG env variable is missing")
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        logger.exception(f"Telegram send failed: {e}")
+
+
+@transaction.atomic
+def create_client_with_user(*, email: str, operator_user: CustomUser, name: str = "") -> str:
+    email = (email or "").strip()
+    if not email:
+        return "❗ E-mail пустой."
+
+    # 1) Пользователь существует?
+    user = CustomUser.objects.filter(email__iexact=email).first()
+    if user:
+        send_client_email_notification(email=email, notification_type="invite_visit")
+        return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
+
+    # 2) Создаём нового пользователя
+    user = CustomUser.objects.create_user(
+        email=email,
+        password=CustomUser.objects.make_random_password(),
+        role="Client",
+        company=operator_user.company,
+        first_name=name or "",
+        is_active=True,
+    )
+
+    # 3) Генерируем код клиента (нумератор)
+    client_code = generate_client_code(operator_user.company)
+
+    # 4) Создаём клиента
+    client = Client.objects.create(
+        company=operator_user.company,
+        client_code=client_code,
+    )
+
+    # 5) Привязываем
+    user.linked_client = client
+    user.client_code = client_code
+    user.save(update_fields=["linked_client", "client_code"])
+
+    # 6) Письмо новому
+    send_client_email_notification(email=email, notification_type="invite_register")
+
+    return f"✅ Клиент создан: {email}\n👤 Код клиента: {client_code}\n📩 Приглашение отправлено."
+
+
+def enqueue_create_client_action(*, telegram_id: str, operator_user_id: int, email: str, name: str = "", lang: str = "") -> None:
+    def _job():
+        try:
+            operator_user = CustomUser.objects.get(id=operator_user_id)
+            result = create_client_with_user(email=email, operator_user=operator_user, name=name)
+            send_tg_message(telegram_id, result)
+        except Exception as e:
+            logger.exception(f"create_client job failed: {e}")
+            send_tg_message(telegram_id, "❗ Ошибка при создании клиента. Смотрите police.log")
+
+    t = threading.Thread(target=_job, daemon=True)
+    t.start()
