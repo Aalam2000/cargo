@@ -14,8 +14,8 @@ from django.views.decorators.csrf import csrf_exempt
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
+
 from accounts.services.client_actions import safe_parse_ai_json, preview_client_search
-from accounts.services.client_actions import build_client_action_preview
 from .models import ChatSession
 
 # Загрузка ключа OpenAI
@@ -345,48 +345,38 @@ def tg_webhook(request):
 
     try:
         data = json.loads(request.body.decode("utf-8"))
-    except:
+    except Exception:
         return JsonResponse({"status": "invalid_json"})
 
     message = data.get("message", {})
-    text = message.get("text", "")
+    text = (message.get("text") or "").strip()
     chat = message.get("chat", {})
 
     telegram_id = str(chat.get("id")) if chat else None
     username = chat.get("username")
     first_name = chat.get("first_name")
     last_name = chat.get("last_name")
-    language = chat.get("language_code")
 
     if not telegram_id or not text:
         return JsonResponse({"status": "ignored"})
 
-    # Сессия Telegram
-    session, created = ChatSession.objects.get_or_create(
-        telegram_id=telegram_id
-    )
-    # ---------- ОПРЕДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ПО ПОЛЮ accounts_customuser.telegram ----------
+    # --- Сессия Telegram ---
+    session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
+
+    # --- Определение пользователя по accounts_customuser.telegram ---
     from accounts.models import CustomUser
 
     matched_user = None
-
-    # нормализуем вход
     incoming = set()
-
     if username:
         incoming.add(username.lower())
     if telegram_id:
         incoming.add(telegram_id.lower())
 
-    # перебираем всех пользователей
     for u in CustomUser.objects.all():
         if not u.telegram:
             continue
-
-        # нормализуем значение в БД
         val = u.telegram.strip().lower().replace("@", "")
-
-        # проверяем совпадение username или ID
         if val in incoming:
             matched_user = u
             break
@@ -395,57 +385,48 @@ def tg_webhook(request):
         session.user = matched_user
         session.save()
 
-    # Если пользователь не привязан — шлём подробности
-    # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
-    # ---------- ПОЛЬЗОВАТЕЛЬ НЕ ОПОЗНАН ----------
+    # --- Пользователь не опознан ---
     if not session.user:
-        # данные, которые пользователь должен вставить в свой профиль
         show_username = f"@{username}" if username else "нет"
-        show_id = telegram_id
-
         details = (
             "Добро пожаловать в CargoAdmin Bot!\n\n"
             "Ваш Telegram ещё не привязан к системе.\n"
-            "Чтобы система могла вас узнать — откройте CargoAdmin и "
-            "в своей карточке пользователя заполните поле «Telegram».\n\n"
+            "Откройте CargoAdmin и заполните поле «Telegram» в карточке пользователя.\n\n"
             "Укажите одно из значений:\n"
             f"• {show_username}\n"
-            f"• {show_id}\n\n"
+            f"• {telegram_id}\n\n"
             "Ссылка на платформу:\nhttps://bonablog.ru\n\n"
             "Ваши данные:\n"
-            f"ID: {show_id}\n"
+            f"ID: {telegram_id}\n"
             f"Username: {show_username}\n"
             f"Имя: {first_name or 'нет'}\n"
             f"Фамилия: {last_name or 'нет'}"
         )
-
         return send_tg_reply(telegram_id, details)
 
-    # ============================================================
-    # 🔥 РЕЖИМ ПАРСЕРА КЛИЕНТОВ — если сообщение начинается с "15"
-    # ============================================================
-    # 🔥 РЕЖИМ ПАРСЕРА КЛИЕНТОВ — если сообщение начинается с "15"
-    if text.startswith("15"):
-        raw_text = text[2:].strip()
+    # --- Права ---
+    if session.user.role not in ("Admin", "Operator"):
+        return send_tg_reply(
+            telegram_id,
+            "У вас нет прав для создания или приглашения клиентов."
+        )
 
-        parser_prompt = build_client_parser_prompt()
+    # --- Парсинг сообщения через OpenAI (ВСЕГДА) ---
+    parser_prompt = build_client_parser_prompt()
+    try:
+        ai_answer = call_openai_with_prompt(parser_prompt, text)
+    except Exception:
+        ai_answer = '{"action":"unknown","email":"","name":""}'
 
-        try:
-            ai_answer = call_openai_with_prompt(parser_prompt, raw_text)
-        except Exception as e:
-            ai_answer = f'{{"action": "unknown", "email": "", "name": ""}}'
+    data = safe_parse_ai_json(ai_answer)
 
-        # 👉 здесь используем функцию разбора и строим текст для оператора
-
-
-        data = safe_parse_ai_json(ai_answer)
+    # --- Реакция только на create_client ---
+    if (data.get("action") or "").strip() == "create_client" and (data.get("email") or "").strip():
+        # Пока используем существующий preview (по текущему проекту)
         preview_text = preview_client_search(data)
-        send_tg_reply(telegram_id, preview_text)
+        return send_tg_reply(telegram_id, preview_text)
 
-        return JsonResponse({"status": "ai_preview"})
-
-    # Пользователь привязан — пока молчим
-    # Формируем обращение
+    # --- Иначе — нейтральный ответ ---
     if first_name or last_name:
         name_block = f"{first_name or ''} {last_name or ''}".strip()
     elif username:
@@ -453,13 +434,11 @@ def tg_webhook(request):
     else:
         name_block = f"ID {telegram_id}"
 
-    welcome_text = (
-        f"Привет, {name_block}! 🎉\n\n"
-        "Скоро здесь появится автоматическая регистрация новых клиентов, "
-        "создание компаний и многое другое!"
+    return send_tg_reply(
+        telegram_id,
+        f"Принял, {name_block}. Если нужно создать клиента — напишите сообщение с e-mail клиента."
     )
 
-    return send_tg_reply(telegram_id, welcome_text)
 
 
 # --- Функция отправки сообщений в Telegram ---
