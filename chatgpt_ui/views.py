@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-from accounts.services.client_actions import safe_parse_ai_json, preview_client_search
+from accounts.services.client_actions import safe_parse_ai_json, create_client_with_user
 from .models import ChatSession
 
 # Загрузка ключа OpenAI
@@ -423,8 +423,12 @@ def tg_webhook(request):
     # --- Реакция только на create_client ---
     if (data.get("action") or "").strip() == "create_client" and (data.get("email") or "").strip():
         # Пока используем существующий preview (по текущему проекту)
-        preview_text = preview_client_search(data)
-        return send_tg_reply(telegram_id, preview_text)
+        result_text = create_client_with_user(
+            email=data["email"],
+            name=data.get("name", ""),
+            operator_user=session.user,
+        )
+        return send_tg_reply(telegram_id, result_text)
 
     # --- Иначе — нейтральный ответ ---
     if first_name or last_name:
