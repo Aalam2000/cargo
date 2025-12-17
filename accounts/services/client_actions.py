@@ -90,6 +90,8 @@ def send_client_email_notification(
     email: str,
     notification_type: str,
     operator_user=None,
+    password: str | None = None,
+    client_code: str | None = None,
     password_reset_token: str | None = None,
 ) -> None:
     """
@@ -112,23 +114,33 @@ def send_client_email_notification(
             "Если у вас возникнут вопросы — свяжитесь с вашим менеджером."
         )
 
+
     elif notification_type == "invite_register":
+
         subject = "Вы зарегистрированы в системе Cargo"
-        reset_link = (
-            f"{base_url}/set-password/{password_reset_token}/"
-            if password_reset_token
-            else f"{base_url}/login/"
-        )
+
+        link = f"{base_url}/login/"
+
         body = (
+
             "Здравствуйте!\n\n"
+
             "Для вас создана учетная запись в системе Cargo.\n\n"
-            "Пожалуйста:\n"
-            "1. Задайте пароль;\n"
-            "2. Заполните данные профиля;\n"
-            "3. Подпишите договор-оферту.\n\n"
-            f"Ссылка:\n{reset_link}\n\n"
-            "После этого вы сможете отслеживать свои товары и доставки."
+
+            "Данные для входа:\n"
+
+            f"Логин (email): {email}\n"
+
+            f"Код клиента: {client_code}\n"
+
+            f"Пароль: {password}\n\n"
+
+            f"Ссылка для входа:\n{link}\n\n"
+
+            "Рекомендуем сменить пароль после первого входа."
+
         )
+
 
     else:
         return  # неизвестный тип — молча выходим
@@ -202,9 +214,21 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
     user.save(update_fields=["linked_client", "client_code"])
 
     # 6) Письмо новому
-    send_client_email_notification(email=email, notification_type="invite_register", operator_user=None, password_reset_token=None)
+    send_client_email_notification(
+        email=email,
+        notification_type="invite_register",
+        operator_user=None,
+        password=raw_password,
+        client_code=client_code,
+    )
 
-    return f"✅ Клиент создан: {email}\n👤 Код клиента: {client_code}\n📩 Приглашение отправлено."
+    return (
+        "✅ Клиент создан\n"
+        f"📧 Email: {email}\n"
+        f"🆔 Код клиента: {client_code}\n"
+        f"🔑 Пароль: {raw_password}\n"
+        "📩 Данные отправлены клиенту на почту."
+    )
 
 
 def enqueue_create_client_action(*, telegram_id: str, operator_user_id: int, email: str, name: str = "", lang: str = "") -> None:
