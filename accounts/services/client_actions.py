@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.urls import reverse
 from accounts.models import CustomUser
+from django.utils.crypto import get_random_string
 
 import os
 import threading
@@ -173,7 +174,7 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
         return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
 
     # 2) Создаём нового пользователя (БЕЗ create_user)
-    raw_password = CustomUser.objects.make_random_password()
+    raw_password = get_random_string(12)
 
     user = CustomUser.objects.create(
         email=email,
