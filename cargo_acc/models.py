@@ -201,39 +201,71 @@ class QRScan(models.Model):
 # === ГРУЗ (агрегатор) ===
 class Cargo(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="cargos")
-    cargo_code = models.CharField(max_length=50, unique=True)
-    # агрегатные параметры
+
+    cargo_code = models.CharField(max_length=50, unique=True, db_index=True)
+
+    # агрегатные параметры (кеш по товарам; пересчитывается сервисом)
     weight_total = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     volume_total = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
-    # упаковка
+
+    # упаковка ГРУЗА (не товара)
     packaging_type = models.ForeignKey(PackagingType, on_delete=models.CASCADE)
-    # статус
-    cargo_status = models.ForeignKey(CargoStatus, on_delete=models.CASCADE)
-    # текущее местоположение
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # статус / местоположение (меняются всегда, даже после фиксации состава)
+    cargo_status = models.ForeignKey(CargoStatus, on_delete=models.CASCADE, db_index=True)
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+
+    # фиксируем только СОСТАВ (add/remove товаров)
+    is_locked = models.BooleanField(default=False, db_index=True)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    locked_by = models.ForeignKey(
+        "accounts.CustomUser",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="locked_cargos",
+    )
+
+    # правило распределения грузовых “добавок” по товарам (на будущее)
+    allocation_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ("weight", "По весу"),
+            ("volume", "По объёму"),
+            ("items", "Поровну по товарам"),
+            ("value", "По стоимости товара"),
+        ],
+        default="weight",
+    )
+
     # QR
     qr_code = models.CharField(max_length=100, blank=True, null=True)
+
     # служебные поля
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        'accounts.CustomUser',
+        "accounts.CustomUser",
         on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='created_cargos'
+        null=True, blank=True,
+        related_name="created_cargos",
     )
     updated_by = models.ForeignKey(
-        'accounts.CustomUser',
+        "accounts.CustomUser",
         on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='updated_cargos'
+        null=True, blank=True,
+        related_name="updated_cargos",
     )
 
     class Meta:
         verbose_name = "Груз"
         verbose_name_plural = "Грузы"
+        indexes = [
+            models.Index(fields=["company", "cargo_code"]),
+            models.Index(fields=["company", "cargo_status"]),
+            models.Index(fields=["company", "warehouse"]),
+            models.Index(fields=["company", "created_at"]),
+            models.Index(fields=["company", "is_locked"]),
+        ]
 
     def __str__(self):
         return self.cargo_code

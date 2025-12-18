@@ -1,433 +1,152 @@
 // web/static/js/cargo_table.js
+(function () {
+  const API_URL = "/api/cargos_table/";
 
-const tableConfig = {
-    tableId: "cargo-table",
-    apiPath: "/api/cargo_table/data/",
-    configPath: "/api/cargo_table/config/",
-    saveSettingsPath: "/cargo_acc/api/save_table_settings/",
+  const state = {
     limit: 50,
-};
+    offset: 0,
+    sort_by: "cargo_code",
+    sort_dir: "asc",
+    search: ""
+  };
 
-let offset = 0;
-let hasMore = true;
-let loading = false;
-let filters = {};
-let userConfig = null;
+  function qs(sel) { return document.querySelector(sel); }
+  function esc(s) { return (s ?? "").toString(); }
 
-let currentRows = []; // хранить текущие данные таблицы
-const sortableFields = ["cargo_code", "client", "shipping_date", "delivery_date"];
-let currentSort = { field: null, dir: "asc" };
+  function buildQuery() {
+    const p = new URLSearchParams();
+    p.set("limit", String(state.limit));
+    p.set("offset", String(state.offset));
+    p.set("sort_by", state.sort_by);
+    p.set("sort_dir", state.sort_dir);
+    if (state.search) p.set("search", state.search);
+    return "?" + p.toString();
+  }
 
+  function setLoader(on) {
+    const el = qs("#loader_cargos");
+    if (!el) return;
+    el.classList.toggle("hidden", !on);
+  }
 
+  function renderHead() {
+    const thead = qs("#cargos_head");
+    if (!thead) return;
 
-const USER_ROLE = window.CARGO_USER_ROLE || "Guest";
-const CLIENT_CODE = window.CLIENT_CODE || "";
+    const cols = [
+      { key: "cargo_code", title: "Код груза" },
+      { key: "record_date", title: "Дата записи" },
+      { key: "products_count", title: "Товаров" },
+      { key: "warehouse", title: "Склад" },
+      { key: "cargo_status", title: "Статус" },
+      { key: "packaging_type", title: "Упаковка груза" },
+      { key: "weight_total", title: "Вес итого" },
+      { key: "volume_total", title: "Объём итого" },
+      { key: "is_locked", title: "Состав фикс." }
+    ];
 
-// === ЛОГ ===
-function log(...args) {
-    console.log("[CargoTable]", ...args);
-    sendLog(args.join(" "));
-}
-
-async function sendLog(msg) {
-    try {
-        await fetch("/api/log/", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({source: "cargo_table.js", message: msg}),
-        });
-    } catch (e) {
-        console.warn("Не удалось отправить лог:", e);
-    }
-}
-
-// === API ===
-async function fetchUserConfig() {
-    try {
-        const res = await fetch(tableConfig.configPath);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const cfg = await res.json();
-        // ✅ если пришло мало полей — дополним стандартными
-        if (!cfg.columns || cfg.columns.length < 8) {
-            cfg.columns = [
-                {"field": "cargo_code", "label": "Код", "visible": true},
-                {"field": "cargo_description", "label": "Описание", "visible": true},
-                {"field": "client", "label": "Клиент", "visible": true},
-                {"field": "status", "label": "Статус", "visible": true},
-                {"field": "packaging", "label": "Упаковка", "visible": true},
-                {"field": "weight", "label": "Вес", "visible": true},
-                {"field": "volume", "label": "Объём", "visible": true},
-                {"field": "cost", "label": "Стоимость", "visible": true},
-            ];
-            cfg.page_size = 50;
-        }
-        return cfg;
-    } catch (e) {
-        return null;
-    }
-}
-
-async function fetchCargoData(reset = false) {
-    return
-    if (loading) return;
-    if (reset) {
-        offset = 0;
-        hasMore = true;
-        document.getElementById("cargo-body").innerHTML = "";
-    }
-    if (!hasMore) return;
-
-    loading = true;
-    document.getElementById("loader").style.display = "block";
-
-    const params = new URLSearchParams({offset, limit: tableConfig.limit, ...filters});
-
-    if (currentSort.field) {
-        params.set("sort_by", currentSort.field);
-        params.set("sort_dir", currentSort.dir);
-    }
-
-
-    if (USER_ROLE === "Client" && CLIENT_CODE) params.set("client", CLIENT_CODE);
-
-    try {
-        const res = await fetch(`${tableConfig.apiPath}?${params.toString()}`);
-        if (!res.ok) throw new Error(`Ошибка загрузки данных ${res.status}`);
-        const data = await res.json();
-
-        const rows = data.results || [];
-        renderRows(rows);
-        // 🔧 если сервер вернул пустой массив — значит больше данных нет
-    if (rows.length === 0) hasMore = false;
-        offset += rows.length;
-        hasMore = data.has_more;
-    } catch (e) {
-        log("❌ Ошибка загрузки данных:", e);
-    } finally {
-        loading = false;
-        document.getElementById("loader").style.display = hasMore ? "block" : "none";
-    }
-}
-
-// === Таблица ===
-function renderHeader(columns) {
-    const headerRow = document.getElementById("cargo-header-row");
-    headerRow.innerHTML = "";
-
-    columns.filter(col => col.visible).forEach((col, index) => {
-        const th = document.createElement("th");
-        th.dataset.field = col.field;
-        th.dataset.index = index;
-        th.draggable = true;
-
-        // === Текст заголовка ===
-        const labelSpan = document.createElement("span");
-        labelSpan.textContent = col.label;
-        th.appendChild(labelSpan);
-
-        // === Стрелочка ===
-        const arrow = document.createElement("span");
-        arrow.classList.add("sort-icon");
-
-        if (sortableFields.includes(col.field)) {
-            // колонка поддерживает сортировку
-            if (currentSort.field === col.field) {
-                arrow.textContent = currentSort.dir === "asc" ? "↓" : "↑";
-                arrow.classList.add("active-sort");
-            } else {
-                arrow.textContent = "↕";
-                arrow.classList.add("sortable-hint");
-            }
-            th.appendChild(arrow);
-
-            // клик только если колонка сортируемая
-            th.addEventListener("click", async () => {
-                if (currentSort.field === col.field) {
-                    currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
-                } else {
-                    currentSort.field = col.field;
-                    currentSort.dir = "asc";
-                }
-
-                userConfig.sort = currentSort;
-                await saveSortSettings();
-                renderHeader(columns);
-                fetchCargoData(true);
-            });
-        }
-
-        headerRow.appendChild(th);
-    });
-}
-
-
-
-function renderRows(rows) {
-    const tbody = document.getElementById("cargo-body");
-    if (!tbody) {
-        log("❌ Не найден #cargo-body");
-        return;
-    }
-    currentRows = rows;
-
-    const frag = document.createDocumentFragment();
-    rows.forEach((row, i) => {
-        const tr = document.createElement("tr");
-        userConfig.columns.forEach(col => {
-            if (!col.visible) return;
-            const td = document.createElement("td");
-            td.textContent = row[col.field] ?? "";
-            tr.appendChild(td);
-        });
-        frag.appendChild(tr);
-    });
-    tbody.appendChild(frag);
-}
-
-
-function moveColumn(fromIndex, toIndex) {
-    const cols = userConfig.columns;
-    const visibleCols = cols.filter(c => c.visible);
-    const hiddenCols = cols.filter(c => !c.visible);
-    const movingCol = visibleCols.splice(fromIndex, 1)[0];
-    visibleCols.splice(toIndex, 0, movingCol);
-    // сохраняем итоговый порядок
-    userConfig.columns = [...visibleCols, ...hiddenCols];
-}
-
-
-// === Фильтры ===
-function setupFilters() {
-    document.querySelectorAll(".filter-container input").forEach(inp => {
-        inp.addEventListener("input", () => {
-            filters[inp.id.replace("filter-", "")] = inp.value;
-            fetchCargoData(true);
-        });
-    });
-}
-
-function setupDynamicFilters() {
-    const filterContainer = document.querySelector(".filter-container");
-    if (!filterContainer) return;
-
-    filterContainer.innerHTML = "";
-    const fields = USER_ROLE === "Client"
-        ? [
-            { id: "filter-cargo", placeholder: "Груз..." },
-            { id: "filter-shipping_date", placeholder: "Дата отправки..." },
-            { id: "filter-delivery_date", placeholder: "Дата доставки..." },
-          ]
-        : [
-            { id: "filter-cargo", placeholder: "Груз..." },
-            { id: "filter-client", placeholder: "Клиент..." },
-            { id: "filter-shipping_date", placeholder: "Дата отправки..." },
-            { id: "filter-delivery_date", placeholder: "Дата доставки..." },
-          ];
-
-    fields.forEach(f => {
-        const input = document.createElement("input");
-        input.type = "text";
-        input.id = f.id;
-        input.placeholder = f.placeholder;
-        input.classList.add("filter-input");
-        input.addEventListener("input", () => {
-            filters[f.id.replace("filter-", "")] = input.value;
-            fetchCargoData(true);
-        });
-        filterContainer.appendChild(input);
-    });
-}
-
-
-
-// === Модалка ===
-function openSettingsModal() {
-    const modal = document.getElementById("settings-modal");
-    const overlay = document.getElementById("modal-overlay");
-    const form = document.getElementById("settings-form");
-
-    if (!modal || !overlay || !form) {
-        log("❌ Не найдены элементы модалки");
-        return;
-    }
-
-    form.innerHTML = "";
-
-    userConfig.columns.forEach((col, idx) => {
-        const div = document.createElement("div");
-        div.classList.add("setting-row");
-        div.draggable = true;
-        div.dataset.index = idx;
-
-        const dragHandle = document.createElement("span");
-        dragHandle.textContent = "☰";
-        dragHandle.classList.add("drag-handle");
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.id = col.field;
-        checkbox.checked = col.visible;
-
-        const label = document.createElement("label");
-        label.htmlFor = col.field;
-        label.textContent = col.label;
-
-        div.appendChild(dragHandle);
-        div.appendChild(checkbox);
-        div.appendChild(label);
-        form.appendChild(div);
-    });
-
-    // drag-n-drop внутри модалки
-    let dragged = null;
-    form.addEventListener("dragstart", e => {
-        dragged = e.target.closest(".setting-row");
-        dragged.classList.add("dragging");
-    });
-    form.addEventListener("dragover", e => e.preventDefault());
-    form.addEventListener("drop", e => {
-        e.preventDefault();
-        const target = e.target.closest(".setting-row");
-        if (!target || target === dragged) return;
-        const rows = [...form.querySelectorAll(".setting-row")];
-        const draggedIndex = rows.indexOf(dragged);
-        const targetIndex = rows.indexOf(target);
-        if (draggedIndex > targetIndex) {
-            form.insertBefore(dragged, target);
+    const tr = document.createElement("tr");
+    cols.forEach(c => {
+      const th = document.createElement("th");
+      th.textContent = c.title;
+      th.dataset.colKey = c.key;
+      th.classList.add("sortable");
+      th.addEventListener("click", () => {
+        if (state.sort_by === c.key) {
+          state.sort_dir = (state.sort_dir === "asc") ? "desc" : "asc";
         } else {
-            form.insertBefore(dragged, target.nextSibling);
+          state.sort_by = c.key;
+          state.sort_dir = "asc";
         }
+        state.offset = 0;
+        load();
+      });
+      tr.appendChild(th);
     });
-    form.addEventListener("dragend", e => {
-        e.target.classList.remove("dragging");
+
+    thead.innerHTML = "";
+    thead.appendChild(tr);
+  }
+
+  function renderRows(rows) {
+    const tbody = qs("#tbody_cargos");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(r.cargo_code)}</td>
+        <td>${esc(r.record_date)}</td>
+        <td>${esc(r.products_count)}</td>
+        <td>${esc(r.warehouse)}</td>
+        <td>${esc(r.cargo_status)}</td>
+        <td>${esc(r.packaging_type)}</td>
+        <td>${esc(r.weight_total)}</td>
+        <td>${esc(r.volume_total)}</td>
+        <td>${r.is_locked ? "Да" : "Нет"}</td>
+      `;
+      tbody.appendChild(tr);
     });
+  }
 
-    overlay.style.display = "block";
-    modal.style.display = "block";
-    overlay.classList.add("show");
-    modal.classList.add("show");
-}
+  function renderPager(total, has_more) {
+    const info = qs("#cargos_page_info");
+    const prev = qs("#cargos_prev");
+    const next = qs("#cargos_next");
 
+    const from = total ? (state.offset + 1) : 0;
+    const to = Math.min(state.offset + state.limit, total);
 
-function closeSettingsModal() {
-    const modal = document.getElementById("settings-modal");
-    const overlay = document.getElementById("modal-overlay");
+    if (info) info.textContent = `${from}-${to} / ${total}`;
 
-    modal.classList.remove("show");
-    overlay.classList.remove("show");
-    modal.style.display = "none";
-    overlay.style.display = "none";
-}
+    if (prev) prev.disabled = state.offset <= 0;
+    if (next) next.disabled = !has_more;
+  }
 
-async function saveSortSettings() {
+  async function load() {
+    setLoader(true);
     try {
-        await fetch(tableConfig.saveSettingsPath, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": window.getCsrf(),
-            },
-            credentials: "include",
-            body: JSON.stringify({
-                cargo_table: userConfig
-            }),
-        });
+      const r = await fetch(API_URL + buildQuery(), { credentials: "same-origin" });
+      const j = await r.json();
+      renderRows(j.results || []);
+      renderPager(j.total || 0, !!j.has_more);
     } catch (e) {
-        console.warn("Ошибка сохранения сортировки:", e);
+      console.error("cargos load error", e);
+    } finally {
+      setLoader(false);
     }
-}
+  }
 
+  function bind() {
+    const search = qs("#cargo_search");
+    if (search) {
+      let t = null;
+      search.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          state.search = (search.value || "").trim();
+          state.offset = 0;
+          load();
+        }, 250);
+      });
+    }
 
-
-async function saveSettings() {
-    const rows = document.querySelectorAll("#settings-form .setting-row");
-    const newOrder = [];
-
-    rows.forEach(row => {
-        const field = row.querySelector("input").id;
-        const checked = row.querySelector("input").checked;
-        const col = userConfig.columns.find(c => c.field === field);
-        if (col) {
-            col.visible = checked;
-            newOrder.push(col);
-        }
+    const prev = qs("#cargos_prev");
+    const next = qs("#cargos_next");
+    if (prev) prev.addEventListener("click", () => {
+      state.offset = Math.max(0, state.offset - state.limit);
+      load();
     });
+    if (next) next.addEventListener("click", () => {
+      state.offset = state.offset + state.limit;
+      load();
+    });
+  }
 
-// обновляем порядок
-    userConfig.columns = newOrder;
-
-    try {
-        const res = await fetch(tableConfig.saveSettingsPath, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": window.getCsrf(),
-            },
-            credentials: "include",
-            body: JSON.stringify({ cargo_table: userConfig }),
-        });
-    } catch (e) {
-        log("❌ Ошибка сохранения настроек:", e);
-    }
-
-    closeSettingsModal();
-    renderHeader(userConfig.columns);
-    fetchCargoData(true);
-    // === ПАГИНАЦИЯ ===
-    const wrapper = document.querySelector(".table-wrapper");
-    if (wrapper) {
-        wrapper.addEventListener("scroll", () => {
-            const nearBottom =
-                wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 40;
-            if (nearBottom && hasMore && !loading) {
-                fetchCargoData();
-            }
-        });
-    }
-
-}
-
-// === Init ===
-document.addEventListener("DOMContentLoaded", async () => {
-    userConfig = await fetchUserConfig();
-    if (userConfig.sort) {
-        currentSort = userConfig.sort;
-    }
-
-    if (!userConfig || !userConfig.columns) {
-        log("❌ Конфигурация таблицы не получена");
-        return;
-    }
-
-    renderHeader(userConfig.columns);
-
-    // === Фильтры по ролям ===
-    setupDynamicFilters();
-    setupFilters();
-
-    fetchCargoData();
-
-    // === ПАГИНАЦИЯ при прокрутке ===
-    const wrapper = document.querySelector(".table-wrapper");
-    if (wrapper) {
-        wrapper.addEventListener("scroll", () => {
-            const nearBottom =
-                wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 40;
-            if (nearBottom && hasMore && !loading) {
-                fetchCargoData();
-            }
-        });
-    }
-
-    document.getElementById("settings-btn").addEventListener("click", openSettingsModal);
-    document.getElementById("settings-cancel").addEventListener("click", closeSettingsModal);
-    document.getElementById("settings-save").addEventListener("click", saveSettings);
-
-    const overlay = document.getElementById("modal-overlay");
-    if (overlay) overlay.addEventListener("click", closeSettingsModal);
-    // кнопка "Сохранить порядок" в модалке
-    const saveBtn = document.getElementById("settings-save");
-    if (saveBtn) {
-        saveBtn.addEventListener("click", saveSettings);
-    }
-});
+  document.addEventListener("DOMContentLoaded", () => {
+    renderHead();
+    bind();
+    load();
+  });
+})();
