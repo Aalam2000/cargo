@@ -14,11 +14,23 @@ CURRENCIES = ["RUB", "CNY", "EUR", "TRY"]
 # ==========================================================
 
 def save_rate(currency, client_rate):
-    CurrencyRate.objects.update_or_create(
+    obj = CurrencyRate.objects.filter(
         currency=currency,
-        date=date.today(),
-        defaults={"rate": client_rate}
-    )
+        date=date.today()
+    ).first()
+
+    if obj:
+        # обновляем только официальный курс
+        obj.rate = client_rate
+        obj.save(update_fields=["rate"])
+    else:
+        # создаём новую запись, ручной курс НЕ трогаем
+        CurrencyRate.objects.create(
+            currency=currency,
+            date=date.today(),
+            rate=client_rate
+        )
+
 
 
 # ==========================================================

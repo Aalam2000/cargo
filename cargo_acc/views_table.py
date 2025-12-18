@@ -24,8 +24,6 @@ from .serializers import CompanySerializer, ClientSerializer, WarehouseSerialize
     CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, AccrualTypeSerializer, PaymentTypeSerializer, \
     CurrencyRateSerializer, TariffSerializer
 
-
-
 logger = logging.getLogger(__name__)
 
 # === Маппинг моделей и разрешённых полей ===
@@ -336,6 +334,7 @@ class PaymentTypeViewSet(viewsets.ModelViewSet):
         company = get_user_company(self.request)
         serializer.save(company=company)
 
+
 # --- ТАРИФЫ ---
 class TariffViewSet(viewsets.ModelViewSet):
     serializer_class = TariffSerializer
@@ -355,6 +354,7 @@ class TariffViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         company = get_user_company(self.request)
         serializer.save(company=company)
+
 
 # --- КУРСЫ ВАЛЮТ ---
 class CurrencyRateViewSet(viewsets.ModelViewSet):
@@ -440,11 +440,29 @@ class ProductsTableViewSet(ViewSet):
         else:
             return Response({"results": [], "total": 0, "has_more": False})
 
-        # фильтры
+        # фильтры (разрешённые поля)
+        FILTERABLE = {
+            "product_code": "product_code",
+            "client": "client__client_code",
+            "cargo": "cargo__cargo_code",
+            "warehouse": "warehouse__name",
+            "cargo_status": "cargo_status__name",
+        }
+
         for key, value in request.GET.items():
-            if key.startswith("filter[") and key.endswith("]") and value.strip():
-                field = key[7:-1]
-                qs = qs.filter(**{f"{field}__icontains": value})
+            if not (key.startswith("filter[") and key.endswith("]")):
+                continue
+
+            val = (value or "").strip()
+            if not val:
+                continue
+
+            field = key[7:-1]
+            orm_field = FILTERABLE.get(field)
+            if not orm_field:
+                continue
+
+            qs = qs.filter(**{f"{orm_field}__icontains": val})
 
         if order_field:
             qs = qs.order_by(order_field)
@@ -645,7 +663,32 @@ def products_table_view(request):
         qs = qs.exclude(delivered_filter)
     else:
         return JsonResponse({"error": "bad tab"}, status=400)
+    # -------- FILTERING --------
+    FILTERABLE = {
+        "product_code": "product_code",
+        "client": "client__client_code",
+        "warehouse": "warehouse__name",
+        "cargo_status": "cargo_status__name",
+    }
 
+    for key, value in request.GET.items():
+        if not (key.startswith("filter[") and key.endswith("]")):
+            continue
+
+        val = (value or "").strip()
+        if not val:
+            continue
+
+        field = key[7:-1]
+        orm_field = FILTERABLE.get(field)
+        if not orm_field:
+            continue
+
+        # client-фильтр допустим только для Admin/Operator
+        if field == "client" and role not in ("Admin", "Operator"):
+            continue
+
+        qs = qs.filter(**{f"{orm_field}__icontains": val})
     # -------- SORTING ----------
     SORTABLE = {
         "product_code": "product_code",

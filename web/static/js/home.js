@@ -9,11 +9,35 @@
 // ----------------------------
 let ROLE = "";
 
+const PRODUCT_COLUMN_LABELS = {
+    product_code: "Номер товара",
+    client: "Код клиента",
+    cargo: "Груз",
+    cargo_status: "Статус",
+    warehouse: "Склад",
+
+    record_date: "Дата записи",
+    shipping_date: "Дата отправки",
+    delivery_date: "Дата доставки",
+
+    cargo_description: "Описание груза",
+    comment: "Комментарий",
+
+    weight: "Вес",
+    volume: "Объём",
+    cost: "Стоимость",
+    images: "Фото",
+};
+
+
+const PRODUCT_SORTABLE_FIELDS = new Set(["product_code", "client", "cargo", "warehouse"]);
+
+
 // lazy pagination
 const lazyState = {
-    in_transit: {last_id: null, loading: false, finished: false},
-    delivered: {last_id: null, loading: false, finished: false},
-    payments: {last_id: null, loading: false, finished: false}
+    in_transit: {last_id: null, loading: false, finished: false, req: 0},
+    delivered: {last_id: null, loading: false, finished: false, req: 0},
+    payments: {last_id: null, loading: false, finished: false, req: 0}
 };
 
 // ----------------------------
@@ -159,8 +183,14 @@ function buildTableHeader(tab, columns) {
     let html = "<thead><tr>";
 
     for (const col of columns) {
-        html += `<th data-field="${col}" class="sortable" style="cursor:pointer;">${col}</th>`;
+        const label = PRODUCT_COLUMN_LABELS[col] || col;
+        const sortable = PRODUCT_SORTABLE_FIELDS.has(col);
+
+        html += sortable
+            ? `<th data-field="${col}" class="sortable" style="cursor:pointer;">${label}</th>`
+            : `<th>${label}</th>`;
     }
+
     html += "</tr></thead><tbody id='tbody_" + tab + "'></tbody>";
 
     table.innerHTML = html;
@@ -230,6 +260,7 @@ function appendRows(tab, rows) {
 // ==========================================================================
 function resetLazy(tab) {
     const st = lazyState[tab];
+    st.req = (st.req || 0) + 1; // инвалидируем все "старые" ответы fetch
     st.loading = false;
     st.finished = false;
     st.last_id = null;
@@ -237,10 +268,14 @@ function resetLazy(tab) {
     if (tbody) tbody.innerHTML = "";
 }
 
+
 async function loadMore(tab, clear = false) {
     const st = lazyState[tab];
     if (st.loading || st.finished) return;
+
+    const myReq = st.req || 0;   // снимок текущего запроса
     st.loading = true;
+
     // вкладка "Оплаты" не использует API товаров
     if (tab === "payments") {
         try {
@@ -248,8 +283,15 @@ async function loadMore(tab, clear = false) {
             const offset = tbody ? tbody.querySelectorAll("tr").length : 0;
             const data = await fetchPayments({offset});
 
+            // если за время fetch был resetLazy() — игнорируем ответ
+            if ((st.req || 0) !== myReq) {
+                st.loading = false;
+                return;
+            }
+
             if (!data.results || data.results.length === 0) {
                 st.finished = true;
+                st.loading = false;
                 return;
             }
 
@@ -284,18 +326,24 @@ async function loadMore(tab, clear = false) {
             product: product.trim()
         });
 
+        // если за время fetch был resetLazy() — игнорируем ответ
+        if ((st.req || 0) !== myReq) {
+            st.loading = false;
+            return;
+        }
+
         if (!data.results || data.results.length === 0) {
             st.finished = true;
+            st.loading = false;
             return;
         }
 
         // если это первая загрузка → строим шапку
-        if (offset === 0) {      // первая порция
+        if (offset === 0) {
             const first = data.results[0];
             const cols = Object.keys(first).filter(k => k !== "id");
             buildTableHeader(tab, cols);
         }
-
 
         appendRows(tab, data.results);
 
@@ -307,6 +355,7 @@ async function loadMore(tab, clear = false) {
 
     st.loading = false;
 }
+
 
 // ==========================================================================
 //     БЛОК ОПЛАТ
