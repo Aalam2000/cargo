@@ -1,20 +1,20 @@
 # cargo_acc/cargo_table.py
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, OuterRef, Subquery, IntegerField, Value, Q
+from django.db.models import Count, OuterRef, Subquery, IntegerField, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from cargo_acc.company_utils import get_user_company, get_log_meta
-from cargo_acc.models import SystemActionLog
 from cargo_acc.models import Cargo, Product
+from cargo_acc.models import SystemActionLog
 
 
 @login_required
 def cargos_page(request):
-    return render(request, "cargo_table.html", {"role": getattr(request.user, "role", "")})
+    return render(request, "cargo_acc/cargo_table.html", {"role": getattr(request.user, "role", "")})
 
 
 @require_GET
@@ -52,7 +52,7 @@ def cargos_table_view(request):
 
     # Подсчёт товаров в грузе (без предположений про related_name)
     cnt_sq = Product.objects.filter(company=company, cargo_id=OuterRef("pk")) \
-        .values("cargo_id").annotate(c=Count("id")).values("c")[:1]
+                 .values("cargo_id").annotate(c=Count("id")).values("c")[:1]
     qs = qs.annotate(products_count=Subquery(cnt_sq, output_field=IntegerField()))
 
     # Быстрый общий поиск

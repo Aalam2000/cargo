@@ -183,14 +183,28 @@ class CargoSerializer(serializers.ModelSerializer):
     images = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field='id'
     )
-    client = serializers.StringRelatedField()
     cargo_status = serializers.StringRelatedField()
     packaging_type = serializers.StringRelatedField()
+    warehouse = serializers.StringRelatedField()
 
     class Meta:
         model = Cargo
-        fields = '__all__'
+        fields = [
+            'id',
+            'cargo_code',
+            'cargo_status',
+            'warehouse',
+            'packaging_type',
+            'weight_total',
+            'volume_total',
+            'is_locked',
+            'created_at',
+            'updated_at',
+            'products',
+            'images',
+        ]
         read_only_fields = ["company"]
+
 
 
 class CarrierCompanySerializer(serializers.ModelSerializer):

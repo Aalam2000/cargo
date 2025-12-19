@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from cargodb import views as core_views
-from . import views, views_payment, views_table
+from . import views, views_payment, views_table, cargo_table
 from .views_invoice import product_invoice_pdf
 
 # --------------------------------------------------------------------
@@ -108,6 +108,10 @@ urlpatterns = [
     path('references/', views.references_page, name='references_page'),
     # в cargo_acc/urls.py: добавить в urlpatterns
     path('products/', views.products_page, name='products_page'),
+    path('cargos/', cargo_table.cargos_page, name='cargos_page'),
+    path('api/cargos_table/', cargo_table.cargos_table_view, name='cargos_table_view'),
+    path('api/cargo/move_update/', cargo_table.cargo_move_update_view, name='cargo_move_update_view'),
+    path('api/cargo/lock/', cargo_table.cargo_lock_view, name='cargo_lock_view'),
     path("api/company/<int:pk>/", views_table.get_company, name="get_company"),
     path("api/company/<int:pk>/update/", views_table.update_company, name="update_company"),
     path("api/products_table/", views_table.products_table_view, name="products_table"),

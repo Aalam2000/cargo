@@ -1,3 +1,4 @@
+{#web/templates/cargo_acc/cargo_table.html#}
 {% load static %}
 <!DOCTYPE html>
 <html lang="ru">
@@ -36,7 +37,7 @@
                     <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
                     <a href="{% url 'references_page' %}" class="menu-item">📚 Справочники</a>
                     <a href="{% url 'products_page' %}" class="menu-item">📦 Товары</a>
-                    <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>
+                    <a href="{% url 'cargos_page' %}" class="menu-item">🚚 Грузы</a>
                     <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>
                     <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
                     <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
@@ -48,7 +49,7 @@
                     <a href="{% url 'home' %}" class="menu-item">🏠 Главная</a>
                     <a href="{% url 'references_page' %}" class="menu-item">📚 Справочники</a>
                     <a href="{% url 'products_page' %}" class="menu-item">📦 Товары</a>
-{#                    <a href="#" class="menu-item">🚚 Грузы (в процессе)</a>#}
+                    <a href="{% url 'cargos_page' %}" class="menu-item">🚚 Грузы</a>
 {#                    <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>#}
                     <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
                     <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
