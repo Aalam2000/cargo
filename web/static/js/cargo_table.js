@@ -2,10 +2,44 @@
 // ================================
 //   CARGOS TABLE — lazy (как товары)
 //   Работает с /api/cargos_table/
+//   + MODAL: создать груз из товаров выбранного клиента
 // ================================
+function renderAddCargoModal() {
+    return `
+        <div class="modal-header">
+            <h3>Добавить груз</h3>
+            <button class="modal-close" id="cargoModalClose">✖</button>
+        </div>
+
+        <div class="modal-body">
+            <select id="addCargoClient" class="modal-input"></select>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Код</th>
+                        <th>Описание</th>
+                        <th>Стоимость</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="addCargoProductsTbody"></tbody>
+            </table>
+
+            <div id="addCargoError" class="error-text"></div>
+        </div>
+
+        <div class="modal-footer">
+            <button id="addCargoCancelBtn" class="btn-secondary">Отмена</button>
+            <button id="addCargoSaveBtn" class="btn-primary" disabled>Создать</button>
+        </div>
+    `;
+}
 
 (function () {
     const CT_API = "/api/cargos_table/";
+    const CT_CLIENTS_API = "/api/get_clients/";
+    const CT_GENERATE_CARGO_API = "/api/generate/cargo/";
 
     let CT_sortBy = "cargo_code";
     let CT_sortDir = "asc";
@@ -30,6 +64,57 @@
         {field: "is_locked", label: "Состав фикс.", sortable: true},
     ];
 
+    // ------------------------------
+    // helpers
+    // ------------------------------
+
+    function CT_getRole() {
+        const meta = document.querySelector('meta[name="user-role"]');
+        return (meta && meta.content) ? meta.content : "";
+    }
+
+    function CT_show(el) {
+        el.classList.remove("hidden");
+    }
+
+    function CT_hide(el) {
+        el.classList.add("hidden");
+    }
+
+    async function CT_json(url, opts) {
+        const res = await fetch(url, {
+            credentials: "same-origin",
+            headers: {
+                ...(opts && opts.headers ? opts.headers : {}),
+                "Content-Type": "application/json",
+            },
+            ...opts,
+        });
+
+        const text = await res.text();
+        let data = null;
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch (e) {
+            throw new Error("bad json");
+        }
+
+        if (!res.ok) {
+            const msg = (data && (data.error || data.detail)) ? (data.error || data.detail) : ("HTTP " + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
+    function CT_getCsrfToken() {
+        // Django default cookie name
+        const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : "";
+    }
+
+    // ------------------------------
+    // table
+    // ------------------------------
 
     async function CT_fetch() {
         const url = new URL(CT_API, window.location.origin);
@@ -50,8 +135,7 @@
         if (f_warehouse) url.searchParams.set("filter[warehouse]", f_warehouse);
         if (f_status) url.searchParams.set("filter[cargo_status]", f_status);
 
-        const res = await fetch(url, {credentials: "same-origin"});
-        return await res.json();
+        return await CT_json(url);
     }
 
     function CT_buildHeader() {
@@ -95,11 +179,9 @@
 
             CT_COLUMNS.forEach(col => {
                 let v = c[col.field];
-
                 if (col.field === "is_locked") {
                     v = v ? "Да" : "Нет";
                 }
-
                 const td = document.createElement("td");
                 td.textContent = v ?? "";
                 tr.appendChild(td);
@@ -125,7 +207,7 @@
         const data = await CT_fetch();
 
         if (CT_lazy.offset === 0) {
-            CT_buildHeader(); // шапка должна быть даже когда строк 0
+            CT_buildHeader();
         }
 
         if (!data.results || data.results.length === 0) {
@@ -135,11 +217,8 @@
             return;
         }
 
-
         CT_appendRows(data.results);
-
         CT_lazy.offset += CT_lazy.limit;
-
         if (!data.has_more) CT_lazy.finished = true;
 
         document.getElementById("loader_cargos").classList.add("hidden");
@@ -159,16 +238,277 @@
         const wrap = document.querySelector('.table-wrapper[data-table-key="cargos"]');
         if (!wrap) return;
         wrap.addEventListener("scroll", () => {
-
             if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 200) {
                 CT_load();
             }
         });
     }
 
+    // ------------------------------
+    // modal: add cargo
+    // ------------------------------
+
+    const AC_state = {
+        clientId: "",
+        products: [], // [{id, product_code, cargo_description, cost, cargo_status_id, packaging_type_id, warehouse_id}]
+        productsById: {},
+    };
+
+    function AC_el(id) {
+        return document.getElementById(id);
+    }
+
+    function AC_setError(msg) {
+        AC_el("addCargoError").textContent = msg || "";
+    }
+
+    function AC_resetModal() {
+        AC_setError("");
+        AC_state.clientId = "";
+        AC_state.products = [];
+        AC_state.productsById = {};
+
+        const clientSel = AC_el("addCargoClient");
+        clientSel.value = "";
+
+        AC_el("addCargoProductsTbody").innerHTML = "";
+
+        AC_el("addCargoAddRowBtn").disabled = true;
+        AC_el("addCargoSaveBtn").disabled = true;
+    }
+
+    function AC_openModal() {
+
+        const overlay = document.createElement("div");
+        overlay.className = "modal-overlay";
+
+        overlay.innerHTML = `
+            <div class="modal">
+                ${renderAddCargoModal()}
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        overlay.querySelector("#cargoModalClose").onclick = () => overlay.remove();
+        overlay.querySelector("#addCargoCancelBtn").onclick = () => overlay.remove();
+        overlay.querySelector("#addCargoSaveBtn").onclick = AC_save;
+
+        overlay.querySelector("#addCargoClient")
+            .addEventListener("change", async () => {
+                const v = overlay.querySelector("#addCargoClient").value.trim();
+                AC_state.clientId = v;
+                if (!v) return;
+                await AC_loadAvailableProducts(v);
+            });
+
+        AC_loadClients();
+    }
+
+
+
+    function AC_closeModal() {
+        CT_hide(AC_el("modal-overlay"));
+        CT_hide(AC_el("add-cargo-modal"));
+    }
+
+    async function AC_loadClients() {
+        const url = new URL(CT_CLIENTS_API, window.location.origin);
+        url.searchParams.set("page", "1");
+        url.searchParams.set("page_size", "200");
+        url.searchParams.set("search", "");
+
+        const data = await CT_json(url);
+        const list = data && data.results ? data.results : [];
+
+        const sel = AC_el("addCargoClient");
+        sel.innerHTML = `<option value="">— выберите клиента —</option>`;
+
+        list.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = String(c.id);
+            opt.textContent = c.client_code || c.name || (`Client #${c.id}`);
+            sel.appendChild(opt);
+        });
+    }
+
+    async function AC_loadAvailableProducts(clientId) {
+        const url = new URL(CT_API, window.location.origin);
+        url.searchParams.set("mode", "available_products");
+        url.searchParams.set("client_id", String(clientId));
+
+        const data = await CT_json(url);
+        const products = data && data.results ? data.results : [];
+
+        AC_state.products = products;
+        AC_state.productsById = {};
+        products.forEach(p => {
+            AC_state.productsById[String(p.id)] = p;
+        });
+
+        AC_el("addCargoProductsTbody").innerHTML = "";
+        AC_el("addCargoAddRowBtn").disabled = false;
+
+        // Добавим одну строку по умолчанию
+        AC_addRow();
+        AC_refreshSaveEnabled();
+    }
+
+    function AC_refreshSaveEnabled() {
+        const ids = AC_getSelectedIds();
+        AC_el("addCargoSaveBtn").disabled = !(AC_state.clientId && ids.length > 0);
+    }
+
+    function AC_getSelectedIds() {
+        const selects = AC_el("addCargoProductsTbody").querySelectorAll("select[data-ac='product']");
+        const ids = [];
+        selects.forEach(s => {
+            const v = (s.value || "").trim();
+            if (v) ids.push(v);
+        });
+        // unique
+        return Array.from(new Set(ids));
+    }
+
+    function AC_buildProductOptions(selectedId) {
+        const used = new Set(AC_getSelectedIds());
+        let html = `<option value="">—</option>`;
+        AC_state.products.forEach(p => {
+            const pid = String(p.id);
+            const disabled = used.has(pid) && pid !== String(selectedId || "");
+            html += `<option value="${pid}" ${disabled ? "disabled" : ""} ${pid === String(selectedId || "") ? "selected" : ""}>${p.product_code}</option>`;
+        });
+        return html;
+    }
+
+    function AC_refreshAllSelects() {
+        const tbody = AC_el("addCargoProductsTbody");
+        const selects = tbody.querySelectorAll("select[data-ac='product']");
+        selects.forEach(sel => {
+            const cur = sel.value;
+            sel.innerHTML = AC_buildProductOptions(cur);
+        });
+    }
+
+    function AC_addRow() {
+        if (!AC_state.clientId) return;
+        if (!AC_state.products || AC_state.products.length === 0) return;
+
+        const tbody = AC_el("addCargoProductsTbody");
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td style="min-width:140px;">
+                <select data-ac="product" class="input-filter" style="width:100%;"></select>
+            </td>
+            <td style="min-width:260px;">
+                <input data-ac="desc" class="input-filter" style="width:100%;" readonly>
+            </td>
+            <td style="min-width:140px;">
+                <input data-ac="cost" class="input-filter" style="width:100%;" readonly>
+            </td>
+            <td style="width:42px; text-align:center;">
+                <button type="button" data-ac="remove" style="border:0; background:transparent; cursor:pointer; font-size:16px;">✖</button>
+            </td>
+        `;
+
+        const sel = tr.querySelector("select[data-ac='product']");
+        const inpDesc = tr.querySelector("input[data-ac='desc']");
+        const inpCost = tr.querySelector("input[data-ac='cost']");
+        const btnRemove = tr.querySelector("button[data-ac='remove']");
+
+        sel.innerHTML = AC_buildProductOptions("");
+
+        sel.addEventListener("change", () => {
+            const pid = (sel.value || "").trim();
+            const p = pid ? AC_state.productsById[pid] : null;
+
+            inpDesc.value = p && p.cargo_description ? p.cargo_description : "";
+            inpCost.value = (p && p.cost !== null && p.cost !== undefined) ? String(p.cost) : "";
+
+            AC_refreshAllSelects();
+            AC_refreshSaveEnabled();
+        });
+
+        btnRemove.addEventListener("click", () => {
+            tr.remove();
+            AC_refreshAllSelects();
+            AC_refreshSaveEnabled();
+        });
+
+        tbody.appendChild(tr);
+
+        AC_refreshAllSelects();
+        AC_refreshSaveEnabled();
+    }
+
+    async function AC_generateCargoCode() {
+        const data = await CT_json(CT_GENERATE_CARGO_API, {method: "GET"});
+
+        if (typeof data === "string") return data;
+        if (!data) throw new Error("bad generate response");
+
+        return (data.cargo_code || data.code || data.generated_code || data.result || "").toString().trim();
+    }
+
+    async function AC_save() {
+        AC_setError("");
+        const clientId = AC_state.clientId;
+        if (!clientId) {
+            AC_setError("Выберите клиента");
+            return;
+        }
+
+        const productIds = AC_getSelectedIds();
+        if (productIds.length === 0) {
+            AC_setError("Добавьте хотя бы один товар");
+            return;
+        }
+
+        AC_el("addCargoSaveBtn").disabled = true;
+
+        try {
+            const cargoCode = await AC_generateCargoCode();
+
+            await CT_json(CT_API, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": CT_getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    cargo_code: cargoCode,
+                    product_ids: productIds,
+                }),
+            });
+
+            AC_closeModal();
+            CT_reset();
+            CT_load();
+        } catch (e) {
+            AC_setError(e.message);
+            AC_refreshSaveEnabled();
+        }
+    }
+
+    function CT_bindAddCargoModal() {
+        const role = CT_getRole();
+        const addBtn = document.getElementById("add-cargo-btn");
+        if (!addBtn) return;
+
+        if (role === "Client") {
+            addBtn.style.display = "none";
+            return;
+        }
+
+        addBtn.addEventListener("click", AC_openModal);
+    }
+
+
     document.addEventListener("DOMContentLoaded", () => {
         CT_bindFilters();
         CT_bindScroll();
+        CT_bindAddCargoModal();
         CT_reset();
         CT_load();
     });

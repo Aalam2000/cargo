@@ -1,11 +1,12 @@
 # cargo_acc/cargo_table.py
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Count, OuterRef, Subquery, IntegerField, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 from cargo_acc.company_utils import get_user_company, get_log_meta
 from cargo_acc.models import Cargo, Product
@@ -17,9 +18,131 @@ def cargos_page(request):
     return render(request, "cargo_acc/cargo_table.html", {"role": getattr(request.user, "role", "")})
 
 
-@require_GET
+@require_http_methods(["GET", "POST"])
 @login_required
 def cargos_table_view(request):
+    # GET-mode: выдача товаров выбранного клиента, которые не входят ни в один груз
+    # (используется модалкой «Добавить груз»)
+    if request.method == "GET" and (request.GET.get("mode") or "").strip() == "available_products":
+        client_id = (request.GET.get("client_id") or "").strip()
+        if not client_id:
+            return JsonResponse({"error": "client_id required"}, status=400)
+
+        company = get_user_company(request)
+        user = request.user
+        role = getattr(user, "role", "")
+
+        if role == "Client":
+            linked = getattr(user, "linked_client", None)
+            if not linked or str(linked.id) != str(client_id):
+                return JsonResponse({"error": "forbidden"}, status=403)
+        elif role not in ("Admin", "Operator"):
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+        products = list(
+            Product.objects.filter(company=company, client_id=client_id, cargo_id__isnull=True)
+            .order_by("product_code")
+            .values(
+                "id",
+                "product_code",
+                "cargo_description",
+                "cost",
+                "cargo_status_id",
+                "packaging_type_id",
+                "warehouse_id",
+            )
+        )
+        return JsonResponse({"results": products})
+
+    # POST-mode: создать груз и привязать выбранные товары
+    if request.method == "POST":
+        try:
+            import json
+            data = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            return JsonResponse({"error": "bad json"}, status=400)
+
+        client_id = data.get("client_id")
+        cargo_code = (data.get("cargo_code") or "").strip()
+        product_ids = data.get("product_ids") or []
+
+        if not client_id:
+            return JsonResponse({"error": "client_id required"}, status=400)
+        if not cargo_code:
+            return JsonResponse({"error": "cargo_code required"}, status=400)
+        if not isinstance(product_ids, list) or not product_ids:
+            return JsonResponse({"error": "product_ids required"}, status=400)
+
+        company = get_user_company(request)
+        user = request.user
+        role = getattr(user, "role", "")
+        if role not in ("Admin", "Operator"):
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+        uniq_ids = sorted({int(x) for x in product_ids if str(x).strip()})
+        if not uniq_ids:
+            return JsonResponse({"error": "product_ids required"}, status=400)
+
+        qs_products = Product.objects.filter(
+            company=company,
+            client_id=client_id,
+            id__in=uniq_ids,
+            cargo_id__isnull=True,
+        )
+
+        found_ids = list(qs_products.values_list("id", flat=True))
+        if len(found_ids) != len(uniq_ids):
+            missing = sorted(set(uniq_ids) - set(found_ids))
+            return JsonResponse({"error": "some products not available", "missing": missing}, status=400)
+
+        status_ids = set(qs_products.values_list("cargo_status_id", flat=True))
+        packaging_ids = set(qs_products.values_list("packaging_type_id", flat=True))
+        if len(status_ids) != 1:
+            return JsonResponse({"error": "products have different cargo_status"}, status=400)
+        if len(packaging_ids) != 1:
+            return JsonResponse({"error": "products have different packaging_type"}, status=400)
+
+        warehouse_ids = set(qs_products.values_list("warehouse_id", flat=True))
+        warehouse_id = list(warehouse_ids)[0] if len(warehouse_ids) == 1 else None
+
+        cargo_status_id = list(status_ids)[0]
+        packaging_type_id = list(packaging_ids)[0]
+
+        with transaction.atomic():
+            cargo = Cargo.objects.create(
+                company=company,
+                client_id=client_id,
+                cargo_code=cargo_code,
+                cargo_status_id=cargo_status_id,
+                packaging_type_id=packaging_type_id,
+                warehouse_id=warehouse_id,
+                created_by=user,
+                updated_by=user,
+            )
+
+            Product.objects.filter(company=company, id__in=uniq_ids).update(cargo_id=cargo.id)
+
+            SystemActionLog.objects.create(
+                company=company,
+                model_name="Cargo",
+                object_id=cargo.id,
+                action="create",
+                old_data={},
+                new_data={
+                    "client_id": int(client_id),
+                    "cargo_code": cargo_code,
+                    "cargo_status_id": int(cargo_status_id),
+                    "packaging_type_id": int(packaging_type_id),
+                    "warehouse_id": int(warehouse_id) if warehouse_id else None,
+                    "product_ids": uniq_ids,
+                },
+                diff={},
+                operator=user,
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+
+        return JsonResponse({"status": "ok", "cargo_id": cargo.id, "cargo_code": cargo.cargo_code})
+
     try:
         limit = int(request.GET.get("limit", 50))
         offset = int(request.GET.get("offset", 0))
