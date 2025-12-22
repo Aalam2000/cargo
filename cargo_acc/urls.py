@@ -43,6 +43,7 @@ urlpatterns = [
     # --------------------------------------------------------------
     path('api/get_table_settings/', views.get_table_settings, name='get_table_settings'),
     path('api/save_table_settings/', views.save_table_settings, name='save_table_settings'),
+    path('api/table_settings/', views.get_table_settings, name='table_settings'),
 
     # --------------------------------------------------------------
     # 🧾 Клиентская таблица (для отображения грузов)

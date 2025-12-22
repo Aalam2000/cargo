@@ -35,7 +35,7 @@ def cargos_table_view(request):
     role = getattr(user, "role", "")
 
     qs = Cargo.objects.filter(company=company).select_related(
-        "warehouse", "cargo_status", "packaging_type"
+        "client", "warehouse", "cargo_status", "packaging_type"
     )
 
     # Ограничение видимости для Client: только грузы, где есть его товары
@@ -59,23 +59,47 @@ def cargos_table_view(request):
     if search:
         qs = qs.filter(
             Q(cargo_code__icontains=search) |
+            Q(client__client_code__icontains=search) |
             Q(warehouse__name__icontains=search) |
             Q(cargo_status__name__icontains=search) |
             Q(packaging_type__name__icontains=search)
         )
 
-    # SORTING
-    SORTABLE = {
+    # -------- FILTERING (как товары) --------
+    FILTERABLE = {
         "cargo_code": "cargo_code",
-        "products_count": "products_count",
+        "client": "client__client_code",
         "warehouse": "warehouse__name",
         "cargo_status": "cargo_status__name",
-        "packaging_type": "packaging_type__name",
-        "weight_total": "weight_total",
-        "volume_total": "volume_total",
-        "is_locked": "is_locked",
-        "created_at": "created_at",
     }
+
+    for key, value in request.GET.items():
+        if not (key.startswith("filter[") and key.endswith("]")):
+            continue
+        val = (value or "").strip()
+        if not val:
+            continue
+
+        field = key[7:-1]
+        orm_field = FILTERABLE.get(field)
+        if not orm_field:
+            continue
+
+        qs = qs.filter(**{f"{orm_field}__icontains": val})
+
+    # SORTING
+    SORTABLE = {
+            "cargo_code": "cargo_code",
+            "client": "client__client_code",
+            "products_count": "products_count",
+            "warehouse": "warehouse__name",
+            "cargo_status": "cargo_status__name",
+            "packaging_type": "packaging_type__name",
+            "weight_total": "weight_total",
+            "volume_total": "volume_total",
+            "is_locked": "is_locked",
+            "created_at": "created_at",
+        }
 
     if sort_by == "record_date":
         field = "id"
@@ -97,6 +121,7 @@ def cargos_table_view(request):
 
         results.append({
             "id": c.id,
+            "client": c.client.client_code if c.client else "",
             "cargo_code": c.cargo_code,
             "record_date": record_date,
             "products_count": int(c.products_count or 0),

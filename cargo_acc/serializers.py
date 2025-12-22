@@ -177,6 +177,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class CargoSerializer(serializers.ModelSerializer):
+    client = serializers.SlugRelatedField(read_only=True, slug_field="client_code")
     products = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field='product_code'
     )
@@ -192,6 +193,7 @@ class CargoSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'cargo_code',
+            'client',
             'cargo_status',
             'warehouse',
             'packaging_type',

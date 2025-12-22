@@ -201,7 +201,12 @@ class QRScan(models.Model):
 # === ГРУЗ (агрегатор) ===
 class Cargo(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="cargos")
-
+    client = models.ForeignKey(
+        "cargo_acc.Client",
+        on_delete=models.PROTECT,
+        related_name="cargos",
+        db_index=True,
+    )
     cargo_code = models.CharField(max_length=50, unique=True, db_index=True)
 
     # агрегатные параметры (кеш по товарам; пересчитывается сервисом)

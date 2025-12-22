@@ -22,33 +22,15 @@
         <meta name="user-role" content="{{ role }}">
 
         <div class="table-card table-container">
-            <div class="table-wrapper" data-table-key="cargos">
+            <div class="table-wrapper" id="cargos-table-wrapper" data-table-key="cargos">
                 <table class="table">
                     <thead id="cargos_head"></thead>
                     <tbody id="tbody_cargos"></tbody>
                 </table>
-
-                <div class="table-footer">
-                    <button id="cargos_prev" class="btn-table">←</button>
-                    <span id="cargos_page_info" class="page-info"></span>
-                    <button id="cargos_next" class="btn-table">→</button>
-                </div>
 
                 <div id="loader_cargos" class="loader hidden"></div>
             </div>
         </div>
     </div>
 
-    <!-- модалка настроек колонок (нужна base.js) -->
-    {#<div id="modal-overlay" class="modal-overlay"></div>#}
-    {#<div id="settings-modal" class="modal">#}
-    {#  <div class="modal-header">#}
-    {#    <div class="modal-title">Настройки таблицы</div>#}
-    {#  </div>#}
-    {#  <form id="settings-form" class="modal-body"></form>#}
-    {#  <div class="modal-footer">#}
-    {#    <button id="settings-cancel" class="btn" type="button">Отмена</button>#}
-    {#    <button id="settings-save" class="btn" type="button">Сохранить</button>#}
-    {#  </div>#}
-    {#</div>#}
 {% endblock %}
