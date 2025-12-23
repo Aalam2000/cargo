@@ -4,10 +4,10 @@
 //   Работает с /api/cargos_table/
 //   + MODAL: создать груз из товаров выбранного клиента
 // ================================
-function renderAddCargoModal() {
+function renderAddCargoModal(isEdit = false) {
     return `
         <div class="modal-header">
-            <h3>Добавить груз</h3>
+            <h3>${isEdit ? "Редактировать груз" : "Добавить груз"}</h3>
             <button class="modal-close" id="cargoModalClose">✖</button>
         </div>
 
@@ -19,10 +19,10 @@ function renderAddCargoModal() {
                     class="modal-input select-search-input"
                     placeholder="Начните ввод клиента"
                     autocomplete="off"
+                    ${isEdit ? "disabled" : ""}
                 >
                 <div id="addCargoClientList" class="autocomplete-list hidden"></div>
             </div>
-
 
             <table class="table">
                 <thead>
@@ -30,21 +30,27 @@ function renderAddCargoModal() {
                         <th>Код</th>
                         <th>Описание</th>
                         <th>Стоимость</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody id="addCargoProductsTbody"></tbody>
             </table>
+
+            <button id="editProductsBtn" class="btn-secondary">
+                Изменить товары
+            </button>
 
             <div id="addCargoError" class="error-text"></div>
         </div>
 
         <div class="modal-footer">
             <button id="addCargoCancelBtn" class="btn-secondary">Отмена</button>
-            <button id="addCargoSaveBtn" class="btn-primary" disabled>Создать</button>
+            <button id="addCargoSaveBtn" class="btn-primary" disabled>
+                ${isEdit ? "Сохранить" : "Создать"}
+            </button>
         </div>
     `;
 }
+
 
 (function () {
     const CT_API = "/api/cargos_table/";
@@ -186,6 +192,9 @@ function renderAddCargoModal() {
         items.forEach(c => {
             const tr = document.createElement("tr");
             tr.dataset.id = c.id || "";
+            tr.addEventListener("click", () => {
+                AC_openEditModal(c.id);
+            });
 
             CT_COLUMNS.forEach(col => {
                 let v = c[col.field];
@@ -199,6 +208,129 @@ function renderAddCargoModal() {
 
             tbody.appendChild(tr);
         });
+    }
+
+    async function AC_openProductsSelector() {
+        const url = new URL(CT_API, window.location.origin);
+        url.searchParams.set("mode", "cargo_products");
+        url.searchParams.set("client_id", AC_state.clientId);
+        if (AC_state.cargoId) {
+            url.searchParams.set("cargo_id", AC_state.cargoId);
+        }
+
+        const data = await CT_json(url);
+        const items = [...data.selected, ...data.free];
+
+        const overlay = document.createElement("div");
+        overlay.className = "modal-overlay";
+        overlay.innerHTML = `
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Товары клиента</h3>
+                    <button class="modal-close" id="closeSelect">✖</button>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <tbody>
+                            ${items.map(p => `
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" data-id="${p.id}"
+                                        ${AC_state.selectedProductIds.has(p.id) ? "checked" : ""}>
+                                    </td>
+                                    <td>${p.product_code}</td>
+                                    <td>${p.cargo_description || ""}</td>
+                                    <td>${p.cost ?? ""}</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button id="applyProducts" class="btn-primary">Сохранить</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector("#closeSelect").onclick = () => overlay.remove();
+
+        overlay.querySelector("#applyProducts").onclick = () => {
+            AC_state.selectedProductIds.clear();
+            overlay.querySelectorAll("input[type=checkbox]").forEach(cb => {
+                if (cb.checked) AC_state.selectedProductIds.add(Number(cb.dataset.id));
+            });
+
+            const selected = items.filter(p => AC_state.selectedProductIds.has(p.id));
+            AC_renderSelectedProducts(selected);
+            AC_refreshSaveEnabled();
+            overlay.remove();
+        };
+    }
+
+    function AC_renderSelectedProducts(items) {
+        const tbody = AC_el("addCargoProductsTbody");
+        tbody.innerHTML = "";
+
+        items.forEach(p => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${p.product_code}</td>
+                <td>${p.cargo_description || ""}</td>
+                <td>${p.cost ?? ""}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function AC_openEditModal(cargoId) {
+        AC_state.mode = "edit";
+        AC_state.cargoId = cargoId;
+        AC_state.selectedProductIds = new Set();
+
+        const overlay = document.createElement("div");
+        overlay.className = "modal-overlay";
+        overlay.innerHTML = `
+            <div class="modal">
+                ${renderAddCargoModal(true)}
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector("#cargoModalClose").onclick =
+            overlay.querySelector("#addCargoCancelBtn").onclick =
+                () => overlay.remove();
+
+        overlay.querySelector("#addCargoSaveBtn").onclick = AC_save;
+
+        // груз → клиент + товары
+        const url = new URL(CT_API, window.location.origin);
+        url.searchParams.set("mode", "cargo_products");
+        url.searchParams.set("cargo_id", cargoId);
+
+        const data = await CT_json(url);
+
+        AC_state.clientId = String(data.client_id || "");
+
+        const clientInput = document.getElementById("addCargoClientInput");
+        if (clientInput) {
+            clientInput.value = data.client_code || "";
+        }
+
+
+        // выбранные
+        AC_state.selectedProductIds.clear();
+        data.selected.forEach(p => {
+            AC_state.selectedProductIds.add(Number(p.id));
+        });
+
+        AC_renderSelectedProducts(data.selected);
+        AC_refreshSaveEnabled();
+        const editBtn = overlay.querySelector("#editProductsBtn");
+        editBtn.onclick = () => {
+            AC_openProductsSelector();
+        };
+
     }
 
     function CT_reset() {
@@ -259,9 +391,10 @@ function renderAddCargoModal() {
     // ------------------------------
 
     const AC_state = {
+        mode: "create",          // create | edit
+        cargoId: null,
         clientId: "",
-        products: [], // [{id, product_code, cargo_description, cost, cargo_status_id, packaging_type_id, warehouse_id}]
-        productsById: {},
+        selectedProductIds: new Set(),
     };
 
     // ------------------------------
@@ -281,6 +414,7 @@ function renderAddCargoModal() {
 
     function AC_clearClientList() {
         const list = document.getElementById("addCargoClientList");
+        if (!list) return;
         list.innerHTML = "";
         list.classList.add("hidden");
     }
@@ -308,7 +442,6 @@ function renderAddCargoModal() {
                 document.getElementById("addCargoClientInput").value = c.client_code;
                 AC_state.clientId = String(c.id);
                 AC_clearClientList();
-                await AC_loadAvailableProducts(c.id);
             };
 
             list.appendChild(div);
@@ -340,6 +473,11 @@ function renderAddCargoModal() {
     }
 
     function AC_openModal() {
+        // RESET STATE FOR CREATE MODE
+        AC_state.mode = "create";
+        AC_state.cargoId = null;
+        AC_state.clientId = "";
+        AC_state.selectedProductIds.clear();
 
         const overlay = document.createElement("div");
         overlay.className = "modal-overlay";
@@ -377,11 +515,20 @@ function renderAddCargoModal() {
         });
 
         document.addEventListener("click", (e) => {
+            if (!document.body.contains(clientInput)) return;
             if (!clientInput.contains(e.target) && !clientList.contains(e.target)) {
                 AC_clearClientList();
             }
         });
 
+        const editBtn = overlay.querySelector("#editProductsBtn");
+        editBtn.onclick = () => {
+            if (!AC_state.clientId) {
+                AC_setError("Сначала выберите клиента");
+                return;
+            }
+            AC_openProductsSelector();
+        };
     }
 
 
@@ -390,29 +537,8 @@ function renderAddCargoModal() {
         CT_hide(AC_el("add-cargo-modal"));
     }
 
-    async function AC_loadAvailableProducts(clientId) {
-        const url = new URL(CT_API, window.location.origin);
-        url.searchParams.set("mode", "available_products");
-        url.searchParams.set("client_id", String(clientId));
-
-        const data = await CT_json(url);
-        const products = data && data.results ? data.results : [];
-
-        AC_state.products = products;
-        AC_state.productsById = {};
-        products.forEach(p => {
-            AC_state.productsById[String(p.id)] = p;
-        });
-
-        AC_el("addCargoProductsTbody").innerHTML = "";
-
-        // Добавим одну строку по умолчанию
-        // AC_addRow();
-        AC_refreshSaveEnabled();
-    }
-
     function AC_refreshSaveEnabled() {
-        const ids = AC_getSelectedIds();
+        const ids = Array.from(AC_state.selectedProductIds);
         const canSave = AC_state.clientId && ids.length > 0;
         AC_el("addCargoSaveBtn").disabled = !canSave;
 
@@ -423,36 +549,6 @@ function renderAddCargoModal() {
         }
     }
 
-    function AC_getSelectedIds() {
-        const selects = AC_el("addCargoProductsTbody").querySelectorAll("select[data-ac='product']");
-        const ids = [];
-        selects.forEach(s => {
-            const v = (s.value || "").trim();
-            if (v) ids.push(v);
-        });
-        // unique
-        return Array.from(new Set(ids));
-    }
-
-    function AC_buildProductOptions(selectedId) {
-        const used = new Set(AC_getSelectedIds());
-        let html = `<option value="">—</option>`;
-        AC_state.products.forEach(p => {
-            const pid = String(p.id);
-            const disabled = used.has(pid) && pid !== String(selectedId || "");
-            html += `<option value="${pid}" ${disabled ? "disabled" : ""} ${pid === String(selectedId || "") ? "selected" : ""}>${p.product_code}</option>`;
-        });
-        return html;
-    }
-
-    function AC_refreshAllSelects() {
-        const tbody = AC_el("addCargoProductsTbody");
-        const selects = tbody.querySelectorAll("select[data-ac='product']");
-        selects.forEach(sel => {
-            const cur = sel.value;
-            sel.innerHTML = AC_buildProductOptions(cur);
-        });
-    }
 
     function AC_addRow() {
         if (!AC_state.clientId) return;
@@ -481,8 +577,6 @@ function renderAddCargoModal() {
         const inpCost = tr.querySelector("input[data-ac='cost']");
         const btnRemove = tr.querySelector("button[data-ac='remove']");
 
-        sel.innerHTML = AC_buildProductOptions("");
-
         sel.addEventListener("change", () => {
             const pid = (sel.value || "").trim();
             const p = pid ? AC_state.productsById[pid] : null;
@@ -490,19 +584,16 @@ function renderAddCargoModal() {
             inpDesc.value = p && p.cargo_description ? p.cargo_description : "";
             inpCost.value = (p && p.cost !== null && p.cost !== undefined) ? String(p.cost) : "";
 
-            AC_refreshAllSelects();
             AC_refreshSaveEnabled();
         });
 
         btnRemove.addEventListener("click", () => {
             tr.remove();
-            AC_refreshAllSelects();
             AC_refreshSaveEnabled();
         });
 
         tbody.appendChild(tr);
 
-        AC_refreshAllSelects();
         AC_refreshSaveEnabled();
     }
 
@@ -530,36 +621,34 @@ function renderAddCargoModal() {
 
     async function AC_save() {
         AC_setError("");
-        const clientId = AC_state.clientId;
-        if (!clientId) {
-            AC_setError("Выберите клиента");
-            return;
-        }
 
-        const productIds = AC_getSelectedIds();
-        if (productIds.length === 0) {
-            AC_setError("Добавьте хотя бы один товар");
+        const productIds = Array.from(AC_state.selectedProductIds);
+        if (!AC_state.clientId || productIds.length === 0) {
+            AC_setError("Не выбран клиент или товары");
             return;
         }
 
         AC_el("addCargoSaveBtn").disabled = true;
 
         try {
-            const cargoCode = await AC_generateCargoCode();
+            let payload = {
+                client_id: AC_state.clientId,
+                product_ids: productIds,
+            };
+
+            if (AC_state.mode === "create") {
+                payload.cargo_code = await AC_generateCargoCode();
+            } else {
+                payload.cargo_id = AC_state.cargoId;
+            }
 
             await CT_json(CT_API, {
                 method: "POST",
-                headers: {
-                    "X-CSRFToken": CT_getCsrfToken(),
-                },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    cargo_code: cargoCode,
-                    product_ids: productIds,
-                }),
+                headers: {"X-CSRFToken": CT_getCsrfToken()},
+                body: JSON.stringify(payload),
             });
 
-            AC_closeModal();
+            document.querySelector(".modal-overlay")?.remove();
             CT_reset();
             CT_load();
         } catch (e) {
@@ -567,6 +656,7 @@ function renderAddCargoModal() {
             AC_refreshSaveEnabled();
         }
     }
+
 
     function CT_bindAddCargoModal() {
         const role = CT_getRole();

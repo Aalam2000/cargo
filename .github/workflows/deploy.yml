@@ -1,3 +1,4 @@
+#.github/workflows/deploy.yml
 name: Deploy to Production Server
 
 on:
@@ -39,7 +40,9 @@ jobs:
 
 
             echo "🔁 Rebuilding and restarting containers..."
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml build --no-cache
+            docker compose -f docker-compose.prod.yml up -d
+
 
             echo "🧩 Checking logs for app container (last 50 lines)..."
             docker compose -f docker-compose.prod.yml logs -t --tail=50 app
