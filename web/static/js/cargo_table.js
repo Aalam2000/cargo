@@ -12,7 +12,17 @@ function renderAddCargoModal() {
         </div>
 
         <div class="modal-body">
-            <select id="addCargoClient" class="modal-input"></select>
+            <div class="select-search-wrapper">
+                <input
+                    type="text"
+                    id="addCargoClientInput"
+                    class="modal-input select-search-input"
+                    placeholder="Начните ввод клиента"
+                    autocomplete="off"
+                >
+                <div id="addCargoClientList" class="autocomplete-list hidden"></div>
+            </div>
+
 
             <table class="table">
                 <thead>
@@ -254,6 +264,60 @@ function renderAddCargoModal() {
         productsById: {},
     };
 
+    // ------------------------------
+    // client autocomplete
+    // ------------------------------
+    let AC_clientPage = 1;
+    let AC_clientSearch = "";
+    let AC_clientLoading = false;
+
+    async function AC_fetchClients(search, page = 1) {
+        const url = new URL("/api/get_clients/", window.location.origin);
+        url.searchParams.set("search", search);
+        url.searchParams.set("page", page);
+        url.searchParams.set("page_size", 7);
+        return await CT_json(url);
+    }
+
+    function AC_clearClientList() {
+        const list = document.getElementById("addCargoClientList");
+        list.innerHTML = "";
+        list.classList.add("hidden");
+    }
+
+    function AC_renderClientList(items) {
+        const list = document.getElementById("addCargoClientList");
+        list.innerHTML = "";
+
+        if (!items.length) {
+            const empty = document.createElement("div");
+            empty.className = "autocomplete-empty";
+            empty.textContent = "Ничего не найдено";
+            list.appendChild(empty);
+            list.classList.remove("hidden");
+            return;
+        }
+
+        items.forEach(c => {
+            const div = document.createElement("div");
+            div.className = "autocomplete-item";
+            div.textContent = c.client_code;
+            div.dataset.id = c.id;
+
+            div.onclick = async () => {
+                document.getElementById("addCargoClientInput").value = c.client_code;
+                AC_state.clientId = String(c.id);
+                AC_clearClientList();
+                await AC_loadAvailableProducts(c.id);
+            };
+
+            list.appendChild(div);
+        });
+
+        list.classList.remove("hidden");
+    }
+
+
     function AC_el(id) {
         return document.getElementById(id);
     }
@@ -268,12 +332,10 @@ function renderAddCargoModal() {
         AC_state.products = [];
         AC_state.productsById = {};
 
-        const clientSel = AC_el("addCargoClient");
-        clientSel.value = "";
+        const clientInput = AC_el("addCargoClientInput");
+        if (clientInput) clientInput.value = "";
 
         AC_el("addCargoProductsTbody").innerHTML = "";
-
-        AC_el("addCargoAddRowBtn").disabled = true;
         AC_el("addCargoSaveBtn").disabled = true;
     }
 
@@ -294,42 +356,38 @@ function renderAddCargoModal() {
         overlay.querySelector("#addCargoCancelBtn").onclick = () => overlay.remove();
         overlay.querySelector("#addCargoSaveBtn").onclick = AC_save;
 
-        overlay.querySelector("#addCargoClient")
-            .addEventListener("change", async () => {
-                const v = overlay.querySelector("#addCargoClient").value.trim();
-                AC_state.clientId = v;
-                if (!v) return;
-                await AC_loadAvailableProducts(v);
-            });
+        const clientInput = document.getElementById("addCargoClientInput");
+        const clientList = document.getElementById("addCargoClientList");
 
-        AC_loadClients();
+        clientInput.addEventListener("input", async () => {
+            const v = clientInput.value.trim();
+            AC_state.clientId = "";
+            AC_clearClientList();
+
+            if (!v || v.length < 1) return;
+
+            AC_clientSearch = v;
+            AC_clientPage = 1;
+            AC_clientLoading = true;
+
+            const data = await AC_fetchClients(v, 1);
+            AC_renderClientList(data.results || []);
+
+            AC_clientLoading = false;
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!clientInput.contains(e.target) && !clientList.contains(e.target)) {
+                AC_clearClientList();
+            }
+        });
+
     }
-
 
 
     function AC_closeModal() {
         CT_hide(AC_el("modal-overlay"));
         CT_hide(AC_el("add-cargo-modal"));
-    }
-
-    async function AC_loadClients() {
-        const url = new URL(CT_CLIENTS_API, window.location.origin);
-        url.searchParams.set("page", "1");
-        url.searchParams.set("page_size", "200");
-        url.searchParams.set("search", "");
-
-        const data = await CT_json(url);
-        const list = data && data.results ? data.results : [];
-
-        const sel = AC_el("addCargoClient");
-        sel.innerHTML = `<option value="">— выберите клиента —</option>`;
-
-        list.forEach(c => {
-            const opt = document.createElement("option");
-            opt.value = String(c.id);
-            opt.textContent = c.client_code || c.name || (`Client #${c.id}`);
-            sel.appendChild(opt);
-        });
     }
 
     async function AC_loadAvailableProducts(clientId) {
@@ -347,16 +405,22 @@ function renderAddCargoModal() {
         });
 
         AC_el("addCargoProductsTbody").innerHTML = "";
-        AC_el("addCargoAddRowBtn").disabled = false;
 
         // Добавим одну строку по умолчанию
-        AC_addRow();
+        // AC_addRow();
         AC_refreshSaveEnabled();
     }
 
     function AC_refreshSaveEnabled() {
         const ids = AC_getSelectedIds();
-        AC_el("addCargoSaveBtn").disabled = !(AC_state.clientId && ids.length > 0);
+        const canSave = AC_state.clientId && ids.length > 0;
+        AC_el("addCargoSaveBtn").disabled = !canSave;
+
+        if (!canSave) {
+            AC_setError("Выберите хотя бы один товар");
+        } else {
+            AC_setError("");
+        }
     }
 
     function AC_getSelectedIds() {
@@ -443,13 +507,26 @@ function renderAddCargoModal() {
     }
 
     async function AC_generateCargoCode() {
-        const data = await CT_json(CT_GENERATE_CARGO_API, {method: "GET"});
+        const clientId = AC_state.clientId;
+        if (!clientId) throw new Error("client_id required");
 
-        if (typeof data === "string") return data;
-        if (!data) throw new Error("bad generate response");
+        const data = await CT_json(CT_GENERATE_CARGO_API, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": CT_getCsrfToken(),
+            },
+            body: JSON.stringify({
+                client_id: clientId,
+            }),
+        });
 
-        return (data.cargo_code || data.code || data.generated_code || data.result || "").toString().trim();
+        if (!data || !data.cargo_code) {
+            throw new Error("bad generate response");
+        }
+
+        return String(data.cargo_code).trim();
     }
+
 
     async function AC_save() {
         AC_setError("");
