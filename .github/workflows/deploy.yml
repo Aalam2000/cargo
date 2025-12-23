@@ -1,20 +1,15 @@
-#.github/workflows/deploy.yml
-name: Deploy to Production Server
+name: Deploy PROD (no rebuild, with backups)
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Deploy via SSH and restart Docker
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: 185.169.54.164
@@ -22,29 +17,30 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            echo "🚀 Starting deploy on production server..."
+            set -e
             cd /var/www/cargodb
 
-            echo "📦 Updating code from master branch..."
+            echo "=== UPDATE CODE ==="
             git fetch origin master
             git reset --hard origin/master
 
-            echo "🧩 Generating fresh migrations on production..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py makemigrations --noinput
-            
-            echo "🐍 Applying new migrations..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py migrate --noinput
+            echo "=== BACKUP DB ==="
+            mkdir -p backups
+            docker exec cargo_db pg_dump -U cargo cargo \
+              > backups/backup_$(date +%F_%H-%M-%S).sql
 
-            echo "🧱 Collecting static files..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps cargo_app python manage.py collectstatic --noinput --clear
+            # keep last 3 backups
+            ls -t backups/*.sql | tail -n +4 | xargs -r rm --
 
+            echo "=== MIGRATIONS ==="
+            docker compose -f docker-compose.prod.yml run --rm cargo_app \
+              python manage.py migrate --noinput
 
-            echo "🔁 Rebuilding and restarting containers..."
-            docker compose -f docker-compose.prod.yml build --no-cache
-            docker compose -f docker-compose.prod.yml up -d
+            echo "=== COLLECTSTATIC ==="
+            docker compose -f docker-compose.prod.yml run --rm cargo_app \
+              python manage.py collectstatic --noinput --clear
 
+            echo "=== RESTART APP ==="
+            docker compose -f docker-compose.prod.yml restart cargo_app
 
-            echo "🧩 Checking logs for app container (last 50 lines)..."
-            docker compose -f docker-compose.prod.yml logs -t --tail=50 app
-
-            echo "✅ Deploy completed successfully!"
+            echo "DEPLOY DONE"

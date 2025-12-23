@@ -1,14 +1,12 @@
-#docker-compose.prod.yml
 services:
   cargo_app:
     container_name: cargo_app
-    image: cargo_app:prod
+    build:
+      context: .
+      dockerfile: Dockerfile
 
-    command: >
-      gunicorn cargodb.wsgi:application
-      --bind 0.0.0.0:8000
+    command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 60
 
-    # 🔥 Подключаем твои .env файлы, лежащие на диске сервера
     env_file:
       - .env.prod
       - .env.secrets
@@ -17,13 +15,10 @@ services:
       - "8000:8000"
 
     volumes:
-      # статика и медиа должны сохраняться между пересборками
+      # КОД С ДИСКА СЕРВЕРА
+      - /var/www/cargodb:/app
+      # persistent
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
 
-    networks:
-      - default
-
-networks:
-  default:
-    name: cargodb_default
+    restart: unless-stopped
