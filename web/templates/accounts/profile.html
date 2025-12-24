@@ -9,9 +9,11 @@
             {% csrf_token %}
 
             <div class="profile-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <h1 class="profile-title">Профиль пользователя</h1>
-
+                {% if user.role != "Client" %}
+                    <h1 class="profile-title">Профиль пользователя</h1>
+                {% endif %}
                 {% if user.role == "Client" %}
+                    <h3>Клиент: {{ request.user.client_code }}</h3>
                     <div id="client-type-switch" style="display: flex; flex-direction: column; align-items: flex-end;">
                         <label>
                             <input type="radio" name="client_type" value="individual"
@@ -31,6 +33,16 @@
             <div class="profile-grid">
 
                 <!-- Общие поля -->
+                {% if user.role == "Client" %}
+                    <div class="form-group">
+                        <label>Код клиента</label>
+                        <input type="text"
+                               class="form-control"
+                               value="{{ request.user.client_code }}"
+                               readonly>
+                    </div>
+
+                {% endif %}
                 <div class="form-group">
                     <label for="first_name">Имя</label>
                     <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
