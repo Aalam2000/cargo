@@ -1,3 +1,4 @@
+#.github/workflows/deploy.yml
 name: Deploy to Production Server
 
 on:
@@ -10,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH and restart Docker
+      - name: Deploy via SSH and rebuild Docker
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: 185.169.54.164
@@ -19,6 +20,7 @@ jobs:
           port: 22
           script: |
             set -e
+
             cd /var/www/cargodb
 
             echo "=== UPDATE CODE ==="
@@ -28,7 +30,7 @@ jobs:
             echo "=== LOAD ENV ==="
             export $(grep -v '^#' .env.prod | xargs)
 
-            echo "=== BACKUP POSTGRES (local, external to docker) ==="
+            echo "=== BACKUP POSTGRES (external DB) ==="
             mkdir -p backups
             PGPASSWORD="$DB_PASSWORD" pg_dump \
               -h "$IP_POSTGRES" \
@@ -37,8 +39,11 @@ jobs:
               "$DB_NAME" \
               > backups/backup_$(date +%F_%H-%M-%S).sql
 
-            echo "=== ROTATE BACKUPS (keep 3) ==="
+            echo "=== ROTATE BACKUPS (keep last 3) ==="
             ls -t backups/*.sql | tail -n +4 | xargs -r rm --
+
+            echo "=== BUILD DOCKER IMAGES ==="
+            docker compose -f docker-compose.prod.yml build --no-cache
 
             echo "=== MIGRATIONS ==="
             docker compose -f docker-compose.prod.yml run --rm cargo_app \
@@ -48,7 +53,7 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm cargo_app \
               python manage.py collectstatic --noinput --clear
 
-            echo "=== RESTART APP ==="
-            docker compose -f docker-compose.prod.yml restart cargo_app
+            echo "=== START CONTAINERS ==="
+            docker compose -f docker-compose.prod.yml up -d
 
             echo "=== DEPLOY DONE ==="
