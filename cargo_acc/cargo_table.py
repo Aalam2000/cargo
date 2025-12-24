@@ -81,11 +81,28 @@ def cargos_table_view(request):
                     id=cargo_id, company=company
                 ).values_list("client__client_code", flat=True).first()
 
+            cargo_data = {}
+            if cargo_id:
+                c = Cargo.objects.select_related(
+                    "warehouse", "cargo_status", "packaging_type"
+                ).get(id=cargo_id, company=company)
+
+                cargo_data = {
+                    "cargo_code": c.cargo_code,
+                    "cargo_status_id": c.cargo_status_id,
+                    "cargo_status": c.cargo_status.name if c.cargo_status else "",
+                    "packaging_type_id": c.packaging_type_id,
+                    "packaging_type": c.packaging_type.name if c.packaging_type else "",
+                    "warehouse_id": c.warehouse_id,
+                    "warehouse": c.warehouse.name if c.warehouse else "",
+                }
+
             return JsonResponse({
                 "client_id": int(client_id),
                 "client_code": client_code,
                 "free": serialize(free_qs),
                 "selected": serialize(selected_qs),
+                **cargo_data,
             })
 
         # --- старый режим (оставляем для совместимости) ---
@@ -190,26 +207,16 @@ def cargos_table_view(request):
             missing = sorted(set(uniq_ids) - set(found_ids))
             return JsonResponse({"error": "some products not available", "missing": missing}, status=400)
 
-        status_ids = set(qs_products.values_list("cargo_status_id", flat=True))
-        packaging_ids = set(qs_products.values_list("packaging_type_id", flat=True))
-
         if not cargo_id:
             # CREATE — строгая проверка
-            if len(status_ids) != 1:
-                return JsonResponse({"error": "products have different cargo_status"}, status=400)
-            if len(packaging_ids) != 1:
-                return JsonResponse({"error": "products have different packaging_type"}, status=400)
-
-            warehouse_ids = set(qs_products.values_list("warehouse_id", flat=True))
-            warehouse_id = list(warehouse_ids)[0] if len(warehouse_ids) == 1 else None
-
-            cargo_status_id = list(status_ids)[0]
-            packaging_type_id = list(packaging_ids)[0]
+            cargo_status_id = data.get("cargo_status_id")
+            packaging_type_id = data.get("packaging_type_id")
+            warehouse_id = data.get("warehouse_id")
         else:
-            # EDIT — берём из груза
-            warehouse_id = cargo.warehouse_id
-            cargo_status_id = cargo.cargo_status_id
-            packaging_type_id = cargo.packaging_type_id
+            # EDIT — берём из POST
+            warehouse_id = data.get("warehouse_id", cargo.warehouse_id)
+            cargo_status_id = data.get("cargo_status_id", cargo.cargo_status_id)
+            packaging_type_id = data.get("packaging_type_id", cargo.packaging_type_id)
 
         with transaction.atomic():
             if cargo_id:
@@ -224,7 +231,24 @@ def cargos_table_view(request):
                 Product.objects.filter(
                     company=company,
                     id__in=uniq_ids
-                ).update(cargo_id=cargo.id)
+                ).update(
+                    cargo_id=cargo.id,
+                    warehouse_id=warehouse_id,
+                    cargo_status_id=cargo_status_id,
+                )
+
+                cargo.warehouse_id = warehouse_id
+                cargo.cargo_status_id = cargo_status_id
+                cargo.packaging_type_id = packaging_type_id
+                cargo.updated_by = user
+                cargo.updated_at = timezone.now()
+                cargo.save(update_fields=[
+                    "warehouse_id",
+                    "cargo_status_id",
+                    "packaging_type_id",
+                    "updated_by",
+                    "updated_at",
+                ])
 
                 action = "update"
 
@@ -241,14 +265,18 @@ def cargos_table_view(request):
                     updated_by=user,
                 )
 
-                Product.objects.filter(company=company, id__in=uniq_ids).update(cargo_id=cargo.id)
+                Product.objects.filter(company=company, id__in=uniq_ids).update(
+                    cargo_id=cargo.id,
+                    warehouse_id=warehouse_id,
+                    cargo_status_id=cargo_status_id,
+                )
                 action = "create"
 
             SystemActionLog.objects.create(
                 company=company,
                 model_name="Cargo",
                 object_id=cargo.id,
-                action="create",
+                action=action,
                 old_data={},
                 new_data={
                     "client_id": int(client_id),

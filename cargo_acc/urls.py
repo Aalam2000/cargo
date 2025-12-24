@@ -122,4 +122,6 @@ urlpatterns = [
     path("api/generate/client/", views_table.api_generate_client_code),
     path("api/generate/product/", views_table.api_generate_product_code),
     path("api/generate/cargo/", views_table.api_generate_cargo_code),
+    path("api/user/cargo-defaults/", views_table.api_user_cargo_defaults),
+
 ]

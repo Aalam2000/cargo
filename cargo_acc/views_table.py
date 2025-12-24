@@ -868,3 +868,21 @@ def api_generate_cargo_code(request):
 
     code = generate_cargo_code(client)
     return JsonResponse({"cargo_code": code})
+
+@login_required
+def api_user_cargo_defaults(request):
+    u = request.user
+    return JsonResponse({
+        "warehouse": (
+            {"id": u.default_warehouse_id, "name": u.default_warehouse.name}
+            if u.default_warehouse else None
+        ),
+        "cargo_status": (
+            {"id": u.default_cargo_status_id, "name": u.default_cargo_status.name}
+            if u.default_cargo_status else None
+        ),
+        "packaging_type": (
+            {"id": u.default_packaging_type_id, "name": u.default_packaging_type.name}
+            if u.default_packaging_type else None
+        ),
+    })

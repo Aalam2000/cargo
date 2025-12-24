@@ -11,17 +11,69 @@ function renderAddCargoModal(isEdit = false) {
             <button class="modal-close" id="cargoModalClose">✖</button>
         </div>
 
-        <div class="modal-body">
-            <div class="select-search-wrapper">
-                <input
-                    type="text"
-                    id="addCargoClientInput"
-                    class="modal-input select-search-input"
-                    placeholder="Начните ввод клиента"
-                    autocomplete="off"
-                    ${isEdit ? "disabled" : ""}
-                >
-                <div id="addCargoClientList" class="autocomplete-list hidden"></div>
+        <div class="modal-body modal-fields">
+
+            <!-- CLIENT -->
+            <div class="modal-row">
+                <label>Клиент</label>
+                <div class="select-search-wrapper">
+                    <input
+                        type="text"
+                        id="addCargoClientInput"
+                        class="modal-input select-search-input"
+                        placeholder="Начните ввод клиента"
+                        autocomplete="off"
+                        ${isEdit ? "disabled" : ""}
+                    >
+                    <div id="addCargoClientList" class="autocomplete-list hidden"></div>
+                </div>
+            </div>
+
+            <!-- CARGO CODE + QR -->
+            <div class="modal-row">
+                <label>Код груза</label>
+                <div style="display:flex; gap:8px; width:100%;">
+                    <input id="cargoCodeInput" class="modal-input" readonly>
+                    <button id="printCargoQR" class="btn-secondary" type="button">
+                        QR
+                    </button>
+                </div>
+            </div>
+
+            <!-- STATUS -->
+            <div class="modal-row">
+                <label>Статус груза</label>
+                <div class="select-search-wrapper">
+                    <input id="cargoStatusInput" class="modal-input select-search-input" readonly>
+                    <div id="cargoStatusList" class="autocomplete-list hidden"></div>
+                </div>
+            </div>
+            
+            <!-- PACKAGING -->
+            <div class="modal-row">
+                <label>Тип упаковки</label>
+                <div class="select-search-wrapper">
+                    <input id="packagingTypeInput" class="modal-input select-search-input" readonly>
+                    <div id="packagingTypeList" class="autocomplete-list hidden"></div>
+                </div>
+            </div>
+            
+            <!-- WAREHOUSE -->
+            <div class="modal-row">
+                <label>Склад</label>
+                <div class="select-search-wrapper">
+                    <input id="warehouseInput" class="modal-input select-search-input" readonly>
+                    <div id="warehouseList" class="autocomplete-list hidden"></div>
+                </div>
+            </div>
+
+
+            <!-- PRODUCTS -->
+            <div class="modal-row">
+                <label>Товары</label>
+                <button id="editProductsBtn" class="btn-secondary" type="button">
+                    Изменить состав
+                </button>
             </div>
 
             <table class="table">
@@ -35,9 +87,21 @@ function renderAddCargoModal(isEdit = false) {
                 <tbody id="addCargoProductsTbody"></tbody>
             </table>
 
-            <button id="editProductsBtn" class="btn-secondary">
-                Изменить товары
-            </button>
+            <!-- TOTALS -->
+            <div class="modal-row">
+                <label>Товаров</label>
+                <input id="productsCount" class="modal-input" readonly>
+            </div>
+
+            <div class="modal-row">
+                <label>Вес итого</label>
+                <input id="weightTotal" class="modal-input" readonly>
+            </div>
+
+            <div class="modal-row">
+                <label>Объём итого</label>
+                <input id="volumeTotal" class="modal-input" readonly>
+            </div>
 
             <div id="addCargoError" class="error-text"></div>
         </div>
@@ -50,6 +114,56 @@ function renderAddCargoModal(isEdit = false) {
         </div>
     `;
 }
+
+
+document.addEventListener("click", async (e) => {
+    if (e.target.id !== "printCargoQR") return;
+
+    const code = document.getElementById("cargoCodeInput").value;
+    if (!code) return;
+
+    const win = window.open("", "_blank");
+
+    win.document.write(`
+        <html>
+        <head>
+            <title>Print</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 0;
+                    text-align: center;
+                }
+                .wrap {
+                    margin-top: 20px;
+                }
+                .code {
+                    margin-top: 12px;
+                    font-size: 18px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="wrap">
+                <img
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}"
+                    onload="setTimeout(() => window.print(), 100)"
+                >
+                <div class="code">${code}</div>
+            </div>
+
+            <script>
+                window.onafterprint = () => {
+                    window.close();
+                };
+            </script>
+        </body>
+        </html>
+    `);
+
+    win.document.close();
+    win.focus();
+});
 
 
 (function () {
@@ -120,6 +234,48 @@ function renderAddCargoModal(isEdit = false) {
             throw new Error(msg);
         }
         return data;
+    }
+
+    async function loadSelect(url, selectEl, valueField = "id", labelField = "name") {
+        const data = await CT_json(url);
+        selectEl.innerHTML = "";
+        data.results.forEach(r => {
+            const o = document.createElement("option");
+            o.value = r[valueField];
+            o.textContent = r[labelField];
+            selectEl.appendChild(o);
+        });
+    }
+
+    async function attachDictSelect(inputId, apiUrl, stateKey) {
+        const input = document.getElementById(inputId);
+        const list = document.createElement("div");
+        list.className = "autocomplete-list hidden";
+        input.parentNode.appendChild(list);
+
+        async function load() {
+            const data = await CT_json(apiUrl + "?page_size=1000");
+            list.innerHTML = "";
+            data.results.forEach(r => {
+                const div = document.createElement("div");
+                div.className = "autocomplete-item";
+                div.textContent = r.name;
+                div.onclick = () => {
+                    input.value = r.name;
+                    AC_state[stateKey] = r.id;
+                    list.classList.add("hidden");
+                };
+                list.appendChild(div);
+            });
+            list.classList.remove("hidden");
+        }
+
+        input.addEventListener("focus", load);
+        document.addEventListener("click", e => {
+            if (!input.contains(e.target) && !list.contains(e.target)) {
+                list.classList.add("hidden");
+            }
+        });
     }
 
     function CT_getCsrfToken() {
@@ -311,25 +467,64 @@ function renderAddCargoModal(isEdit = false) {
         const data = await CT_json(url);
 
         AC_state.clientId = String(data.client_id || "");
+        AC_state.selectedProductIds.clear();
+        (data.selected || []).forEach(p => AC_state.selectedProductIds.add(Number(p.id)));
+        AC_renderSelectedProducts(data.selected || []);
+
 
         const clientInput = document.getElementById("addCargoClientInput");
         if (clientInput) {
             clientInput.value = data.client_code || "";
         }
 
-
-        // выбранные
-        AC_state.selectedProductIds.clear();
-        data.selected.forEach(p => {
-            AC_state.selectedProductIds.add(Number(p.id));
-        });
-
-        AC_renderSelectedProducts(data.selected);
         AC_refreshSaveEnabled();
         const editBtn = overlay.querySelector("#editProductsBtn");
         editBtn.onclick = () => {
             AC_openProductsSelector();
         };
+        // cargo code
+        document.getElementById("cargoCodeInput").value = data.cargo_code || "";
+
+        // текущие значения груза
+        if (data.cargo_status_id && data.cargo_status) {
+            AC_el("cargoStatusInput").value = data.cargo_status;
+            AC_state.cargoStatusId = data.cargo_status_id;
+        }
+
+        if (data.packaging_type_id && data.packaging_type) {
+            AC_el("packagingTypeInput").value = data.packaging_type;
+            AC_state.packagingTypeId = data.packaging_type_id;
+        }
+
+        if (data.warehouse_id && data.warehouse) {
+            AC_el("warehouseInput").value = data.warehouse;
+            AC_state.warehouseId = data.warehouse_id;
+        }
+
+        AC_bindDictAutocomplete(
+            "cargoStatusInput",
+            "cargoStatusList",
+            "/api/table/cargo-statuses/",
+            "cargoStatusId"
+        );
+
+        AC_bindDictAutocomplete(
+            "packagingTypeInput",
+            "packagingTypeList",
+            "/api/table/packaging-types/",
+            "packagingTypeId"
+        );
+
+        AC_bindDictAutocomplete(
+            "warehouseInput",
+            "warehouseList",
+            "/api/table/warehouses/",
+            "warehouseId"
+        );
+
+
+        // totals (readonly, если придут позже — обновятся)
+        AC_el("productsCount").value = data.selected.length;
 
     }
 
@@ -395,6 +590,9 @@ function renderAddCargoModal(isEdit = false) {
         cargoId: null,
         clientId: "",
         selectedProductIds: new Set(),
+        cargoStatusId: null,
+        packagingTypeId: null,
+        warehouseId: null,
     };
 
     // ------------------------------
@@ -403,6 +601,79 @@ function renderAddCargoModal(isEdit = false) {
     let AC_clientPage = 1;
     let AC_clientSearch = "";
     let AC_clientLoading = false;
+
+    function AC_clearList(listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        list.innerHTML = "";
+        list.classList.add("hidden");
+    }
+
+    function AC_renderDictList(items, listId, inputId, stateKey) {
+        const list = document.getElementById(listId);
+        list.innerHTML = "";
+
+        if (!items.length) {
+            const empty = document.createElement("div");
+            empty.className = "autocomplete-empty";
+            empty.textContent = "Ничего не найдено";
+            list.appendChild(empty);
+            list.classList.remove("hidden");
+            return;
+        }
+
+        items.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "autocomplete-item";
+            div.textContent = item.name;
+            div.onclick = () => {
+                document.getElementById(inputId).value = item.name;
+                AC_state[stateKey] = item.id;
+                AC_clearList(listId);
+            };
+            list.appendChild(div);
+        });
+
+        list.classList.remove("hidden");
+    }
+
+    async function AC_bindDictAutocomplete(inputId, listId, apiUrl, stateKey) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        if (!input || !list) return;
+
+        let loaded = false;
+        let cached = [];
+        let opening = false;
+
+        async function load() {
+            if (!loaded) {
+                const data = await CT_json(apiUrl + "?page_size=1000");
+                cached = data.results || [];
+                loaded = true;
+            }
+            AC_renderDictList(cached, listId, inputId, stateKey);
+        }
+
+        input.addEventListener("mousedown", async (e) => {
+            e.stopPropagation();
+            opening = true;
+            await load();
+            setTimeout(() => opening = false, 0);
+        });
+
+        list.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+        });
+
+        document.addEventListener("mousedown", (e) => {
+            if (opening) return;
+            if (!input.contains(e.target) && !list.contains(e.target)) {
+                AC_clearList(listId);
+            }
+        });
+    }
+
 
     async function AC_fetchClients(search, page = 1) {
         const url = new URL("/api/get_clients/", window.location.origin);
@@ -472,7 +743,7 @@ function renderAddCargoModal(isEdit = false) {
         AC_el("addCargoSaveBtn").disabled = true;
     }
 
-    function AC_openModal() {
+    async function AC_openModal() {
         // RESET STATE FOR CREATE MODE
         AC_state.mode = "create";
         AC_state.cargoId = null;
@@ -529,6 +800,48 @@ function renderAddCargoModal(isEdit = false) {
             }
             AC_openProductsSelector();
         };
+        // === справочники: ТОЧНО КАК выбор клиента ===
+        AC_bindDictAutocomplete(
+            "cargoStatusInput",
+            "cargoStatusList",
+            "/api/table/cargo-statuses/",
+            "cargoStatusId"
+        );
+
+        AC_bindDictAutocomplete(
+            "packagingTypeInput",
+            "packagingTypeList",
+            "/api/table/packaging-types/",
+            "packagingTypeId"
+        );
+
+        AC_bindDictAutocomplete(
+            "warehouseInput",
+            "warehouseList",
+            "/api/table/warehouses/",
+            "warehouseId"
+        );
+
+
+        // дефолты пользователя (НЕ ЛОМАЕМ МОДАЛКУ, если API недоступен)
+        try {
+            const defs = await CT_json("/api/user/cargo-defaults/");
+            if (defs.cargo_status) {
+                AC_el("cargoStatusInput").value = defs.cargo_status.name;
+                AC_state.cargoStatusId = defs.cargo_status.id;
+            }
+            if (defs.packaging_type) {
+                AC_el("packagingTypeInput").value = defs.packaging_type.name;
+                AC_state.packagingTypeId = defs.packaging_type.id;
+            }
+            if (defs.warehouse) {
+                AC_el("warehouseInput").value = defs.warehouse.name;
+                AC_state.warehouseId = defs.warehouse.id;
+            }
+        } catch (e) {
+            // дефолты не критичны — просто пропускаем
+        }
+
     }
 
 
@@ -539,7 +852,12 @@ function renderAddCargoModal(isEdit = false) {
 
     function AC_refreshSaveEnabled() {
         const ids = Array.from(AC_state.selectedProductIds);
-        const canSave = AC_state.clientId && ids.length > 0;
+        const canSave =
+            AC_state.clientId &&
+            ids.length > 0 &&
+            AC_state.cargoStatusId &&
+            AC_state.packagingTypeId &&
+            AC_state.warehouseId;
         AC_el("addCargoSaveBtn").disabled = !canSave;
 
         if (!canSave) {
@@ -634,6 +952,9 @@ function renderAddCargoModal(isEdit = false) {
             let payload = {
                 client_id: AC_state.clientId,
                 product_ids: productIds,
+                cargo_status_id: AC_state.cargoStatusId,
+                packaging_type_id: AC_state.packagingTypeId,
+                warehouse_id: AC_state.warehouseId,
             };
 
             if (AC_state.mode === "create") {
