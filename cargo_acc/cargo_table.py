@@ -169,13 +169,21 @@ def cargos_table_view(request):
         if not uniq_ids:
             return JsonResponse({"error": "product_ids required"}, status=400)
 
-        qs_products = Product.objects.filter(
-            company=company,
-            client_id=client_id,
-            id__in=uniq_ids,
-        ).filter(
-            Q(cargo_id__isnull=True) | Q(cargo_id=cargo.id)
-        )
+        if cargo_id:
+            qs_products = Product.objects.filter(
+                company=company,
+                client_id=client_id,
+                id__in=uniq_ids,
+            ).filter(
+                Q(cargo_id__isnull=True) | Q(cargo_id=cargo.id)
+            )
+        else:
+            qs_products = Product.objects.filter(
+                company=company,
+                client_id=client_id,
+                id__in=uniq_ids,
+                cargo_id__isnull=True,
+            )
 
         found_ids = list(qs_products.values_list("id", flat=True))
         if len(found_ids) != len(uniq_ids):
