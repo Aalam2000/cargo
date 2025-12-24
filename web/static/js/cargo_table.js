@@ -125,40 +125,60 @@ document.addEventListener("click", async (e) => {
     const win = window.open("", "_blank");
 
     win.document.write(`
-        <html>
-        <head>
-            <title>Print</title>
-            <style>
-                body {
-                    margin: 0;
-                    padding: 0;
-                    text-align: center;
-                }
-                .wrap {
-                    margin-top: 20px;
-                }
-                .code {
-                    margin-top: 12px;
-                    font-size: 18px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="wrap">
+    <html>
+    <head>
+    <title>Print</title>
+    <style>
+    @page {
+        margin: 0;
+    }
+    html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .wrap {
+        width: 90vw;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .qr img {
+        max-width: 100%;
+        max-height: 80%;
+    }
+    .code {
+        margin-top: 1vh;
+        font-size: 3vh;
+        text-align: center;
+        word-break: break-all;
+    }
+    </style>
+    </head>
+    <body>
+        <div class="wrap">
+            <div class="qr">
                 <img
-                    src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}"
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(code)}"
                     onload="setTimeout(() => window.print(), 100)"
                 >
-                <div class="code">${code}</div>
             </div>
-
-            <script>
-                window.onafterprint = () => {
-                    window.close();
-                };
-            </script>
-        </body>
-        </html>
+            <div class="code">${code}</div>
+        </div>
+    
+        <script>
+            window.onafterprint = () => window.close();
+        </script>
+    </body>
+    </html>
     `);
 
     win.document.close();
