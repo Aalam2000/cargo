@@ -536,3 +536,53 @@ button:hover, .btn:hover {
     padding: 20px 25px;
     margin-bottom: 25px;
 }
+
+/* === Раздельный скролл: слева фикс, справа прокрутка === */
+html, body {
+  height: 100%;
+  overflow: hidden; /* чтобы не скроллился весь экран */
+}
+
+.layout {
+  height: 100vh;
+  display: flex; /* если уже flex — повтор не повредит */
+  min-height: 0; /* важно для корректного overflow у детей */
+}
+
+/* Левая панель: фиксируем по высоте окна */
+.sidebar {
+  height: 100vh;
+  overflow-y: hidden; /* можно заменить на auto, если когда-то станет много пунктов */
+  flex: 0 0 auto;
+}
+
+/* Правая часть: скролл только здесь */
+.content {
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+  min-height: 0; /* важно */
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.layout {
+  height: 100vh;
+  min-height: 0;
+}
+
+.sidebar {
+  height: 100vh;
+  overflow-x: visible;  /* чтобы бургер-ухо не резалось */
+  overflow-y: hidden;   /* слева скролл не нужен */
+}
+
+.content {
+  height: 100vh;
+  overflow-y: auto;
+  min-height: 0;
+}
