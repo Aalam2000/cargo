@@ -176,5 +176,3 @@ Client ─┬──< Cargo >──┬──< CargoMovement >── TransportBill
 ```
 
 ---
-
-Хочешь, чтобы я сразу сохранил этот текст в виде нового `README.md` для проекта (в /README.md, заменив старый)?
