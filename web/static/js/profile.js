@@ -10,12 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
+
       try {
         const res = await fetch(window.location.pathname, {
           method: "POST",
           body: fd,
           headers: { "X-Requested-With": "XMLHttpRequest" },
         });
+
         if (res.ok) {
           alert("✅ Профиль успешно сохранён");
         } else {
@@ -60,12 +62,13 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/accounts/api/generate_qr_payment/", { method: "POST" });
         const data = await res.json();
+
         if (data.qr_url) {
           const html = `
             <div class="modal">
               <div class="modal-header">Оплата по QR</div>
               <div class="modal-body text-center">
-                <img src="${data.qr_url}" alt="QR" style="width:280px;height:280px;display:block;margin:auto;">
+                <img src="${data.qr_url}" alt="QR" style="width:280px;height:280px;margin:auto;display:block;">
                 <p>Отсканируйте QR для оплаты через СБП</p>
               </div>
               <div class="modal-footer">
@@ -73,37 +76,38 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
             </div>`;
           openModal({ html, modalName: "qr" });
-        } else alert("Не удалось получить QR-код");
+        } else {
+          alert("Не удалось получить QR-код");
+        }
       } catch (e) {
         alert("Ошибка: " + e.message);
       }
     });
   }
+
+  // === Переключение типа клиента (только по change) ===
+  const typeInputs = document.querySelectorAll('input[name="client_type"]');
+  if (typeInputs.length > 0) {
+    typeInputs.forEach((radio) => {
+      radio.addEventListener("change", toggleClientType);
+    });
+  }
 });
 
-// === Переключение типа клиента ===
+// === Переключение блоков клиента ===
 function toggleClientType() {
-    const type = document.querySelector('input[name="client_type"]:checked').value;
-    const blockIndividual = document.getElementById("block-individual");
-    const blockCompany = document.getElementById("block-company");
+  const checked = document.querySelector('input[name="client_type"]:checked');
+  if (!checked) return;
 
-    if (type === "individual") {
-        blockIndividual.style.display = "block";
-        blockCompany.style.display = "none";
-    } else {
-        blockIndividual.style.display = "none";
-        blockCompany.style.display = "block";
-    }
-}
+  const blockIndividual = document.getElementById("block-individual");
+  const blockCompany = document.getElementById("block-company");
+  if (!blockIndividual || !blockCompany) return;
 
-// === Инициализация блока типов клиента ===
-const typeInputs = document.querySelectorAll('input[name="client_type"]');
-
-if (typeInputs.length > 0) {
-    // Если пользователь — Клиент, у него есть переключатель
-    toggleClientType();
-
-    typeInputs.forEach(r => {
-        r.addEventListener("change", toggleClientType);
-    });
+  if (checked.value === "individual") {
+    blockIndividual.style.display = "block";
+    blockCompany.style.display = "none";
+  } else {
+    blockIndividual.style.display = "none";
+    blockCompany.style.display = "block";
+  }
 }

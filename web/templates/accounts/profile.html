@@ -4,233 +4,243 @@
 {% block title %}Профиль пользователя{% endblock %}
 
 {% block content %}
-    <div class="profile-card">
-        <form id="profile-form" method="POST" class="profile-form">
-            {% csrf_token %}
+<div class="profile-card">
+    <form id="profile-form" method="POST" class="profile-form">
+        {% csrf_token %}
 
-            <div class="profile-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                {% if user.role != "Client" %}
-                    <h1 class="profile-title">Профиль пользователя</h1>
-                {% endif %}
-                {% if user.role == "Client" %}
-                    <h3>Клиент: {{ request.user.client_code }}</h3>
-                    <div id="client-type-switch" style="display: flex; flex-direction: column; align-items: flex-end;">
-                        <label>
-                            <input type="radio" name="client_type" value="individual"
-                                   {% if user.client_type == 'individual' %}checked{% endif %}>
-                            Физ. лицо
-                        </label>
-                        <label>
-                            <input type="radio" name="client_type" value="company"
-                                   {% if user.client_type == 'company' %}checked{% endif %}>
-                            Юр. лицо
-                        </label>
-                    </div>
-                {% endif %}
+        <div class="profile-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+            {% if user.role != "Client" %}
+                <h1 class="profile-title">Профиль пользователя</h1>
+            {% endif %}
 
+            {% if user.role == "Client" %}
+                <h3>Клиент: {{ request.user.client_code }}</h3>
+
+                <div id="client-type-switch" style="display:flex;flex-direction:column;align-items:flex-end;">
+                    <label>
+                        <input type="radio"
+                               name="client_type"
+                               value="individual"
+                               required
+                               {% if user.client_type == 'individual' or not user.client_type %}checked{% endif %}>
+                        Физ. лицо
+                    </label>
+                    <label>
+                        <input type="radio"
+                               name="client_type"
+                               value="company"
+                               required
+                               {% if user.client_type == 'company' %}checked{% endif %}>
+                        Юр. лицо
+                    </label>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="profile-grid">
+
+            <!-- Общие поля -->
+            <div class="form-group">
+                <label for="first_name">Имя</label>
+                <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
             </div>
 
-            <div class="profile-grid">
-
-                <!-- Общие поля -->
-                {% if user.role == "Client" %}
-                    <div class="form-group">
-                        <label>Код клиента</label>
-                        <input type="text"
-                               class="form-control"
-                               value="{{ request.user.client_code }}"
-                               readonly>
-                    </div>
-
-                {% endif %}
-                <div class="form-group">
-                    <label for="first_name">Имя</label>
-                    <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="last_name">Фамилия</label>
-                    <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="phone">Телефон</label>
-                    <input type="text" id="phone" name="phone" value="{{ user.phone }}">
-                </div>
-
-                <div class="form-group">
-                    <label for="telegram">Telegram</label>
-                    <input type="text" id="telegram" name="telegram" value="{{ user.telegram }}">
-                </div>
-
-                <div class="form-group">
-                    <label for="whatsapp">WhatsApp</label>
-                    <input type="text" id="whatsapp" name="whatsapp" value="{{ user.whatsapp }}">
-                </div>
-
-                <div class="form-group">
-                    <label>Email</label>
-                    <p class="readonly">{{ user.email }}</p>
-                </div>
-
-                <div class="form-group">
-                    <label>Роль</label>
-                    <p class="readonly">{{ user.role }}</p>
-                </div>
-
-                <!-- Для Клиента -->
-                {% if user.role == "Client" %}
-
-                    <!-- Блок Физ. лицо -->
-                    <div id="block-individual" class="client-block">
-                        <div class="form-group">
-                            <label for="inn">ИНН</label>
-                            <input type="text" id="inn" name="inn" value="{{ user.inn }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="address">Адрес проживания</label>
-                            <input type="text" id="address" name="address" value="{{ user.address }}">
-                        </div>
-                    </div>
-
-                    <!-- Блок Юр. лицо -->
-                    <div id="block-company" class="client-block">
-                        <div class="form-group">
-                            <label for="company_name">Название компании</label>
-                            <input type="text" id="company_name" name="company_name" value="{{ user.company_name }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="inn">ИНН</label>
-                            <input type="text" id="inn" name="inn" value="{{ user.inn }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="ogrn">ОГРН</label>
-                            <input type="text" id="ogrn" name="ogrn" value="{{ user.ogrn }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="legal_address">Юридический адрес</label>
-                            <input type="text" id="legal_address" name="legal_address" value="{{ user.legal_address }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="actual_address">Фактический адрес</label>
-                            <input type="text" id="actual_address" name="actual_address" value="{{ user.actual_address }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="representative">Представитель (ФИО)</label>
-                            <input type="text" id="representative" name="representative" value="{{ user.representative }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="basis">Основание (Устав / доверенность)</label>
-                            <input type="text" id="basis" name="basis" value="{{ user.basis }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="bank_name">Банк</label>
-                            <input type="text" id="bank_name" name="bank_name" value="{{ user.bank_name }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="bic">БИК/SWIFT</label>
-                            <input type="text" id="bic" name="bic" value="{{ user.bic }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="account">Расчётный счёт</label>
-                            <input type="text" id="account" name="account" value="{{ user.account }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="corr_account">Корр. счёт</label>
-                            <input type="text" id="corr_account" name="corr_account" value="{{ user.corr_account }}">
-                        </div>
-                    </div>
-
-                {% endif %}
-
-                <!-- Для сотрудников компании -->
-                {% if user.role == "Admin" or user.role == "Operator" %}
-                    <div class="form-group">
-                        <label for="default_warehouse">Склад по умолчанию</label>
-                        <select id="default_warehouse" name="default_warehouse">
-                            {% for w in warehouses %}
-                                <option value="{{ w.id }}" {% if user.default_warehouse and user.default_warehouse.id == w.id %}selected{% endif %}>{{ w.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="default_cargo_type">Тип груза по умолчанию</label>
-                        <select id="default_cargo_type" name="default_cargo_type">
-                            {% for ct in cargo_types %}
-                                <option value="{{ ct.id }}" {% if user.default_cargo_type and user.default_cargo_type.id == ct.id %}selected{% endif %}>{{ ct.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="default_cargo_status">Статус груза по умолчанию</label>
-                        <select id="default_cargo_status" name="default_cargo_status">
-                            {% for cs in cargo_statuses %}
-                                <option value="{{ cs.id }}" {% if user.default_cargo_status and user.default_cargo_status.id == cs.id %}selected{% endif %}>{{ cs.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="default_packaging_type">Упаковка по умолчанию</label>
-                        <select id="default_packaging_type" name="default_packaging_type">
-                            {% for pt in packaging_types %}
-                                <option value="{{ pt.id }}" {% if user.default_packaging_type and user.default_packaging_type.id == pt.id %}selected{% endif %}>{{ pt.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="location">Локация (офис/склад)</label>
-                        <input type="text" id="location" name="location" value="{{ user.location }}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="work_hours">Рабочие часы</label>
-                        <input type="text" id="work_hours" name="work_hours" value="{{ user.work_hours }}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="notes">Примечание</label>
-                        <textarea id="notes" name="notes" rows="3">{{ user.notes }}</textarea>
-                    </div>
-                {% endif %}
+            <div class="form-group">
+                <label for="last_name">Фамилия</label>
+                <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required>
             </div>
 
-            <!-- Блок кнопок -->
-            <div class="profile-actions">
-                <button type="submit" class="btn">💾 Сохранить</button>
-
-                {% if user.role == "Client" %}
-                    <button type="button" id="btn-contract" class="btn">📄 Договор</button>
-                    <button type="button" id="btn-sign" class="btn btn-cancel">✍️ Подписать</button>
-                    <button type="button" id="btn-pay" class="btn">💳 Оплатить по QR</button>
-                {% endif %}
+            <div class="form-group">
+                <label for="phone">Телефон</label>
+                <input type="text" id="phone" name="phone" value="{{ user.phone }}">
             </div>
-        </form>
 
-        {% if user.role == "Client" %}
-            <div id="contract-status" class="text-center" style="margin-top:15px;">
-                {% if user.contract_signed %}
-                    <span style="color:green;font-weight:600;">✅ Договор подписан</span>
-                {% else %}
-                    <span style="color:#b00;font-weight:600;">⚠️ Договор не подписан — доступ к товарам и оплатам ограничен</span>
-                {% endif %}
+            <div class="form-group">
+                <label for="telegram">Telegram</label>
+                <input type="text" id="telegram" name="telegram" value="{{ user.telegram }}">
             </div>
-        {% endif %}
-    </div>
 
-    <script defer src="{% static 'js/profile.js' %}"></script>
+            <div class="form-group">
+                <label for="whatsapp">WhatsApp</label>
+                <input type="text" id="whatsapp" name="whatsapp" value="{{ user.whatsapp }}">
+            </div>
+
+            <div class="form-group">
+                <label>Email</label>
+                <p class="readonly">{{ user.email }}</p>
+            </div>
+
+            <div class="form-group">
+                <label>Роль</label>
+                <p class="readonly">{{ user.role }}</p>
+            </div>
+
+            {% if user.role == "Client" %}
+                <hr class="profile-separator">
+
+                <div class="form-group">
+                    <label for="inn">ИНН</label>
+                    <input type="text" id="inn" name="inn" value="{{ user.inn }}">
+                </div>
+
+                <!-- Физ. лицо -->
+                <div id="block-individual"
+                     class="client-block"
+                     style="{% if user.client_type != 'individual' %}display:none;{% endif %}">
+                    <div class="form-group">
+                        <label for="address">Адрес проживания</label>
+                        <input type="text" id="address" name="address" value="{{ user.address }}">
+                    </div>
+                </div>
+
+                <!-- Юр. лицо -->
+                <div id="block-company"
+                     class="client-block"
+                     style="{% if user.client_type != 'company' %}display:none;{% endif %}">
+
+                    <div class="form-group">
+                        <label for="company_name">Название компании</label>
+                        <input type="text" id="company_name" name="company_name" value="{{ user.company_name }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ogrn">ОГРН</label>
+                        <input type="text" id="ogrn" name="ogrn" value="{{ user.ogrn }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="legal_address">Юридический адрес</label>
+                        <input type="text" id="legal_address" name="legal_address" value="{{ user.legal_address }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="actual_address">Фактический адрес</label>
+                        <input type="text" id="actual_address" name="actual_address" value="{{ user.actual_address }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="representative">Представитель (ФИО)</label>
+                        <input type="text" id="representative" name="representative" value="{{ user.representative }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="basis">Основание (Устав / доверенность)</label>
+                        <input type="text" id="basis" name="basis" value="{{ user.basis }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bank_name">Банк</label>
+                        <input type="text" id="bank_name" name="bank_name" value="{{ user.bank_name }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bic">БИК / SWIFT</label>
+                        <input type="text" id="bic" name="bic" value="{{ user.bic }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="account">Расчётный счёт</label>
+                        <input type="text" id="account" name="account" value="{{ user.account }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="corr_account">Корр. счёт</label>
+                        <input type="text" id="corr_account" name="corr_account" value="{{ user.corr_account }}">
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if user.role == "Admin" or user.role == "Operator" %}
+                <hr class="profile-separator">
+
+                <div class="form-group">
+                    <label for="default_warehouse">Склад по умолчанию</label>
+                    <select id="default_warehouse" name="default_warehouse">
+                        {% for w in warehouses %}
+                            <option value="{{ w.id }}"
+                                {% if user.default_warehouse and user.default_warehouse.id == w.id %}selected{% endif %}>
+                                {{ w.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="default_cargo_type">Тип груза по умолчанию</label>
+                    <select id="default_cargo_type" name="default_cargo_type">
+                        {% for ct in cargo_types %}
+                            <option value="{{ ct.id }}"
+                                {% if user.default_cargo_type and user.default_cargo_type.id == ct.id %}selected{% endif %}>
+                                {{ ct.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="default_cargo_status">Статус груза по умолчанию</label>
+                    <select id="default_cargo_status" name="default_cargo_status">
+                        {% for cs in cargo_statuses %}
+                            <option value="{{ cs.id }}"
+                                {% if user.default_cargo_status and user.default_cargo_status.id == cs.id %}selected{% endif %}>
+                                {{ cs.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="default_packaging_type">Упаковка по умолчанию</label>
+                    <select id="default_packaging_type" name="default_packaging_type">
+                        {% for pt in packaging_types %}
+                            <option value="{{ pt.id }}"
+                                {% if user.default_packaging_type and user.default_packaging_type.id == pt.id %}selected{% endif %}>
+                                {{ pt.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Локация</label>
+                    <input type="text" id="location" name="location" value="{{ user.location }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="work_hours">Рабочие часы</label>
+                    <input type="text" id="work_hours" name="work_hours" value="{{ user.work_hours }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Примечание</label>
+                    <textarea id="notes" name="notes" rows="3">{{ user.notes }}</textarea>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="profile-actions">
+            <button type="submit" class="btn">💾 Сохранить</button>
+
+            {% if user.role == "Client" %}
+                <button type="button" id="btn-contract" class="btn">📄 Договор</button>
+                <button type="button" id="btn-sign" class="btn btn-cancel">✍️ Подписать</button>
+                <button type="button" id="btn-pay" class="btn">💳 Оплатить по QR</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if user.role == "Client" %}
+        <div id="contract-status" class="text-center" style="margin-top:15px;">
+            {% if user.contract_signed %}
+                <span style="color:green;font-weight:600;">✅ Договор подписан</span>
+            {% else %}
+                <span style="color:#b00;font-weight:600;">
+                    ⚠️ Договор не подписан — доступ к товарам и оплатам ограничен
+                </span>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<script defer src="{% static 'js/profile.js' %}"></script>
 {% endblock %}
