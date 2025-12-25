@@ -47,9 +47,10 @@ async function PT_fetch() {
     const f_warehouse = document.getElementById("filterWarehouse").value.trim();
 
     if (f_code) url.searchParams.set("filter[product_code]", f_code);
-    if (f_client) url.searchParams.set("filter[client__client_code]", f_client);
-    if (f_cargo) url.searchParams.set("filter[cargo__cargo_code]", f_cargo);
-    if (f_warehouse) url.searchParams.set("filter[warehouse__name]", f_warehouse);
+    if (f_client) url.searchParams.set("filter[client]", f_client);
+    if (f_cargo) url.searchParams.set("filter[cargo]", f_cargo);
+    if (f_warehouse) url.searchParams.set("filter[warehouse]", f_warehouse);
+
 
     const res = await fetch(url);
     return await res.json();

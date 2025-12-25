@@ -43,9 +43,6 @@ def profile_view(request):
             user.default_cargo_status_id = request.POST.get('default_cargo_status') or user.default_cargo_status_id
             user.default_packaging_type_id = request.POST.get(
                 'default_packaging_type') or user.default_packaging_type_id
-            user.location = request.POST.get('location', user.location)
-            user.work_hours = request.POST.get('work_hours', user.work_hours)
-            user.notes = request.POST.get('notes', user.notes)
 
         user.save()
 

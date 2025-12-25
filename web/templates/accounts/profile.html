@@ -41,11 +41,6 @@
 
             <!-- Общие поля -->
             <div class="form-group">
-                <label for="first_name">Имя</label>
-                <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
-            </div>
-
-            <div class="form-group">
                 <label for="last_name">Фамилия</label>
                 <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required>
             </div>
@@ -206,15 +201,6 @@
                     <input type="text" id="location" name="location" value="{{ user.location }}">
                 </div>
 
-                <div class="form-group">
-                    <label for="work_hours">Рабочие часы</label>
-                    <input type="text" id="work_hours" name="work_hours" value="{{ user.work_hours }}">
-                </div>
-
-                <div class="form-group">
-                    <label for="notes">Примечание</label>
-                    <textarea id="notes" name="notes" rows="3">{{ user.notes }}</textarea>
-                </div>
             {% endif %}
         </div>
 

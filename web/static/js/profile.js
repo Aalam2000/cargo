@@ -21,7 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (res.ok) {
           alert("✅ Профиль успешно сохранён");
         } else {
-          alert("Ошибка при сохранении профиля");
+          const text = await res.text();
+          console.error("Profile save error:", res.status, text);
+          alert(`Ошибка при сохранении профиля (${res.status}). Смотри Console.`);
         }
       } catch (err) {
         alert("Ошибка сети: " + err.message);
