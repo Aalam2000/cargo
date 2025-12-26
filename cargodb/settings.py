@@ -34,9 +34,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://bonablog.ru",
     "https://www.bonablog.ru",
     "https://185.169.54.164",
-    "http://bonablog.ru",
-    "http://www.bonablog.ru",
-    "http://185.169.54.164",
+    "https://crm.cargonumber1.ru",
 ]
 
 
@@ -175,4 +173,4 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = EMAIL_HOST_USER
 
-SITE_URL = "https://bonablog.ru/"
+SITE_URL = os.getenv("SITE_URL", "https://bonablog.ru/").rstrip("/") + "/"

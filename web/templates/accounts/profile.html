@@ -41,6 +41,11 @@
 
             <!-- Общие поля -->
             <div class="form-group">
+                    <label for="first_name">Имя</label>
+                    <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}" required>
+                </div>
+
+            <div class="form-group">
                 <label for="last_name">Фамилия</label>
                 <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}" required>
             </div>
@@ -206,6 +211,7 @@
 
         <div class="profile-actions">
             <button type="submit" class="btn">💾 Сохранить</button>
+            <button type="button" id="btn-password" class="btn btn-cancel">Сменить пароль</button>
 
             {% if user.role == "Client" %}
                 <button type="button" id="btn-contract" class="btn">📄 Договор</button>
