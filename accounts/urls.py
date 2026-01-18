@@ -15,4 +15,5 @@ urlpatterns = [
     # только для администратора
     path('api/files/<str:username>/', views_profile.list_user_files, name='list_user_files'),
     path('api/files/<str:username>/<str:filename>/', views_profile.download_user_file, name='download_user_file'),
+    path("cargochats/link/", views.cargochats_link, name="cargochats_link"),
 ]

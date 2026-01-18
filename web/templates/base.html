@@ -43,6 +43,7 @@
                     <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
                     <div class="admin-block">
                         <button onclick="window.open('/admin/', '_blank')" class="btn">Django Admin</button>
+                        <button id="cargochats-btn" class="menu-item">🤖 Чаты / AI-настройки</button>
                     </div>
 
                 {% elif user.role == "Operator" %}

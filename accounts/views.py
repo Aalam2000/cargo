@@ -1,9 +1,15 @@
 # accounts/views.py
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.contrib import messages
-from cargo_acc.models import Company, Warehouse, CargoType, CargoStatus, PackagingType
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import render, redirect
+from django.views.decorators.http import require_GET
+
+from accounts.services.chat_token import build_cargochats_token
 from cargo_acc.company_utils import get_user_company
+from cargo_acc.models import Company, Warehouse, CargoType, CargoStatus, PackagingType
+
 
 @login_required
 def profile_view(request):
@@ -58,4 +64,24 @@ def profile_view(request):
         'cargo_types': CargoType.objects.filter(company=company),
         'cargo_statuses': CargoStatus.objects.filter(company=company),
         'packaging_types': PackagingType.objects.filter(company=company),
+    })
+
+
+@require_GET
+def cargochats_link(request):
+    user = request.user
+    if not user.is_authenticated or user.role != "Admin":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    company = get_user_company(request)
+    if not company:
+        return JsonResponse({"error": "company_not_found"}, status=400)
+
+    token = build_cargochats_token(
+        company_id=company.id,
+        user_id=user.id,
+    )
+
+    return JsonResponse({
+        "url": f"{settings.CARGOCHATS_URL}?token={token}"
     })

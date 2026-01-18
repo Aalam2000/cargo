@@ -175,3 +175,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = EMAIL_HOST_USER
 
 SITE_URL = os.getenv("SITE_URL", "https://crm.dadaexpo.ru/").rstrip("/") + "/"
+
+# === CargoChats SSO ===
+CARGOCHATS_URL = "https://openai.dadaexpo.ru/ui/resources"
+CARGOCHATS_JWT_SECRET = os.getenv("CARGOCHATS_JWT_SECRET", SECRET_KEY)

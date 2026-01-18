@@ -313,3 +313,21 @@ window.toggleSidebar = function () {
     // ПК версия — используем .collapsed
     sidebar.classList.toggle('collapsed');
 };
+
+document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("cargochats-btn");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+        try {
+            const r = await fetch("/accounts/cargochats/link/", {
+                credentials: "same-origin"
+            });
+            if (!r.ok) throw new Error("forbidden");
+            const data = await r.json();
+            window.location.href = data.url;
+        } catch (e) {
+            alert("Ошибка доступа к AI-настройкам");
+        }
+    });
+});
