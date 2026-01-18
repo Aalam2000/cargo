@@ -190,6 +190,9 @@ button:hover, .btn:hover {
     background: var(--accent-dark);
 }
 
+.admin-block button + button {
+    margin-top: 8px;
+}
 
 .admin-block {
     margin-top: auto;
