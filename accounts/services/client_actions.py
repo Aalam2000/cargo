@@ -11,7 +11,7 @@ from django.utils.crypto import get_random_string
 import os
 import threading
 import requests
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from cargo_acc.models import Client
 from cargo_acc.services.code_generator import generate_client_code
 
@@ -114,7 +114,6 @@ def send_client_email_notification(
             "Если у вас возникнут вопросы — свяжитесь с вашим менеджером."
         )
 
-
     elif notification_type == "invite_register":
 
         subject = "Вы зарегистрированы в системе Cargo"
@@ -141,10 +140,8 @@ def send_client_email_notification(
 
         )
 
-
     else:
         return  # неизвестный тип — молча выходим
-
 
     try:
         send_mail(
@@ -173,47 +170,51 @@ def send_tg_message(chat_id: str, text: str) -> None:
         logger.exception(f"Telegram send failed: {e}")
 
 
-@transaction.atomic
-def create_client_with_user(*, email: str, operator_user: CustomUser, name: str = "") -> str:
+def _create_client_with_user_once(*, email: str, operator_user: CustomUser, name: str = "") -> str:
+    """
+    Одна попытка создания клиента/пользователя в транзакции.
+    Внешняя функция делает retry при IntegrityError.
+    """
     email = (email or "").strip()
     if not email:
         return "❗ E-mail пустой."
 
-    # 1) Пользователь существует?
-    user = CustomUser.objects.filter(email__iexact=email).first()
-    if user:
-        send_client_email_notification(email=email, notification_type="invite_visit", operator_user=None)
-        return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
+    with transaction.atomic():
+        # 1) Пользователь существует?
+        user = CustomUser.objects.filter(email__iexact=email).first()
+        if user:
+            send_client_email_notification(email=email, notification_type="invite_visit", operator_user=None)
+            return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
 
-    # 2) Создаём нового пользователя (БЕЗ create_user)
-    raw_password = get_random_string(12)
+        # 2) Создаём нового пользователя (БЕЗ create_user)
+        raw_password = get_random_string(12)
 
-    user = CustomUser.objects.create(
-        email=email,
-        role="Client",
-        company=operator_user.company,
-        first_name=name or "",
-        is_active=True,
-    )
+        user = CustomUser.objects.create(
+            email=email,
+            role="Client",
+            company=operator_user.company,
+            first_name=name or "",
+            is_active=True,
+        )
 
-    user.set_password(raw_password)
-    user.save(update_fields=["password"])
+        user.set_password(raw_password)
+        user.save(update_fields=["password"])
 
-    # 3) Генерируем код клиента (нумератор)
-    client_code = generate_client_code(operator_user.company)
+        # 3) Генерируем код клиента (атомарно, с блокировкой Company)
+        client_code = generate_client_code(operator_user.company)
 
-    # 4) Создаём клиента
-    client = Client.objects.create(
-        company=operator_user.company,
-        client_code=client_code,
-    )
+        # 4) Создаём клиента
+        client = Client.objects.create(
+            company=operator_user.company,
+            client_code=client_code,
+        )
 
-    # 5) Привязываем
-    user.linked_client = client
-    user.client_code = client_code
-    user.save(update_fields=["linked_client", "client_code"])
+        # 5) Привязываем
+        user.linked_client = client
+        user.client_code = client_code
+        user.save(update_fields=["linked_client", "client_code"])
 
-    # 6) Письмо новому
+    # 6) Письмо новому (вне транзакции, чтобы не держать блокировки)
     send_client_email_notification(
         email=email,
         notification_type="invite_register",
@@ -229,6 +230,27 @@ def create_client_with_user(*, email: str, operator_user: CustomUser, name: str 
         f"🔑 Пароль: {raw_password}\n"
         "📩 Данные отправлены клиенту на почту."
     )
+
+
+def create_client_with_user(*, email: str, operator_user: CustomUser, name: str = "") -> str:
+    """
+    Создание клиента с защитным retry на случай гонок/параллельных путей создания.
+
+    Критично: IntegrityError может прилететь не только по client_code,
+    но и по другим UNIQUE (например, email). В этом случае повтор обычно
+    безопасен: при повторе мы попадём в ветку "пользователь уже существует".
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, 4):  # 1–3 попытки
+        try:
+            return _create_client_with_user_once(email=email, operator_user=operator_user, name=name)
+        except IntegrityError as e:
+            last_exc = e
+            logger.warning(f"IntegrityError on create_client_with_user attempt={attempt}: {e}")
+            continue
+
+    logger.exception(f"create_client_with_user failed after retries: {last_exc}")
+    return "❗ Не удалось создать клиента из-за конкурирующих операций. Попробуйте ещё раз."
 
 
 def enqueue_create_client_action(*, telegram_id: str, operator_user_id: int, email: str, name: str = "", lang: str = "") -> None:

@@ -18,6 +18,8 @@ class Company(models.Model):
     description = models.CharField(max_length=500, blank=True, null=True)
 
     # === Новые поля для кодогенерации ===
+    # Важно: client_counter должен обновляться атомарно (см. cargo_acc/services/code_generator.py),
+    # где Company берётся через select_for_update() в транзакции.
     prefix = models.CharField(max_length=2, unique=True, verbose_name="Префикс компании")
     client_counter = models.PositiveIntegerField(default=0)
 
