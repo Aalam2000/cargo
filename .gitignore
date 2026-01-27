@@ -65,3 +65,7 @@ Thumbs.db
 index.nginx-debian.html
 .env.*
 !**/migrations/__init__.py
+.aider/
+/.aider.tags.cache.v4/cache.db-shm
+/.aider.tags.cache.v4/cache.db-wal
+/.aider.tags.cache.v4/cache.db

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from django.db import transaction
-from django.db.models import F
+from django.db import transaction, connection
 
 from cargo_acc.models import Company, Client, Product, Cargo
 
@@ -16,35 +15,71 @@ def _num(n: int, length: int) -> str:
 @transaction.atomic
 def generate_client_code(company: Company) -> str:
     """
-    Атомарная генерация client_code, устойчивая к параллельным запросам.
+    Атомарная генерация client_code с заполнением "дыр".
 
-    Алгоритм:
-    - блокируем строку Company через select_for_update();
-    - подбираем следующий код на основе company.prefix + zfill(company.client_counter + 1);
-    - проверяем уникальность в cargo_acc_client.client_code;
-    - если занят — увеличиваем счётчик и повторяем;
-    - при успехе сохраняем company.client_counter.
+    Гарантии:
+    - блокируем строку Company (select_for_update) => параллельные запросы не дают дублей;
+    - выбираем минимальный свободный номер (заполняем дырки);
+    - client_counter повышаем только если выдали номер больше текущего counter.
     """
-    # Важно: работаем с "свежей" строкой компании под блокировкой.
     locked_company = Company.objects.select_for_update().get(pk=company.pk)
 
     prefix = (locked_company.prefix or "").upper().strip()
     if not prefix:
-        # Явно падаем, чтобы не генерировать мусорные коды.
         raise ValueError("Company.prefix пустой — невозможно сгенерировать client_code")
 
-    # Стартуем со следующего значения
-    counter = int(locked_company.client_counter or 0)
+    # Важно: client_code уникален глобально, но номера ищем по префиксу компании.
+    # Формат: <PREFIX><6 цифр>, например KH000010.
+    regex = rf'^{prefix}[0-9]{{6}}$'
+    like_prefix = f"{prefix}%"
 
-    while True:
-        counter += 1
-        candidate = f"{prefix}{_num(counter, 6)}"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            WITH used AS (
+                SELECT substring(client_code from '[0-9]{6}$')::int AS n
+                FROM cargo_acc_client
+                WHERE client_code LIKE %s
+                  AND client_code ~ %s
+            ),
+            bounds AS (
+                SELECT GREATEST(
+                    COALESCE((SELECT max(n) FROM used), 0),
+                    %s
+                ) AS hi
+            ),
+            missing AS (
+                SELECT gs.n
+                FROM bounds b
+                CROSS JOIN generate_series(1, b.hi) AS gs(n)
+                LEFT JOIN used u ON u.n = gs.n
+                WHERE u.n IS NULL
+                ORDER BY gs.n
+                LIMIT 1
+            )
+            SELECT
+                COALESCE((SELECT n FROM missing), (SELECT hi + 1 FROM bounds)) AS next_n
+            """,
+            [like_prefix, regex, int(locked_company.client_counter or 0)],
+        )
+        next_n = int(cursor.fetchone()[0])
 
-        # Проверка уникальности по всей таблице (client_code уникален глобально)
-        if not Client.objects.filter(client_code=candidate).exists():
-            locked_company.client_counter = counter
-            locked_company.save(update_fields=["client_counter"])
-            return candidate
+    client_code = f"{prefix}{_num(next_n, 6)}"
+
+    # Подстраховка: если каким-то другим путём уже заняли (крайне редко),
+    # просто повторим (сработает retry в create_client_with_user, но лучше тут).
+    # Без бесконечного цикла: несколько шагов.
+    for _ in range(5):
+        if not Client.objects.filter(client_code=client_code).exists():
+            if next_n > int(locked_company.client_counter or 0):
+                locked_company.client_counter = next_n
+                locked_company.save(update_fields=["client_counter"])
+            return client_code
+
+        next_n += 1
+        client_code = f"{prefix}{_num(next_n, 6)}"
+
+    raise RuntimeError("Не удалось подобрать уникальный client_code за 5 попыток")
 
 
 # === Товар клиента: <ClientCode>-000001 ===
