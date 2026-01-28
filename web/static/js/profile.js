@@ -31,17 +31,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // === Генерация и открытие договора ===
+  // === Открытие страницы договора ===
   if (btnContract) {
-    btnContract.addEventListener("click", async () => {
-      try {
-        const res = await fetch("/accounts/api/generate_contract/", { method: "POST" });
-        const data = await res.json();
-        if (data.url) window.open(data.url, "_blank");
-        else alert("Не удалось создать договор");
-      } catch (e) {
-        alert("Ошибка: " + e.message);
-      }
+    btnContract.addEventListener("click", () => {
+      window.location.href = "/accounts/contract/";
     });
   }
 

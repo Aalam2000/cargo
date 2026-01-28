@@ -499,7 +499,6 @@ class ProductsTableViewSet(ViewSet):
         except Product.DoesNotExist:
             return Response({"error": "not_found"}, status=404)
 
-        # ЛОГИ (универсальная функция)
         meta = get_log_meta("Product", product.id)
 
         return Response({
@@ -507,11 +506,18 @@ class ProductsTableViewSet(ViewSet):
             "product_code": product.product_code,
             "client": product.client.client_code if product.client else "",
 
-            # ДАТА И АВТОР ЗАПИСИ — СЮДА ПОЛЕ ДЛЯ МОДАЛКИ
             "record_date": meta["created_at"],
             "created_by": meta["created_by"],
 
+            # === ВАЖНО: ID-шники справочников (для селектов в edit-модалке)
+            "warehouse_id": product.warehouse_id,
+            "cargo_type_id": product.cargo_type_id,
+            "cargo_status_id": product.cargo_status_id,
+            "packaging_type_id": product.packaging_type_id,
+
             "cargo_description": product.cargo_description,
+            # TODO: migrate departure_place/destination_place from TEXT to FK -> Warehouse (departure_warehouse_id / destination_warehouse_id)
+            # TODO: after migration, return departure_warehouse_id / destination_warehouse_id and optionally expand to {id,name} for UI
             "departure_place": product.departure_place,
             "destination_place": product.destination_place,
             "weight": product.weight,
@@ -529,6 +535,7 @@ class ProductsTableViewSet(ViewSet):
     def create(self, request):
         data = request.data
         company = get_user_company(request)
+        u = request.user
 
         client_id = data.get("client_id")
         if not client_id:
@@ -539,18 +546,22 @@ class ProductsTableViewSet(ViewSet):
         except Client.DoesNotExist:
             return Response({"error": "client_not_found"}, status=404)
 
+        warehouse_id = data.get("warehouse_id") or getattr(u, "default_warehouse_id", None)
+        cargo_type_id = data.get("cargo_type_id") or getattr(u, "default_cargo_type_id", None)
+        cargo_status_id = data.get("cargo_status_id") or getattr(u, "default_cargo_status_id", None)
+        packaging_type_id = data.get("packaging_type_id") or getattr(u, "default_packaging_type_id", None)
+
         p = Product.objects.create(
             client=client,
             company=company,
-            warehouse_id=data.get("warehouse_id"),
-            cargo_type_id=data.get("cargo_type_id"),
-            cargo_status_id=data.get("cargo_status_id"),
-            packaging_type_id=data.get("packaging_type_id"),
+            warehouse_id=warehouse_id,
+            cargo_type_id=cargo_type_id,
+            cargo_status_id=cargo_status_id,
+            packaging_type_id=packaging_type_id,
             product_code=data.get("product_code"),
             comment=data.get("comment", "")
         )
 
-        # ЛОГ СОЗДАНИЯ
         SystemActionLog.objects.create(
             company=company,
             model_name="Product",
@@ -569,7 +580,6 @@ class ProductsTableViewSet(ViewSet):
     # UPDATE — обновление товара + логирование diff
     # ----------------------------------------------------
     def update(self, request, pk=None):
-
         company = get_user_company(request)
 
         try:
@@ -580,7 +590,10 @@ class ProductsTableViewSet(ViewSet):
 
         data = request.data
 
+        # TODO: migrate departure_place/destination_place from TEXT to FK -> Warehouse (departure_warehouse_id / destination_warehouse_id)
+        # TODO: after migration, accept and persist departure_warehouse_id / destination_warehouse_id instead of text fields
         fields = [
+            "warehouse_id", "cargo_type_id", "cargo_status_id", "packaging_type_id",
             "cargo_description", "departure_place", "destination_place",
             "weight", "volume", "cost", "delivery_time",
             "shipping_date", "delivery_date", "comment"
@@ -588,7 +601,10 @@ class ProductsTableViewSet(ViewSet):
 
         for f in fields:
             if f in data:
-                setattr(product, f, data[f])
+                val = data[f]
+                if val == "":
+                    val = None
+                setattr(product, f, val)
 
         product.save()
 
@@ -599,7 +615,6 @@ class ProductsTableViewSet(ViewSet):
             if old_data.get(k) != new_data.get(k):
                 diff[k] = [old_data.get(k), new_data.get(k)]
 
-        # ЛОГ ИЗМЕНЕНИЯ
         SystemActionLog.objects.create(
             company=company,
             model_name="Product",
@@ -876,6 +891,10 @@ def api_user_cargo_defaults(request):
         "warehouse": (
             {"id": u.default_warehouse_id, "name": u.default_warehouse.name}
             if u.default_warehouse else None
+        ),
+        "cargo_type": (
+            {"id": u.default_cargo_type_id, "name": u.default_cargo_type.name}
+            if u.default_cargo_type else None
         ),
         "cargo_status": (
             {"id": u.default_cargo_status_id, "name": u.default_cargo_status.name}

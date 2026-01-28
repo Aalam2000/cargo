@@ -1,0 +1,139 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Договор {{ contract_number }}</title>
+  <link rel="stylesheet" href="{{ css_url }}">
+</head>
+<body>
+  <header class="hdr">
+    <div class="hdr__left">
+      <img class="logo" src="{{ logo_url }}" alt="logo">
+    </div>
+    <div class="hdr__right">
+      <div class="doc-title">ДОГОВОР № {{ contract_number }}</div>
+      <div class="doc-sub">Дата: {{ today_date }}</div>
+    </div>
+  </header>
+
+  <section class="block">
+    <h2>1. Стороны</h2>
+
+    <p>
+      <b>Исполнитель:</b>
+      {{ executor_name }}{% if executor_registration %}, рег. № {{ executor_registration }}{% endif %}
+      {% if executor_tax_id %}, ИНН {{ executor_tax_id }}{% endif %}
+      {% if executor_ogrn %}, ОГРН {{ executor_ogrn }}{% endif %}.
+    </p>
+
+    <p>
+      <b>Заказчик:</b>
+      {% if client_type == "company" %}
+        {{ client_company_name }}{% if client_inn %}, ИНН {{ client_inn }}{% endif %}{% if client_ogrn %}, ОГРН {{ client_ogrn }}{% endif %}.
+      {% else %}
+        {{ client_full_name }} (код клиента: {{ client_code }}).
+      {% endif %}
+    </p>
+  </section>
+
+  <section class="block">
+    <h2>2. Контакты</h2>
+    <table class="tbl">
+      <tr>
+        <th>Исполнитель</th>
+        <th>Заказчик</th>
+      </tr>
+      <tr>
+        <td>
+          {% if executor_email %}<div>Email: {{ executor_email }}</div>{% endif %}
+          {% if executor_phone %}<div>Тел: {{ executor_phone }}</div>{% endif %}
+        </td>
+        <td>
+          {% if client_email %}<div>Email: {{ client_email }}</div>{% endif %}
+          {% if client_phone %}<div>Тел: {{ client_phone }}</div>{% endif %}
+        </td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="block">
+    <h2>3. Адреса</h2>
+    <table class="tbl">
+      <tr>
+        <th>Исполнитель</th>
+        <th>Заказчик</th>
+      </tr>
+      <tr>
+        <td>
+          {% if executor_legal_address %}<div><b>Юр. адрес:</b> {{ executor_legal_address }}</div>{% endif %}
+          {% if executor_actual_address %}<div><b>Факт. адрес:</b> {{ executor_actual_address }}</div>{% endif %}
+        </td>
+        <td>
+          {% if client_type == "company" %}
+            {% if client_legal_address %}<div><b>Юр. адрес:</b> {{ client_legal_address }}</div>{% endif %}
+            {% if client_actual_address %}<div><b>Факт. адрес:</b> {{ client_actual_address }}</div>{% endif %}
+          {% else %}
+            <div>—</div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+  </section>
+
+  {% if client_type == "company" %}
+  <section class="block">
+    <h2>4. Банковские реквизиты Заказчика</h2>
+    <table class="tbl tbl--2col">
+      <tr><td>Банк</td><td>{{ client_bank_name }}</td></tr>
+      <tr><td>БИК / SWIFT</td><td>{{ client_bic }}</td></tr>
+      <tr><td>Р/с</td><td>{{ client_account }}</td></tr>
+      <tr><td>К/с</td><td>{{ client_corr_account }}</td></tr>
+    </table>
+  </section>
+  {% endif %}
+
+  <section class="block">
+    <h2>5. Подписи</h2>
+
+    <table class="tbl">
+      <tr>
+        <th>Исполнитель</th>
+        <th>Заказчик</th>
+      </tr>
+      <tr>
+        <td class="sign">
+          <div class="sign__line"></div>
+          <div class="sign__name">
+            {% if executor_representative_fullname %}
+              {{ executor_representative_fullname }}
+            {% elif executor_director_fullname %}
+              {{ executor_director_fullname }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+          {% if executor_representative_basis %}
+            <div class="sign__meta">{{ executor_representative_basis }}</div>
+          {% endif %}
+        </td>
+        <td class="sign">
+          <div class="sign__line"></div>
+          <div class="sign__name">
+            {% if client_type == "company" %}
+              {{ client_representative }}
+              {% if client_basis %}<div class="sign__meta">{{ client_basis }}</div>{% endif %}
+            {% else %}
+              {{ client_full_name }}
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+    </table>
+  </section>
+
+  <footer class="ftr">
+    <div>Договор сформирован автоматически в системе.</div>
+  </footer>
+</body>
+</html>

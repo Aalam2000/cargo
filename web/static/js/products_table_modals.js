@@ -11,9 +11,6 @@ function getCSRF() {
 // ===============================
 //   ADD PRODUCT MODAL
 // ===============================
-// ===============================
-//   ADD PRODUCT MODAL — новая версия
-// ===============================
 function openProductAdd() {
 
     const overlay = document.createElement("div");
@@ -87,11 +84,9 @@ function openProductAdd() {
         overlay.remove();
     };
 
-
     // ===============================
     //  LOAD REFERENCES (SELECTS)
     // ===============================
-
     async function loadRef(url, selectEl) {
         const r = await fetch(url);
         const j = await r.json();
@@ -103,16 +98,38 @@ function openProductAdd() {
         });
     }
 
-    loadRef("/api/warehouses/?page_size=9999", document.getElementById("add_warehouse"));
-    loadRef("/api/cargo-types/?page_size=9999", document.getElementById("add_cargo_type"));
-    loadRef("/api/cargo-statuses/?page_size=9999", document.getElementById("add_cargo_status"));
-    loadRef("/api/packaging-types/?page_size=9999", document.getElementById("add_packaging"));
+    const selWarehouse = document.getElementById("add_warehouse");
+    const selCargoType = document.getElementById("add_cargo_type");
+    const selCargoStatus = document.getElementById("add_cargo_status");
+    const selPackaging = document.getElementById("add_packaging");
 
+    const refPromises = [
+        loadRef("/api/warehouses/?page_size=9999", selWarehouse),
+        loadRef("/api/cargo-types/?page_size=9999", selCargoType),
+        loadRef("/api/cargo-statuses/?page_size=9999", selCargoStatus),
+        loadRef("/api/packaging-types/?page_size=9999", selPackaging),
+    ];
+
+    async function applyUserDefaults() {
+        try {
+            const r = await fetch("/api/user/cargo-defaults/", { credentials: "include" });
+            if (!r.ok) return;
+            const d = await r.json();
+
+            if (d.warehouse && d.warehouse.id) selWarehouse.value = String(d.warehouse.id);
+            if (d.cargo_type && d.cargo_type.id) selCargoType.value = String(d.cargo_type.id);
+            if (d.cargo_status && d.cargo_status.id) selCargoStatus.value = String(d.cargo_status.id);
+            if (d.packaging_type && d.packaging_type.id) selPackaging.value = String(d.packaging_type.id);
+        } catch (e) {
+            // молча, чтобы не ломать UX
+        }
+    }
+
+    Promise.all(refPromises).then(applyUserDefaults);
 
     // ===============================
     //  AUTOCOMPLETE CLIENT (как было)
     // ===============================
-
     const input = overlay.querySelector("#add_client_code");
 
     let dropdown = document.createElement("div");
@@ -150,7 +167,7 @@ function openProductAdd() {
 
         dropdown.querySelectorAll(".autocomplete-item").forEach(item => {
             item.addEventListener("mousedown", (e) => {
-                e.stopPropagation();             // блокируем "закрытие"
+                e.stopPropagation();
                 input.value = item.textContent.trim();
                 dropdown.classList.add("hidden");
                 setTimeout(() => dropdown.innerHTML = "", 50);
@@ -162,12 +179,11 @@ function openProductAdd() {
     input.addEventListener("focus", showDropdown);
 
     document.addEventListener("mousedown", (e) => {
-        if (e.target.closest(".autocomplete-item")) return;  // выбор элемента
+        if (e.target.closest(".autocomplete-item")) return;
         if (!dropdown.contains(e.target) && e.target !== input) {
             dropdown.classList.add("hidden");
         }
     });
-
 
     // ===============================
     //  SAVE
@@ -183,7 +199,7 @@ function openProductAdd() {
         const client = js1.results.find(c => c.client_code === clientCode);
         if (!client) return;
 
-        // генерируем код товара
+        // генерируем код нового товара
         const r2 = await fetch("/api/generate/product/", {
             method: "POST",
             credentials: "include",
@@ -207,10 +223,10 @@ function openProductAdd() {
                 client_id: client.id,
                 product_code: js2.product_code,
 
-                warehouse_id: document.getElementById("add_warehouse").value,
-                cargo_type_id: document.getElementById("add_cargo_type").value,
-                cargo_status_id: document.getElementById("add_cargo_status").value,
-                packaging_type_id: document.getElementById("add_packaging").value,
+                warehouse_id: selWarehouse.value,
+                cargo_type_id: selCargoType.value,
+                cargo_status_id: selCargoStatus.value,
+                packaging_type_id: selPackaging.value,
             })
         });
 
@@ -220,6 +236,7 @@ function openProductAdd() {
     };
 
 }
+
 
 async function loadFullProductAndEdit(productId) {
 
@@ -297,7 +314,7 @@ function stubEditProduct(product) {
 
             <div class="modal-body modal-fields">
 
-                <!-- INFORM FIELDS -->
+                <!-- INFO -->
                 <div class="modal-row">
                     <label>Код товара</label>
                     <div class="modal-info">${product.product_code}</div>
@@ -313,21 +330,49 @@ function stubEditProduct(product) {
                     <div class="modal-info">${product.record_date || ""}</div>
                 </div>
 
-                <!-- EDITABLE FIELDS -->
+                <!-- REFERENCES (справочники) -->
+                <div class="modal-row">
+                    <label>Склад *</label>
+                    <select id="edit_warehouse" class="modal-input"></select>
+                </div>
 
+                <div class="modal-row">
+                    <label>Тип груза *</label>
+                    <select id="edit_cargo_type" class="modal-input"></select>
+                </div>
+
+                <div class="modal-row">
+                    <label>Статус груза *</label>
+                    <select id="edit_cargo_status" class="modal-input"></select>
+                </div>
+
+                <div class="modal-row">
+                    <label>Тип упаковки *</label>
+                    <select id="edit_packaging" class="modal-input"></select>
+                </div>
+
+                <!-- EDITABLE -->
                 <div class="modal-row">
                     <label>Описание</label>
                     <input id="edit_description" class="modal-input" value="${product.cargo_description || ""}">
                 </div>
 
-                <div class="modal-row">
-                    <label>Пункт отправления</label>
-                    <input id="edit_departure" class="modal-input" value="${product.departure_place || ""}">
+                <div class="modal-row select-search-wrapper">
+                    <label>Пункт отправления (склад)</label>
+                    <input id="edit_departure"
+                           class="select-search-input modal-input"
+                           autocomplete="off"
+                           placeholder="Начните ввод..."
+                           value="${product.departure_place || ""}">
                 </div>
 
-                <div class="modal-row">
-                    <label>Пункт назначения</label>
-                    <input id="edit_destination" class="modal-input" value="${product.destination_place || ""}">
+                <div class="modal-row select-search-wrapper">
+                    <label>Пункт назначения (склад)</label>
+                    <input id="edit_destination"
+                           class="select-search-input modal-input"
+                           autocomplete="off"
+                           placeholder="Начните ввод..."
+                           value="${product.destination_place || ""}">
                 </div>
 
                 <div class="modal-row">
@@ -377,14 +422,133 @@ function stubEditProduct(product) {
 
     document.body.appendChild(overlay);
 
-    document.getElementById("edit_cancel").onclick = () => overlay.remove();
+    // ----------------------------
+    // helpers: load refs
+    // ----------------------------
+    async function loadRef(url, selectEl, selectedId) {
+        const r = await fetch(url, { credentials: "include" });
+        const j = await r.json();
+        const rows = j.results || j;
+
+        selectEl.innerHTML = "";
+
+        // пустой вариант (на всякий)
+        const emptyOpt = document.createElement("option");
+        emptyOpt.value = "";
+        emptyOpt.textContent = "—";
+        selectEl.appendChild(emptyOpt);
+
+        rows.forEach(row => {
+            const o = document.createElement("option");
+            o.value = row.id;
+            o.textContent = row.name;
+            selectEl.appendChild(o);
+        });
+
+        if (selectedId !== null && selectedId !== undefined) {
+            selectEl.value = String(selectedId);
+        }
+    }
+
+    // грузим справочники и выставляем текущие значения товара
+    loadRef("/api/warehouses/?page_size=9999", document.getElementById("edit_warehouse"), product.warehouse_id);
+    loadRef("/api/cargo-types/?page_size=9999", document.getElementById("edit_cargo_type"), product.cargo_type_id);
+    loadRef("/api/cargo-statuses/?page_size=9999", document.getElementById("edit_cargo_status"), product.cargo_status_id);
+    loadRef("/api/packaging-types/?page_size=9999", document.getElementById("edit_packaging"), product.packaging_type_id);
+
+    // ----------------------------
+    // Warehouses autocomplete (до 7 строк + скролл)
+    // ----------------------------
+    let warehousesCache = [];
+    async function loadWarehouses() {
+        if (warehousesCache.length) return warehousesCache;
+        const r = await fetch("/api/warehouses/?page_size=9999", { credentials: "include" });
+        const j = await r.json();
+        warehousesCache = j.results || j;
+        return warehousesCache;
+    }
+
+    function bindWarehouseAutocomplete(inputEl) {
+        const dropdown = document.createElement("div");
+        dropdown.className = "autocomplete-list hidden";
+        dropdown.style.position = "absolute";
+        dropdown.style.maxHeight = "224px";  // ~7 строк
+        dropdown.style.overflowY = "auto";
+        dropdown.style.zIndex = "10000";
+        overlay.appendChild(dropdown);
+
+        async function show() {
+            const list = await loadWarehouses();
+            const q = inputEl.value.trim().toLowerCase();
+
+            const filtered = q
+                ? list.filter(w => (w.name || "").toLowerCase().includes(q))
+                : list;
+
+            dropdown.innerHTML = filtered.length
+                ? filtered.map(w => `<div class="autocomplete-item">${w.name}</div>`).join("")
+                : `<div class="autocomplete-empty">Нет совпадений</div>`;
+
+            const rect = inputEl.getBoundingClientRect();
+            dropdown.style.top = (rect.top + rect.height) + "px";
+            dropdown.style.left = rect.left + "px";
+            dropdown.style.width = rect.width + "px";
+            dropdown.classList.remove("hidden");
+
+            dropdown.querySelectorAll(".autocomplete-item").forEach(item => {
+                item.addEventListener("mousedown", (e) => {
+                    e.stopPropagation();
+                    inputEl.value = item.textContent.trim();
+                    dropdown.classList.add("hidden");
+                    setTimeout(() => dropdown.innerHTML = "", 50);
+                });
+            });
+        }
+
+        inputEl.addEventListener("input", show);
+        inputEl.addEventListener("focus", show);
+
+        return dropdown;
+    }
+
+    const depInput = overlay.querySelector("#edit_departure");
+    const dstInput = overlay.querySelector("#edit_destination");
+
+    const depDropdown = bindWarehouseAutocomplete(depInput);
+    const dstDropdown = bindWarehouseAutocomplete(dstInput);
+
+    const onDocDown = (e) => {
+        if (e.target.closest(".autocomplete-item")) return;
+        if (!depDropdown.contains(e.target) && e.target !== depInput) depDropdown.classList.add("hidden");
+        if (!dstDropdown.contains(e.target) && e.target !== dstInput) dstDropdown.classList.add("hidden");
+    };
+    document.addEventListener("mousedown", onDocDown);
+
+    function cleanup() {
+        document.removeEventListener("mousedown", onDocDown);
+        overlay.remove();
+    }
+
+    // ----------------------------
+    // buttons
+    // ----------------------------
+    document.getElementById("edit_cancel").onclick = cleanup;
 
     document.getElementById("edit_save").onclick = async () => {
 
         const payload = {
+            // справочники (сохраняем ссылки/ID)
+            warehouse_id: document.getElementById("edit_warehouse").value || null,
+            cargo_type_id: document.getElementById("edit_cargo_type").value || null,
+            cargo_status_id: document.getElementById("edit_cargo_status").value || null,
+            packaging_type_id: document.getElementById("edit_packaging").value || null,
+
+            // обычные поля
             cargo_description: document.getElementById("edit_description").value.trim(),
-            departure_place: document.getElementById("edit_departure").value.trim(),
-            destination_place: document.getElementById("edit_destination").value.trim(),
+            // TODO: after backend migration to FK (departure_warehouse_id / destination_warehouse_id),
+            // TODO: store IDs instead of text and set these inputs based on returned warehouse objects.
+            departure_place: depInput.value.trim(),      // сейчас в модели это строка
+            destination_place: dstInput.value.trim(),    // сейчас в модели это строка
             weight: document.getElementById("edit_weight").value || null,
             volume: document.getElementById("edit_volume").value || null,
             cost: document.getElementById("edit_cost").value || null,
@@ -404,14 +568,12 @@ function stubEditProduct(product) {
             body: JSON.stringify(payload)
         });
 
-
-        overlay.remove();
+        cleanup();
         PT_reset();
         PT_load();
     };
-
-
 }
+
 
 
 function stubCalcFinance(product) {

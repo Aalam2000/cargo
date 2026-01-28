@@ -1,7 +1,8 @@
 # accounts/urls.py
 from django.urls import path
 from django.contrib.auth import views as auth_views
-from . import views, views_profile
+from . import views, views_profile, views_contract
+
 
 
 urlpatterns = [
@@ -11,6 +12,8 @@ urlpatterns = [
     path('api/send_sign_link/', views_profile.send_sign_link, name='send_sign_link'),
     path('api/generate_qr_payment/', views_profile.generate_qr_payment, name='generate_qr_payment'),
     path('contract/sign/<str:token>/', views_profile.sign_contract, name='sign_contract'),
+    path('contract/', views_contract.contract_page, name='contract_page'),
+
 
     # только для администратора
     path('api/files/<str:username>/', views_profile.list_user_files, name='list_user_files'),
