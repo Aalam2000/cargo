@@ -1,9 +1,7 @@
 services:
   cargo_app:
+    image: ghcr.io/aalam2000/cargodb:latest
     container_name: cargo_app
-    build:
-      context: .
-      dockerfile: Dockerfile
 
     command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 60
 
@@ -15,9 +13,6 @@ services:
       - "8000:8000"
 
     volumes:
-      # КОД С ДИСКА СЕРВЕРА
-      - /var/www/cargodb:/app
-      # persistent
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
 

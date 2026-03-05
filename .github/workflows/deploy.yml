@@ -1,59 +1,35 @@
-#.github/workflows/deploy.yml
-name: Deploy to Production Server
+name: Build and Deploy
 
 on:
   push:
     branches:
-      - master
+      - bonacargoprod
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH and rebuild Docker
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build image
+        run: docker build -t ghcr.io/aalam2000/cargodb:latest .
+
+      - name: Push image
+        run: docker push ghcr.io/aalam2000/cargodb:latest
+
+      - name: Deploy to server
         uses: appleboy/ssh-action@v0.1.5
         with:
-          host: 185.169.54.164
-          username: webmaster
+          host: 155.212.230.161
+          username: cargo
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            set -e
-
             cd /var/www/cargodb
-
-            echo "=== UPDATE CODE ==="
-            git fetch origin master
-            git reset --hard origin/master
-
-            echo "=== LOAD ENV ==="
-            export $(grep -v '^#' .env.prod | xargs)
-
-            echo "=== BACKUP POSTGRES (external DB) ==="
-            mkdir -p backups
-            PGPASSWORD="$DB_PASSWORD" pg_dump \
-              -h "$IP_POSTGRES" \
-              -p "$DB_PORT" \
-              -U "$DB_USER" \
-              "$DB_NAME" \
-              > backups/backup_$(date +%F_%H-%M-%S).sql
-
-            echo "=== ROTATE BACKUPS (keep last 3) ==="
-            ls -t backups/*.sql | tail -n +4 | xargs -r rm --
-
-            echo "=== BUILD DOCKER IMAGES ==="
-            docker compose -f docker-compose.prod.yml build --no-cache
-
-            echo "=== MIGRATIONS ==="
-            docker compose -f docker-compose.prod.yml run --rm cargo_app \
-              python manage.py migrate --noinput
-
-            echo "=== COLLECTSTATIC ==="
-            docker compose -f docker-compose.prod.yml run --rm cargo_app \
-              python manage.py collectstatic --noinput --clear
-
-            echo "=== START CONTAINERS ==="
-            docker compose -f docker-compose.prod.yml up -d
-
-            echo "=== DEPLOY DONE ==="
+            docker compose pull
+            docker compose up -d
