@@ -111,9 +111,14 @@ TEMPLATES = [
 
 # Static & Media
 STATIC_URL = '/static/'
-#STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web/static')]
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'web/static'),
+]
+
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -142,10 +147,6 @@ LOGGING = {
 
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = '/'
-
-# Serve static in dev mode
-if DEBUG:
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web/static')]
 
 # === COOKIE / SESSION FIX FOR SAFARI (iOS white screen issue) ===
 SESSION_COOKIE_SECURE = True
