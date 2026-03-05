@@ -25,17 +25,13 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # ALLOWED_HOSTS
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') + [
-    'bonablog.ru', 'www.bonablog.ru', 'localhost', '127.0.0.1', '185.169.54.164'
+    'crm.bona-plus.ru',
+    'www.crm.bona-plus.ru'
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "https://bonablog.ru",
-    "https://www.bonablog.ru",
-    "https://crm.dadaexpo.ru",
-    "https://185.169.54.164",
-    "https://crm.cargonumber1.ru",
+    "https://crm.bona-plus.ru",
+    "https://www.crm.bona-plus.ru",
 ]
 
 
@@ -115,9 +111,9 @@ TEMPLATES = [
 
 # Static & Media
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web/static')]
+#STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web/static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

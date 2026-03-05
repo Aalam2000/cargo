@@ -3,7 +3,11 @@ services:
     image: ghcr.io/aalam2000/cargodb:latest
     container_name: cargo_app
 
-    command: gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 60
+    command: >
+      sh -c "
+      python manage.py collectstatic --noinput &&
+      gunicorn cargodb.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 60
+      "
 
     env_file:
       - .env.prod
