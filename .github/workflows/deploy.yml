@@ -30,6 +30,5 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd /var/www/cargodb
-            docker compose pull
-            docker compose up -d
+            docker compose -f /var/www/cargodb/docker-compose.prod.yml pull
+            docker compose -f /var/www/cargodb/docker-compose.prod.yml up -d
