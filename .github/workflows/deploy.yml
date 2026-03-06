@@ -31,4 +31,6 @@ jobs:
           port: 22
           script: |
             docker compose -f /var/www/cargodb/docker-compose.prod.yml pull
-            docker compose -f /var/www/cargodb/docker-compose.prod.yml up -d --force-recreate
+            docker compose -f /var/www/cargodb/docker-compose.prod.yml down
+            rm -rf /var/www/cargodb/staticfiles/*
+            docker compose -f /var/www/cargodb/docker-compose.prod.yml up -d
