@@ -19,6 +19,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from accounts.models import CustomUser
 from accounts.services.client_actions import safe_parse_ai_json
 from .models import ChatSession
+from .langgraph_bot import run_admin_bot_graph
 
 # Загрузка ключа OpenAI
 load_dotenv()
@@ -360,104 +361,26 @@ def tg_webhook(request):
     chat = message.get("chat", {})
 
     telegram_id = str(chat.get("id")) if chat else None
-    username = chat.get("username")
-    first_name = chat.get("first_name")
-    last_name = chat.get("last_name")
+    username = chat.get("username") or ""
+    first_name = chat.get("first_name") or ""
+    last_name = chat.get("last_name") or ""
 
     if not telegram_id or not text:
         return JsonResponse({"status": "ignored"})
 
-    # --- Сессия Telegram ---
-    session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
-
-    # --- Определение пользователя по accounts_customuser.telegram ---
-
-    matched_user = None
-
-    candidates = Q()
-    if username:
-        u1 = username.strip()
-        candidates |= Q(telegram__iexact=u1) | Q(telegram__iexact=f"@{u1}") | Q(telegram__iexact=u1.lower()) | Q(
-            telegram__iexact=f"@{u1.lower()}")
-    if telegram_id:
-        t1 = str(telegram_id).strip()
-        candidates |= Q(telegram__iexact=t1)
-
-    if candidates:
-        matched_user = CustomUser.objects.filter(candidates).first()
-
-    if matched_user and not session.user:
-        session.user = matched_user
-        session.save()
-
-    # --- Пользователь не опознан ---
-    if not session.user:
-        show_username = f"@{username}" if username else "нет"
-        details = (
-            "Добро пожаловать в CargoAdmin Bot!\n\n"
-            "Ваш Telegram ещё не привязан к системе.\n"
-            "Откройте CargoAdmin и заполните поле «Telegram» в карточке пользователя.\n\n"
-            "Укажите одно из значений:\n"
-            f"• {show_username}\n"
-            f"• {telegram_id}\n\n"
-            "Ссылка на платформу:\nhttps://crm.bona-plus.ru\n\n"
-            "Ваши данные:\n"
-            f"ID: {telegram_id}\n"
-            f"Username: {show_username}\n"
-            f"Имя: {first_name or 'нет'}\n"
-            f"Фамилия: {last_name or 'нет'}"
-        )
-        return send_tg_reply(telegram_id, details)
-
-    # --- Права ---
-    if session.user.role not in ("Admin", "Operator"):
-        return send_tg_reply(
-            telegram_id,
-            "У вас нет прав для создания или приглашения клиентов."
-        )
-
-    # --- Парсинг сообщения через OpenAI (ВСЕГДА) ---
-    parser_prompt = build_client_parser_prompt()
-    try:
-        ai_answer = call_openai_with_prompt(parser_prompt, text)
-    except Exception:
-        ai_answer = '{"action":"unknown","email":"","name":""}'
-
-    data = safe_parse_ai_json(ai_answer)
-
-    action = (data.get("action") or "").strip()
-    email = (data.get("email") or "").strip()
-    name = (data.get("name") or "").strip()
-    reply = (data.get("reply") or "").strip() or "Принято. Выполняю."
-    lang = (data.get("lang") or "").strip()
-
-    # 1) Сразу отвечаем пользователю (на его языке — это делает OpenAI через reply)
-    # 2) Если нужно действие — запускаем в фоне
-    if action == "create_client" and email:
-        from accounts.services.client_actions import enqueue_create_client_action
-        enqueue_create_client_action(
-            telegram_id=telegram_id,
-            operator_user_id=session.user_id,
-            email=email,
-            name=name,
-            lang=lang,
-        )
-
-    return send_tg_reply(telegram_id, reply)
-
-    # --- Иначе — нейтральный ответ ---
-    if first_name or last_name:
-        name_block = f"{first_name or ''} {last_name or ''}".strip()
-    elif username:
-        name_block = f"@{username}"
-    else:
-        name_block = f"ID {telegram_id}"
-
-    return send_tg_reply(
-        telegram_id,
-        f"Принял, {name_block}. Если нужно создать клиента — напишите сообщение с e-mail клиента."
+    result = run_admin_bot_graph(
+        telegram_id=telegram_id,
+        username=username,
+        first_name=first_name,
+        last_name=last_name,
+        text=text,
     )
 
+    reply_text = (result.get("reply_text") or "").strip()
+    if not reply_text:
+        reply_text = "Запрос принят."
+
+    return send_tg_reply(telegram_id, reply_text)
 
 # --- Функция отправки сообщений в Telegram ---
 def send_tg_reply(chat_id, text):
