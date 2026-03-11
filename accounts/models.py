@@ -213,24 +213,39 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         return self.client_code
 
     def save(self, *args, **kwargs):
-        """Автоматическая синхронизация клиента и пользователя"""
+        """Автоматическая синхронизация клиента и пользователя."""
         if self.email:
             self.email = self.__class__.objects.normalize_email(self.email)
         if self.client_code:
             self.client_code = str(self.client_code).strip().upper()
 
-        # --- Автосвязь пользователя с клиентом ---
         from cargo_acc.models import Client
+
+        if self.role == "Client" and self.linked_client:
+            if not self.company_id and self.linked_client.company_id:
+                self.company_id = self.linked_client.company_id
+            if not self.client_code and self.linked_client.client_code:
+                self.client_code = self.linked_client.client_code
+
         if self.role == "Client" and not self.linked_client and self.client_code:
-            client = Client.objects.filter(client_code=self.client_code).first()
+            if not self.company_id:
+                raise ValueError(
+                    "Для пользователя с ролью Client обязательно должна быть указана company "
+                    "до автосоздания/автопривязки клиента."
+                )
+
+            client = Client.objects.filter(
+                company_id=self.company_id,
+                client_code=self.client_code,
+            ).first()
+
             if client:
                 self.linked_client = client
             else:
-                # если такого клиента нет — создаём автоматически
                 client = Client.objects.create(
                     client_code=self.client_code,
-                    company_id=1,  # ⚠️ подставь ID своей основной компании
-                    description=f"Автоматически создан для {self.email}"
+                    company_id=self.company_id,
+                    description=f"Автоматически создан для {self.email}",
                 )
                 self.linked_client = client
 
