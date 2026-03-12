@@ -1,8 +1,8 @@
 # chatgpt_ui/langgraph_bot.py
+from __future__ import annotations
 import re
 
 from accounts.services.company_actions import enqueue_create_company_action
-from __future__ import annotations
 
 from typing import Any, Dict, Optional, TypedDict
 
