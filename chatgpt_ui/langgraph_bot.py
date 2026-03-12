@@ -34,26 +34,29 @@ class AdminBotState(TypedDict, total=False):
 
     onboarding_mode: str
     pending_action: str
+    dialog_mode: str
     debug_note: str
 
 
+def _clean_text(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _normalize_text(value: str | None) -> str:
+    return _clean_text(value).lower()
+
+
 def _build_unidentified_reply(state: AdminBotState) -> str:
-    username = (state.get("username") or "").strip()
-    telegram_id = (state.get("telegram_id") or "").strip()
-    first_name = (state.get("first_name") or "").strip()
-    last_name = (state.get("last_name") or "").strip()
+    username = _clean_text(state.get("username"))
+    telegram_id = _clean_text(state.get("telegram_id"))
+    first_name = _clean_text(state.get("first_name"))
+    last_name = _clean_text(state.get("last_name"))
 
     show_username = f"@{username}" if username else "нет"
 
     return (
-        "Добро пожаловать в CargoAdmin Bot!\n\n"
         "Ваш Telegram ещё не привязан к системе.\n"
-        "Откройте CargoAdmin и заполните поле «Telegram» в карточке пользователя.\n\n"
-        "Укажите одно из значений:\n"
-        f"• {show_username}\n"
-        f"• {telegram_id}\n\n"
-        "Ссылка на платформу:\nhttps://crm.bona-plus.ru\n\n"
-        "Ваши данные:\n"
+        "Откройте CargoAdmin и заполните поле Telegram в карточке пользователя.\n\n"
         f"ID: {telegram_id}\n"
         f"Username: {show_username}\n"
         f"Имя: {first_name or 'нет'}\n"
@@ -62,22 +65,66 @@ def _build_unidentified_reply(state: AdminBotState) -> str:
 
 
 def _build_identified_reply(state: AdminBotState) -> str:
-    first_name = (state.get("first_name") or "").strip()
-    username = (state.get("username") or "").strip()
-    role = (state.get("user_role") or "").strip()
+    first_name = _clean_text(state.get("first_name"))
+    username = _clean_text(state.get("username"))
+    role = _clean_text(state.get("user_role"))
 
     name_block = first_name or (f"@{username}" if username else "коллега")
 
     return (
         f"Принято, {name_block}.\n"
-        f"Роль в системе: {role}.\n\n"
-        "Доступные направления:\n"
+        f"Роль: {role}.\n\n"
+        "Доступно:\n"
         "1. Создание компании\n"
         "2. Создание пользователя компании\n"
         "3. Создание клиента\n"
-        "4. Инструкции и консультации\n\n"
-        "Пока активен базовый режим распознавания.\n"
-        "Следующие сценарии будут поэтапно перенесены в LangGraph."
+        "4. Инструкции"
+    )
+
+
+def _is_smalltalk(text: str) -> bool:
+    lowered = _normalize_text(text)
+    return any(
+        phrase in lowered
+        for phrase in (
+            "привет",
+            "здрав",
+            "даров",
+            "дароф",
+            "салам",
+            "чего молчишь",
+            "давай поговорим",
+            "поговорим",
+        )
+    )
+
+
+def _is_help_request(text: str) -> bool:
+    lowered = _normalize_text(text)
+    return any(
+        phrase in lowered
+        for phrase in (
+            "что умеешь",
+            "помощь",
+            "help",
+            "инструкц",
+            "что ты умеешь",
+            "меню",
+        )
+    )
+
+
+def _is_complaint(text: str) -> bool:
+    lowered = _normalize_text(text)
+    return any(
+        phrase in lowered
+        for phrase in (
+            "не сделал",
+            "ни хера не сделал",
+            "ничего не сделал",
+            "ты сделал",
+            "что сделал",
+        )
     )
 
 
@@ -92,10 +139,16 @@ def _extract_telegram(text: str) -> str:
 
 
 def _extract_company_name(text: str) -> str:
-    raw = (text or "").strip()
+    raw = _clean_text(text)
+
+    quoted = re.search(r'["«“](.+?)["»”]', raw)
+    if quoted:
+        value = quoted.group(1).strip(" .,:;\"'«»")
+        if value:
+            return value
 
     patterns = [
-        r"(?:компан(?:ию|ия|ии|ией)|фирм(?:у|а|ы|е)|организац(?:ию|ия|ии))\s+(.+?)(?:,|;|\n|$)",
+        r"(?:компан(?:ию|ия|ии|ией)|фирм(?:у|а|ы|е)|организац(?:ию|ия|ии))\s+([A-Za-zА-Яа-я0-9 _.\-]+?)(?:,|;|\n|$)",
         r"(?:название|company)\s*[:\-]\s*(.+?)(?:,|;|\n|$)",
     ]
 
@@ -110,10 +163,10 @@ def _extract_company_name(text: str) -> str:
 
 
 def _parse_create_company_request(text: str) -> dict:
-    raw = (text or "").strip()
+    raw = _clean_text(text)
     lowered = raw.lower()
 
-    company_words = ("создай", "создать", "добавь", "добавить", "зарегистрируй", "регистрация")
+    company_words = ("создай", "создать", "добавь", "добавить", "зарегистрируй", "регистрация", "сделай")
     entity_words = ("компан", "фирм", "организац")
 
     wants_create = any(word in lowered for word in company_words) and any(word in lowered for word in entity_words)
@@ -138,6 +191,36 @@ def _parse_create_company_request(text: str) -> dict:
     }
 
 
+def _parse_company_data_from_followup(text: str) -> dict:
+    raw = _clean_text(text)
+    company_name = _extract_company_name(raw)
+    admin_email = _extract_email(raw)
+    admin_telegram = _extract_telegram(raw)
+
+    return {
+        "company_name": company_name,
+        "admin_email": admin_email,
+        "admin_telegram": admin_telegram,
+        "missing_fields": [
+            field
+            for field, value in (
+                ("company_name", company_name),
+                ("admin_email", admin_email),
+            )
+            if not value
+        ],
+    }
+
+
+def _get_last_assistant_message(session: ChatSession) -> str:
+    last_msg = (
+        ChatMessage.objects.filter(session=session, role="assistant")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    return _clean_text(last_msg.content if last_msg else "")
+
+
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
     session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
@@ -147,12 +230,14 @@ def node_load_context(state: AdminBotState) -> AdminBotState:
         "user_id": session.user_id,
         "identified": bool(session.user_id),
         "stop": False,
+        "pending_action": _clean_text(getattr(session, "pending_action", "")),
+        "dialog_mode": _clean_text(getattr(session, "dialog_mode", "")) or "idle",
     }
 
 
 def node_detect_actor(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
-    username = (state.get("username") or "").strip()
+    username = _clean_text(state.get("username"))
 
     session = ChatSession.objects.select_related("user").get(id=state["session_id"])
     matched_user = session.user
@@ -197,7 +282,7 @@ def node_security_guard(state: AdminBotState) -> AdminBotState:
             "safety_level": "allow_unidentified",
         }
 
-    user_role = (state.get("user_role") or "").strip()
+    user_role = _clean_text(state.get("user_role"))
 
     if user_role not in ("Admin", "Operator"):
         return {
@@ -221,23 +306,47 @@ def node_route_unidentified(state: AdminBotState) -> AdminBotState:
 
 
 def node_route_identified(state: AdminBotState) -> AdminBotState:
+    text = _clean_text(state.get("text"))
+
+    if _is_smalltalk(text):
+        return {
+            "request_level": "smalltalk",
+            "reply_text": "На связи. Могу: создать компанию, пользователя компании, клиента, дать инструкцию.",
+            "stop": True,
+        }
+
+    if _is_help_request(text):
+        return {
+            "request_level": "help",
+            "reply_text": _build_identified_reply(state),
+            "stop": True,
+        }
+
+    if _is_complaint(text):
+        pending_action = _clean_text(state.get("pending_action"))
+        dialog_mode = _clean_text(state.get("dialog_mode"))
+
+        if pending_action == "create_company" and dialog_mode == "await_company_data":
+            return {
+                "request_level": "complaint",
+                "reply_text": "Пока нет. Я жду от тебя данные компании: название и email главного админа.",
+                "stop": True,
+            }
+
+        return {
+            "request_level": "complaint",
+            "reply_text": "Пока нет выполненного действия. Напиши команду точнее.",
+            "stop": True,
+        }
+
     return {
-        "request_level": "menu",
-        "info_level": "base_menu",
-        "reply_text": _build_identified_reply(state),
-        "stop": True,
+        "request_level": "route_main",
+        "stop": False,
     }
 
 
 def node_action_router_stub(state: AdminBotState) -> AdminBotState:
-    text = (state.get("text") or "").strip().lower()
-
-    if "компан" in text or "фирм" in text or "организац" in text:
-        return {
-            "pending_action": "create_company",
-            "reply_text": "Режим создания компании пока подключён как заглушка.",
-            "stop": True,
-        }
+    text = _normalize_text(state.get("text"))
 
     if "пользоват" in text or "юзер" in text or "сотрудник" in text:
         return {
@@ -255,7 +364,7 @@ def node_action_router_stub(state: AdminBotState) -> AdminBotState:
 
     return {
         "pending_action": "",
-        "reply_text": _build_identified_reply(state),
+        "reply_text": "Не понял команду. Напиши: создать компанию / создать пользователя / создать клиента / помощь.",
         "stop": True,
     }
 
@@ -263,7 +372,7 @@ def node_action_router_stub(state: AdminBotState) -> AdminBotState:
 def node_info_router_stub(state: AdminBotState) -> AdminBotState:
     return {
         "info_level": "stub",
-        "reply_text": "Блок инструкций и консультаций пока подключён как заглушка.",
+        "reply_text": "Блок инструкций пока подключён как заглушка.",
         "stop": True,
     }
 
@@ -271,7 +380,8 @@ def node_info_router_stub(state: AdminBotState) -> AdminBotState:
 def node_execute_company_action(state: AdminBotState) -> AdminBotState:
     session = ChatSession.objects.select_related("user").get(id=state["session_id"])
     operator_user = session.user
-    text = (state.get("text") or "").strip()
+    text = _clean_text(state.get("text"))
+    dialog_mode = _clean_text(state.get("dialog_mode"))
 
     if not operator_user:
         return {
@@ -279,13 +389,10 @@ def node_execute_company_action(state: AdminBotState) -> AdminBotState:
             "stop": True,
         }
 
-    parsed = _parse_create_company_request(text)
-
-    if parsed.get("intent") != "create_company":
-        return {
-            "reply_text": _build_identified_reply(state),
-            "stop": True,
-        }
+    if dialog_mode == "await_company_data":
+        parsed = _parse_company_data_from_followup(text)
+    else:
+        parsed = _parse_create_company_request(text)
 
     missing_fields = parsed.get("missing_fields") or []
     if missing_fields:
@@ -296,11 +403,13 @@ def node_execute_company_action(state: AdminBotState) -> AdminBotState:
             hints.append("email главного админа")
 
         return {
+            "pending_action": "create_company",
+            "dialog_mode": "await_company_data",
             "reply_text": (
                 "Для создания компании не хватает данных.\n"
                 f"Нужно прислать: {', '.join(hints)}.\n\n"
                 "Пример:\n"
-                "Создать компанию Bona Logistics, admin email: boss@example.com, telegram: @boss"
+                'Создать компанию "Ромашка", admin email: boss@example.com, telegram: @boss'
             ),
             "stop": True,
         }
@@ -315,7 +424,8 @@ def node_execute_company_action(state: AdminBotState) -> AdminBotState:
     )
 
     return {
-        "pending_action": "create_company",
+        "pending_action": "",
+        "dialog_mode": "idle",
         "reply_text": (
             "Команда принята.\n"
             f"Создаю компанию: {parsed['company_name']}\n"
@@ -328,8 +438,25 @@ def node_execute_company_action(state: AdminBotState) -> AdminBotState:
 
 def node_finalize(state: AdminBotState) -> AdminBotState:
     session = ChatSession.objects.get(id=state["session_id"])
-    text = (state.get("text") or "").strip()
-    reply_text = (state.get("reply_text") or "").strip()
+    text = _clean_text(state.get("text"))
+    reply_text = _clean_text(state.get("reply_text"))
+    pending_action = _clean_text(state.get("pending_action"))
+    dialog_mode = _clean_text(state.get("dialog_mode")) or "idle"
+
+    if hasattr(session, "pending_action"):
+        session.pending_action = pending_action
+    if hasattr(session, "dialog_mode"):
+        session.dialog_mode = dialog_mode
+
+    update_fields = []
+    if hasattr(session, "pending_action"):
+        update_fields.append("pending_action")
+    if hasattr(session, "dialog_mode"):
+        update_fields.append("dialog_mode")
+    if update_fields:
+        session.save(update_fields=update_fields)
+
+    last_assistant_text = _get_last_assistant_message(session)
 
     if text:
         ChatMessage.objects.create(
@@ -338,7 +465,7 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
             content=text,
         )
 
-    if reply_text:
+    if reply_text and reply_text != last_assistant_text:
         ChatMessage.objects.create(
             session=session,
             role="assistant",
@@ -361,9 +488,17 @@ def route_after_security(state: AdminBotState) -> str:
 
 
 def route_after_identified(state: AdminBotState) -> str:
-    text = (state.get("text") or "").strip()
-    parsed = _parse_create_company_request(text)
+    if state.get("stop"):
+        return "finalize"
 
+    text = _clean_text(state.get("text"))
+    dialog_mode = _clean_text(state.get("dialog_mode"))
+    pending_action = _clean_text(state.get("pending_action"))
+
+    if pending_action == "create_company" and dialog_mode == "await_company_data":
+        return "execute_company_action"
+
+    parsed = _parse_create_company_request(text)
     if parsed.get("intent") == "create_company":
         return "execute_company_action"
 
@@ -419,6 +554,7 @@ def build_admin_bot_graph():
             "execute_company_action": "execute_company_action",
             "action_router_stub": "action_router_stub",
             "info_router_stub": "info_router_stub",
+            "finalize": "finalize",
         },
     )
 
