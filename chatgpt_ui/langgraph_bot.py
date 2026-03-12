@@ -82,6 +82,16 @@ def _build_identified_reply(state: AdminBotState) -> str:
     )
 
 
+def _build_instruction_reply() -> str:
+    return (
+        "Инструкция:\n"
+        "1. Для создания компании напиши название и email главного админа.\n"
+        "2. Можно сразу добавить Telegram админа.\n\n"
+        "Пример:\n"
+        'Создать компанию "Ромашка", admin email: boss@example.com, telegram: @boss'
+    )
+
+
 def _is_smalltalk(text: str) -> bool:
     lowered = _normalize_text(text)
     return any(
@@ -108,6 +118,8 @@ def _is_help_request(text: str) -> bool:
             "помощь",
             "help",
             "инструкц",
+            "дай инструкц",
+            "инструкция",
             "что ты умеешь",
             "меню",
         )
@@ -134,8 +146,16 @@ def _extract_email(text: str) -> str:
 
 
 def _extract_telegram(text: str) -> str:
-    match = re.search(r"(@[A-Za-z0-9_]{4,})", text or "")
-    return (match.group(1) if match else "").strip()
+    raw = text or ""
+    matches = re.findall(r"(?<![A-Za-z0-9._%+-])(@[A-Za-z0-9_]{4,})\b", raw)
+    if not matches:
+        return ""
+
+    for value in matches:
+        if value.lower() not in ("@gmail", "@mail", "@yahoo", "@outlook", "@hotmail", "@icloud"):
+            return value.strip()
+
+    return ""
 
 
 def _extract_company_name(text: str) -> str:
@@ -318,7 +338,7 @@ def node_route_identified(state: AdminBotState) -> AdminBotState:
     if _is_help_request(text):
         return {
             "request_level": "help",
-            "reply_text": _build_identified_reply(state),
+            "reply_text": _build_instruction_reply(),
             "stop": True,
         }
 
