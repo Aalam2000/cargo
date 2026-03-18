@@ -143,6 +143,7 @@ def cargo_table_config(request):
 @login_required
 def cargo_table_data(request):
     user = request.user
+    company = request.company
     offset = int(request.GET.get("offset", 0))
     limit = int(request.GET.get("limit", 50))
     role = getattr(user, "role", "")
@@ -150,21 +151,21 @@ def cargo_table_data(request):
     # все возможные фильтры, приходящие с фронта
     filters = {k: v for k, v in request.GET.items() if v}
 
-    qs = Cargo.objects.select_related("client", "cargo_status", "packaging_type")
+    qs = Cargo.objects.select_related(
+        "client", "cargo_status", "packaging_type"
+    ).filter(company=company)
 
     # --- РОЛЬ КЛИЕНТА ---
     if role == "Client" and user.client_code:
-        qs = qs.filter(client__client_code=user.client_code)
+        qs = qs.filter(client__company=company, client__client_code=user.client_code)
 
     # --- Универсальная фильтрация (без числовых и суммовых полей) ---
-    # исключаем поля с цифрами и суммами
     excluded_fields = [
         "weight", "volume", "cost", "insurance",
         "packaging_cost", "tariff_min", "tariff_weight",
         "places_count",
     ]
 
-    # маппинг фильтров на реальные поля модели
     field_map = {
         "cargo": "cargo_code__icontains",
         "cargo_code": "cargo_code__icontains",
@@ -179,7 +180,6 @@ def cargo_table_data(request):
         "delivery_date": "delivery_date__icontains",
     }
 
-    # применяем фильтры динамически
     for key, value in filters.items():
         if key in excluded_fields:
             continue
@@ -189,14 +189,11 @@ def cargo_table_data(request):
         elif hasattr(Cargo, key):
             qs = qs.filter(**{f"{key}__icontains": value})
 
-    # --- Пагинация ---
     total = qs.count()
 
-    # если offset превышает общее число строк — вернуть пусто
     if offset >= total:
         return JsonResponse({"results": [], "has_more": False})
 
-    # --- Сортировка ---
     sort_by = request.GET.get("sort_by")
     sort_dir = request.GET.get("sort_dir", "asc")
 
@@ -217,7 +214,6 @@ def cargo_table_data(request):
     next_offset = offset + qs.count()
     has_more = next_offset < total
 
-    # --- Формат вывода ---
     def fmt(d):
         try:
             return d.strftime("%d.%m.%Y") if d else ""
@@ -255,7 +251,6 @@ def cargo_table_data(request):
 
     return JsonResponse({"results": results, "has_more": has_more})
 
-
 @login_required
 def all_tables_view(request):
     return render(request, "all_tables.html")
@@ -263,26 +258,68 @@ def all_tables_view(request):
 
 @login_required
 def api_all_tables(request):
+    company = request.company
+
     with connection.cursor() as cursor:
         all_tables = connection.introspection.table_names(cursor)
-    # Берём все таблицы из cargo_acc, включая вспомогательные
-    filtered = [t.replace("cargo_acc_", "") for t in all_tables if t.startswith("cargo_acc_")]
-    return JsonResponse(filtered, safe=False)
 
+        filtered = []
+        for table_name in all_tables:
+            if not table_name.startswith("cargo_acc_"):
+                continue
+
+            columns_info = connection.introspection.get_table_description(cursor, table_name)
+            column_names = [col.name for col in columns_info]
+
+            if table_name == "cargo_acc_company" or "company_id" in column_names:
+                filtered.append(table_name.replace("cargo_acc_", ""))
+
+    return JsonResponse(filtered, safe=False)
 
 @login_required
 def api_table_data(request):
     """Возвращает первые строки конкретной таблицы"""
     table = request.GET.get("table")
+    company = request.company
+
     if not table:
         return JsonResponse({"error": "No table name"}, status=400)
 
+    if not company:
+        return JsonResponse({"error": "No company"}, status=403)
+
+    db_table = f"cargo_acc_{table.replace('cargo_acc_', '')}"
+
     with connection.cursor() as cursor:
-        cursor.execute(f"SELECT * FROM {table} LIMIT 200")
+        all_tables = connection.introspection.table_names(cursor)
+        allowed_tables = [t for t in all_tables if t.startswith("cargo_acc_")]
+
+        if db_table not in allowed_tables:
+            return JsonResponse({"error": "Invalid table"}, status=400)
+
+        columns_info = connection.introspection.get_table_description(cursor, db_table)
+        column_names = [col.name for col in columns_info]
+
+        if db_table == "cargo_acc_company":
+            cursor.execute(
+                f"SELECT * FROM {db_table} WHERE id = %s LIMIT 200",
+                [company.id],
+            )
+        elif "company_id" in column_names:
+            cursor.execute(
+                f"SELECT * FROM {db_table} WHERE company_id = %s LIMIT 200",
+                [company.id],
+            )
+        else:
+            return JsonResponse(
+                {"error": "Table is not tenant-scoped"},
+                status=403,
+            )
+
         columns = [col[0] for col in cursor.description]
         rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
-    return JsonResponse({"columns": columns, "rows": rows})
 
+    return JsonResponse({"columns": columns, "rows": rows})
 
 # ==============================
 #  Публичная главная страница (до входа)
@@ -306,31 +343,44 @@ def home_view(request):
     После входа — страница с данными, фильтрацией и таблицами.
     """
     user = request.user
-    role = user.role
+    role = getattr(user, "role", "")
+    company = request.company
     client_id = request.GET.get("client_id")
     product_code = request.GET.get("product_code", "").strip()
     cargo_code = request.GET.get("cargo_code", "").strip()
 
-    products = Product.objects.select_related("cargo_status", "client", "warehouse", "company")
-    payments = Payment.objects.select_related("client", "company")
+    products = Product.objects.select_related(
+        "cargo_status", "client", "warehouse", "company"
+    ).filter(company=company)
+    payments = Payment.objects.select_related(
+        "client", "company"
+    ).filter(company=company)
 
     if role == "Client":
         client_obj = getattr(user, "linked_client", None)
-        if client_obj:
+        if client_obj and getattr(client_obj, "company_id", None) == getattr(company, "id", None):
             products = products.filter(client_id=client_obj.id)
             payments = payments.filter(client_id=client_obj.id)
+        else:
+            products = products.none()
+            payments = payments.none()
+
     elif role == "Operator" and client_id:
-        products = products.filter(client_id=client_id)
-        payments = payments.filter(client_id=client_id)
+        products = products.filter(client_id=client_id, client__company=company)
+        payments = payments.filter(client_id=client_id, client__company=company)
 
     if product_code:
         products = products.filter(product_code__icontains=product_code)
 
-    delivered = products.filter(cargo_status__name__icontains="достав") | products.filter(
-        cargo_status__name__icontains="выдан"
+    if cargo_code:
+        products = products.filter(cargo__cargo_code__icontains=cargo_code, cargo__company=company)
+
+    delivered = products.filter(
+        Q(cargo_status__name__icontains="достав") |
+        Q(cargo_status__name__icontains="выдан")
     )
     in_transit = products.exclude(id__in=delivered.values_list("id", flat=True))
-    clients = Client.objects.all().order_by("client_code") if role == "Operator" else []
+    clients = Client.objects.filter(company=company).order_by("client_code") if role == "Operator" else []
 
     return render(request, "home.html", {
         "role": role,
@@ -342,10 +392,6 @@ def home_view(request):
     })
 
 
-# cargodb/views.py
-
-
-
 # ==============================
 #  Расчет баланса клиента + последний платеж
 # ==============================
@@ -353,37 +399,45 @@ def home_view(request):
 def client_balance(request):
     user = request.user
     role = getattr(user, "role", "")
+    company = request.company
     client_code = request.GET.get("client_code", "").strip()
     total_paid = 0.0
     last_payment_date = None
     last_payment_amount = 0.0
 
-    # --- Для клиента ---
     if role == "Client":
         client_obj = getattr(user, "linked_client", None)
-        if client_obj:
-            payments = Payment.objects.filter(client=client_obj).order_by("-payment_date")
+        if client_obj and getattr(client_obj, "company_id", None) == getattr(company, "id", None):
+            payments = Payment.objects.filter(
+                company=company,
+                client=client_obj,
+            ).order_by("-payment_date")
             total_paid = payments.aggregate(total=Sum("amount_total")).get("total") or 0
             if payments.exists():
                 last = payments.first()
                 last_payment_date = last.payment_date
                 last_payment_amount = last.amount_total
 
-    # --- Для админа / оператора ---
     elif role in ["Admin", "Operator"] and client_code:
-        if client_code == "self":  # защита
+        if client_code == "self":
             return JsonResponse({"total_paid": 0})
-        matches = Client.objects.filter(client_code__icontains=client_code)
-        if matches.count() == 1:
-            client = matches.first()
-            payments = Payment.objects.filter(client=client).order_by("-payment_date")
+
+        client = Client.objects.filter(
+            company=company,
+            client_code__icontains=client_code,
+        ).first()
+
+        if client:
+            payments = Payment.objects.filter(
+                company=company,
+                client=client,
+            ).order_by("-payment_date")
             total_paid = payments.aggregate(total=Sum("amount_total")).get("total") or 0
             if payments.exists():
                 last = payments.first()
                 last_payment_date = last.payment_date
                 last_payment_amount = last.amount_total
 
-    # --- Форматируем ответ ---
     result = {
         "total_paid": float(total_paid),
         "last_payment_date": last_payment_date.strftime("%d.%m.%Y") if last_payment_date else "",
@@ -391,7 +445,6 @@ def client_balance(request):
     }
 
     return JsonResponse(result)
-
 
 @login_required
 def api_user_role(request):

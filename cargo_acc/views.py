@@ -1,10 +1,11 @@
 # cargo_acc/views.py
-import traceback
-import sys
-import logging
 import json
+import logging
 import os
+import sys
 import time
+import traceback
+
 import transliterate
 from django.apps import apps
 from django.contrib.auth.decorators import login_required
@@ -16,19 +17,18 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework import viewsets
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
     CarrierCompany, Vehicle, TransportBill, CargoMovement, Client
-from .serializers import CompanySerializer, ClientSerializer, WarehouseSerializer, CargoTypeSerializer, \
-    CargoStatusSerializer, PackagingTypeSerializer, ImageSerializer, ProductSerializer, CargoSerializer, \
+from .serializers import ProductSerializer, CargoSerializer, \
     CarrierCompanySerializer, VehicleSerializer, TransportBillSerializer, CargoMovementSerializer
 
-
 logger = logging.getLogger(__name__)
+
 
 # === HTML страницы ===
 def settings_modal(request):
@@ -51,19 +51,19 @@ def mod_delrow_view(request):
 def client_table_data(request):
     """API для выгрузки таблицы клиентов с фильтрацией и пагинацией."""
     try:
-        # Фильтрация по параметру 'search' из GET-запроса
         search_query = request.GET.get('search', '').lower()
-        clients = Client.objects.filter(client_code__icontains=search_query).select_related('company')
+        clients = Client.objects.filter(
+            company=request.company,
+            client_code__icontains=search_query
+        ).select_related('company')
 
-        # Пагинация
-        paginator = Paginator(clients, 10)  # 10 записей на страницу
+        paginator = Paginator(clients, 10)
         page = request.GET.get('page', 1)
         try:
             clients_page = paginator.page(page)
         except EmptyPage:
             return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
 
-        # Формирование результата
         result = [
             {'id': client.id, 'client_code': client.client_code, 'company': client.company.name}
             for client in clients_page
@@ -75,9 +75,6 @@ def client_table_data(request):
         })
 
     except Exception as e:
-        # Логирование ошибки вместо print
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Ошибка: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -86,10 +83,13 @@ def client_table_data(request):
 @login_required
 def get_clients(request):
     search_query = request.GET.get('search', '').lower()
-    page = int(request.GET.get('page', 1))  # Параметр страницы
-    page_size = int(request.GET.get('page_size', 7))  # Лимит записей
+    page = int(request.GET.get('page', 1))
+    page_size = int(request.GET.get('page_size', 7))
 
-    clients = Client.objects.filter(client_code__icontains=search_query)
+    clients = Client.objects.filter(
+        company=request.company,
+        client_code__icontains=search_query
+    ).order_by('client_code')
     paginator = Paginator(clients, page_size)
 
     try:
@@ -97,7 +97,15 @@ def get_clients(request):
     except EmptyPage:
         return JsonResponse({'results': [], 'error': 'Страница не существует'}, status=404)
 
-    result = [{'id': c.id, 'client_code': c.client_code} for c in clients_page]
+    result = [
+        {
+            'id': c.id,
+            'client_code': c.client_code,
+            'company': c.company.name,
+            'description': c.description,
+        }
+        for c in clients_page
+    ]
     return JsonResponse({
         'results': result,
         'page': page,
@@ -105,13 +113,14 @@ def get_clients(request):
     })
 
 
-
 @login_required
 def get_companies(request):
     search_query = request.GET.get('search', '').lower()
-    companies = Company.objects.filter(name__icontains=search_query)
+    companies = Company.objects.filter(
+        id=request.company.id,
+        name__icontains=search_query
+    )
 
-    # Пагинация
     paginator = Paginator(companies, 10)
     page = request.GET.get('page', 1)
     try:
@@ -120,8 +129,12 @@ def get_companies(request):
         return JsonResponse({'results': [], 'page': page, 'total_pages': paginator.num_pages})
 
     result = [
-        {'id': company.id, 'name': company.name, 'registration': company.registration,
-         'description': company.description}
+        {
+            'id': company.id,
+            'name': company.name,
+            'registration': company.registration,
+            'description': company.description,
+        }
         for company in companies_page
     ]
     return JsonResponse({'results': result, 'page': page, 'total_pages': paginator.num_pages})
@@ -130,12 +143,9 @@ def get_companies(request):
 def add_image_to_product(request, product_id):
     """API для загрузки картинки."""
     if request.method == 'POST' and request.FILES.get('image_file'):
-        product = get_object_or_404(Product, id=product_id)
+        product = get_object_or_404(Product, id=product_id, company=request.company)
 
-        # Создаем новое изображение и сохраняем его
         image = Image.objects.create(image_file=request.FILES['image_file'])
-
-        # Добавляем это изображение к продукту
         product.images.add(image)
 
         return JsonResponse({
@@ -158,7 +168,10 @@ def transliterate_filename(filename):
 def check_packaging_type_name(request):
     """API для проверки уникальности названия типа упаковки."""
     packaging_type_name = request.GET.get('name', '')
-    is_unique = not PackagingType.objects.filter(name=packaging_type_name).exists()
+    is_unique = not PackagingType.objects.filter(
+        company=request.company,
+        name=packaging_type_name
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
@@ -166,7 +179,10 @@ def check_packaging_type_name(request):
 def check_cargo_status_name(request):
     """API для проверки уникальности названия статуса груза."""
     cargo_status_name = request.GET.get('name', '')
-    is_unique = not CargoStatus.objects.filter(name=cargo_status_name).exists()
+    is_unique = not CargoStatus.objects.filter(
+        company=request.company,
+        name=cargo_status_name
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
@@ -174,56 +190,66 @@ def check_cargo_status_name(request):
 def check_cargo_type_name(request):
     """API для проверки уникальности названия типа груза."""
     cargo_type_name = request.GET.get('name', '')
-    is_unique = not CargoType.objects.filter(name=cargo_type_name).exists()
+    is_unique = not CargoType.objects.filter(
+        company=request.company,
+        name=cargo_type_name
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
 def check_client_code(request):
     """API для проверки уникальности названия Клиента."""
     client_code = request.GET.get('client_code', '')
-    is_unique = not Client.objects.filter(client_code=client_code).exists()
+    is_unique = not Client.objects.filter(
+        company=request.company,
+        client_code=client_code
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
 def check_company_name(request):
     """API для проверки уникальности названия Компании."""
     company_name = request.GET.get('name', '')
-    is_unique = not Company.objects.filter(name=company_name).exists()
+    is_unique = not Company.objects.filter(
+        id=request.company.id,
+        name=company_name
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
 def check_warehouse_name(request):
     """API для проверки уникальности названия Склада."""
     warehouse_name = request.GET.get('name', '')
-    is_unique = not Warehouse.objects.filter(name=warehouse_name).exists()
+    is_unique = not Warehouse.objects.filter(
+        company=request.company,
+        name=warehouse_name
+    ).exists()
     return JsonResponse({'is_unique': is_unique})
 
 
 @login_required
 def add_client(request):
     """API для добавления клиента."""
-    if request.method == 'POST':
-        try:
-            # Чтение данных из запроса
-            data = json.loads(request.body)
-            client_code = data.get('client_code')
-            company_name = data.get('company')
-            description = data.get('description')
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
 
-            # Поиск или создание компании
-            company, created = Company.objects.get_or_create(name=company_name)
+    try:
+        data = json.loads(request.body)
+        client_code = data.get('client_code')
+        description = data.get('description')
 
-            # Создание клиента с компанией
-            client = Client.objects.create(
-                client_code=client_code,
-                company=company,  # Ссылка на объект компании
-                description=description
-            )
+        client = Client.objects.create(
+            client_code=client_code,
+            company=request.company,
+            description=description
+        )
 
-            return JsonResponse({'message': 'Client created successfully', 'client_id': client.id}, status=201)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+        return JsonResponse(
+            {'message': 'Client created successfully', 'client_id': client.id},
+            status=201
+        )
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 # Вьюшка для загрузки настроек таблицы
@@ -244,7 +270,7 @@ def save_table_settings(request):
         data = json.loads(request.body)
         user = request.user
         settings = user.table_settings or {}  # не затираем существующие
-        settings.update(data)                 # добавляем/обновляем конкретную таблицу
+        settings.update(data)  # добавляем/обновляем конкретную таблицу
         user.table_settings = settings
         user.save(update_fields=["table_settings"])
         return JsonResponse({'status': 'success'})
@@ -257,25 +283,41 @@ class UniversalDeleteView(APIView):
 
     def delete(self, request, model_name, pk):
         try:
-            # Динамически получаем модель по имени
             model = apps.get_model('cargo_acc', model_name)
-            # Пытаемся найти запись по ID
-            instance = model.objects.get(pk=pk)
-            instance.delete()  # Удаляем запись
-            return JsonResponse({'message': 'Запись успешно удалена'}, status=status.HTTP_204_NO_CONTENT)
-        except model.DoesNotExist:
-            return JsonResponse({'error': 'Запись не найдена'}, status=status.HTTP_404_NOT_FOUND)
-        except LookupError:
-            return JsonResponse({'error': 'Модель не найдена'}, status=status.HTTP_400_BAD_REQUEST)
 
+            if not hasattr(model, 'company'):
+                return JsonResponse(
+                    {'error': 'Удаление для этой модели не поддерживается'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            instance = model.objects.get(pk=pk, company=request.company)
+            instance.delete()
+            return JsonResponse(
+                {'message': 'Запись успешно удалена'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+
+        except LookupError:
+            return JsonResponse(
+                {'error': 'Модель не найдена'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except model.DoesNotExist:
+            return JsonResponse(
+                {'error': 'Запись не найдена'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 from django.contrib.auth.decorators import login_required
+
 
 @login_required
 def operator_clients(request):
     """Страница справочника клиентов и внесения платежей (для оператора)."""
     return render(request, 'cargo_acc/operator_clients.html')
+
 
 # Класс `ProductViewSet` является часть DRF (Django Rest Framework) и предоставляет API-интерфейс для работы с моделью `Product`. Он наследует от `ModelViewSet`, который предоставляет ряд стандартных действий, таких как создание, обновление, удаление и получение объектов.
 #
@@ -312,17 +354,23 @@ class ProductViewSet(ModelViewSet):
     serializer_class = ProductSerializer
     http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
 
+    def get_queryset(self):
+        return self.queryset.filter(company=self.request.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.company)
+
     def list(self, request, *args, **kwargs):
-        # Отладочные принты — смотрите логи контейнера/консоли
         try:
             print("+++ ProductViewSet.list START user:", getattr(request, "user", None), file=sys.stderr)
-            # Попытка собрать queryset
-            queryset = self.queryset.all()
+
+            queryset = self.get_queryset()
+
             try:
-                # печатаем SQL (коротко) и количество записей, если это возможно
                 print("+++ ProductViewSet queryset SQL:", str(queryset.query), file=sys.stderr)
             except Exception as e_q:
                 print("+++ ProductViewSet: cannot read queryset.query:", e_q, file=sys.stderr)
+
             try:
                 cnt = queryset.count()
                 print("+++ ProductViewSet queryset.count():", cnt, file=sys.stderr)
@@ -338,21 +386,23 @@ class ProductViewSet(ModelViewSet):
 
             print("+++ ProductViewSet: serializing full queryset", file=sys.stderr)
             serializer = self.get_serializer(queryset, many=True)
-            # Внимание: serializer.data вызывает сериализацию — это нормально для отладки
+
             try:
                 items_len = len(serializer.data)
             except Exception as e_ser:
                 items_len = f"error getting len: {e_ser}"
             print("+++ ProductViewSet: serialization finished, items:", items_len, file=sys.stderr)
+
             return Response(serializer.data)
 
         except Exception as e:
             tb = traceback.format_exc()
             print("=== ProductViewSet.list EXCEPTION ===", file=sys.stderr)
             print(tb, file=sys.stderr)
-            for _n in ('debug','pol'): __import__('logging').getLogger(_n).exception("ProductViewSet.list error", exc_info=True)
-            # Возвращаем трассировку в ответ для быстрой отладки (dev only)
+            for _n in ('debug', 'pol'):
+                __import__('logging').getLogger(_n).exception("ProductViewSet.list error", exc_info=True)
             return Response({"error": str(e), "traceback": tb}, status=500)
+
 
 # ViewSet для Грузов
 class CargoViewSet(viewsets.ModelViewSet):
@@ -360,7 +410,7 @@ class CargoViewSet(viewsets.ModelViewSet):
     serializer_class = CargoSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(company=self.request.company)
         sort_by = self.request.query_params.get('sort_by', 'id')
         return queryset.order_by(sort_by)
 
@@ -371,9 +421,9 @@ class CarrierCompanyViewSet(viewsets.ModelViewSet):
     serializer_class = CarrierCompanySerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'name')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+        queryset = super().get_queryset().filter(company=self.request.company)
+        sort_by = self.request.query_params.get('sort_by', 'name')
+        return queryset.order_by(sort_by)
 
 
 # ViewSet для Автомобилей
@@ -382,10 +432,9 @@ class VehicleViewSet(viewsets.ModelViewSet):
     serializer_class = VehicleSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by',
-                                                'license_plate')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+        queryset = super().get_queryset().filter(company=self.request.company)
+        sort_by = self.request.query_params.get('sort_by', 'license_plate')
+        return queryset.order_by(sort_by)
 
 
 # ViewSet для Транспортных Накладных
@@ -394,9 +443,9 @@ class TransportBillViewSet(viewsets.ModelViewSet):
     serializer_class = TransportBillSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()  # Получаем первоначальный queryset из родительского метода
-        sort_by = self.request.query_params.get('sort_by', 'bill_code')  # Получаем параметр для сортировки из запроса
-        return queryset.order_by(sort_by)  # Сортируем по переданному полю (по умолчанию 'name')
+        queryset = super().get_queryset().filter(company=self.request.company)
+        sort_by = self.request.query_params.get('sort_by', 'bill_code')
+        return queryset.order_by(sort_by)
 
 
 # ViewSet для Перемещений Грузов
@@ -405,8 +454,8 @@ class CargoMovementViewSet(viewsets.ModelViewSet):
     serializer_class = CargoMovementSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        sort_by = self.request.query_params.get('sort_by', 'id')  # ← заменить name на id
+        queryset = super().get_queryset().filter(company=self.request.company)
+        sort_by = self.request.query_params.get('sort_by', 'id')
         return queryset.order_by(sort_by)
 
 
@@ -426,7 +475,11 @@ def sse_clients_stream(request):
         local_ts = 0
         while True:
             if last_update_timestamp > local_ts:
-                data = list(Client.objects.values('id', 'client_code', 'description'))
+                data = list(
+                    Client.objects.filter(company=request.company).values(
+                        'id', 'client_code', 'description'
+                    )
+                )
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 local_ts = last_update_timestamp
             time.sleep(30)
@@ -441,7 +494,7 @@ def references_page(request):
         "company_name": request.user.company.name
     })
 
+
 @login_required
 def products_page(request):
     return render(request, "cargo_acc/product_table.html")
-

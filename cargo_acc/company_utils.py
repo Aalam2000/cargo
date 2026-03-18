@@ -3,10 +3,61 @@ from cargo_acc.models import SystemActionLog
 
 
 def get_user_company(request):
-    user = request.user
-    if not user or not hasattr(user, "company") or user.company is None:
-        raise PermissionDenied("Компания пользователя не определена")
-    return user.company
+    company = getattr(request, "company", None)
+    if company is not None:
+        return company
+
+    user = getattr(request, "user", None)
+    if user and hasattr(user, "company") and user.company is not None:
+        return user.company
+
+    raise PermissionDenied("Компания пользователя не определена")
+
+
+def get_user_role(request):
+    role = getattr(request, "role", None)
+    if role is not None:
+        return role
+
+    user = getattr(request, "user", None)
+    return getattr(user, "role", None)
+
+
+def get_user_access_level(request):
+    access_level = getattr(request, "access_level", None)
+    if access_level is not None:
+        return access_level
+
+    user = getattr(request, "user", None)
+    return getattr(user, "access_level", None)
+
+
+def get_user_assigned_object(request):
+    assigned_object = getattr(request, "assigned_object", None)
+    if assigned_object is not None:
+        return assigned_object
+
+    user = getattr(request, "user", None)
+    return getattr(user, "assigned_object", None)
+
+
+def get_user_timezone(request):
+    tz = getattr(request, "timezone", None)
+    if tz:
+        return tz
+
+    user = getattr(request, "user", None)
+    return getattr(user, "timezone", "UTC") or "UTC"
+
+
+def get_user_table_settings(request):
+    table_settings = getattr(request, "table_settings", None)
+    if table_settings is not None:
+        return table_settings
+
+    user = getattr(request, "user", None)
+    return getattr(user, "table_settings", None) or {}
+
 
 def get_log_meta(model_name, object_id):
     logs = SystemActionLog.objects.filter(
