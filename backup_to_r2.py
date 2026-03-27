@@ -213,9 +213,12 @@ def upload_to_r2(file_path: Path) -> float:
     r2_access_key = os.getenv("R2_ACCESS_KEY_ID")
     r2_secret_key = os.getenv("R2_SECRET_ACCESS_KEY")
     r2_bucket = os.getenv("R2_BUCKET_NAME")
+    r2_folder = os.getenv("R2_FOLDER", "backups")
 
     if not all([r2_endpoint, r2_access_key, r2_secret_key, r2_bucket]):
         raise RuntimeError("R2 credentials missing in env")
+
+    object_key = f"{r2_folder.rstrip('/')}/{file_path.name}"
 
     s3 = boto3.client(
         "s3",
@@ -226,7 +229,7 @@ def upload_to_r2(file_path: Path) -> float:
         region_name="auto",
     )
 
-    s3.upload_file(str(file_path), r2_bucket, file_path.name)
+    s3.upload_file(str(file_path), r2_bucket, object_key)
     return time.perf_counter() - start
 
 
