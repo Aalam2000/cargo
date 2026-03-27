@@ -20,5 +20,25 @@ services:
     volumes:
       - /var/www/cargodb/staticfiles:/app/staticfiles
       - /var/www/cargodb/media:/app/media
+      - /var/www/cargodb/translations:/app/translations
+
+    restart: unless-stopped
+
+  translation_worker:
+    image: ghcr.io/aalam2000/cargodb:latest
+    container_name: cargo_translation_worker
+
+    command: >
+      sh -c "
+      mkdir -p /app/translations &&
+      python manage.py translation_worker --interval 300
+      "
+
+    env_file:
+      - .env.prod
+      - .env.secrets
+
+    volumes:
+      - /var/www/cargodb/translations:/app/translations
 
     restart: unless-stopped

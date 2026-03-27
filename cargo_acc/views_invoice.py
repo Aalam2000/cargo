@@ -46,7 +46,7 @@ BASE_FILE_URL = f"file://{WEB_STATIC_ROOT}"
 def product_invoice_pdf(request, pk):
     logger.debug("=== START PDF GENERATION ===")
 
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product, pk=pk, company=request.company)
     logger.debug(f"Product loaded: id={product.id}, code={product.product_code}")
 
     logger.debug(f"WEB_STATIC_ROOT = {WEB_STATIC_ROOT}")
@@ -75,12 +75,12 @@ def product_invoice_pdf(request, pk):
 
         pdf = HTML(
             string=html,
-            base_url=BASE_FILE_URL,  # локальный file://, без HTTP
+            base_url=BASE_FILE_URL,
         ).write_pdf()
 
         logger.debug("PDF generated successfully")
 
-    except Exception as e:
+    except Exception:
         logger.error("PDF generation failed", exc_info=True)
         raise
 

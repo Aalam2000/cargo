@@ -53,6 +53,15 @@ def cargos_table_view(request):
             elif role not in ("Admin", "Operator"):
                 return JsonResponse({"error": "forbidden"}, status=403)
 
+            if cargo_id:
+                try:
+                    cargo = Cargo.objects.get(id=cargo_id, company=company)
+                except Cargo.DoesNotExist:
+                    return JsonResponse({"error": "cargo not found"}, status=404)
+
+                if str(cargo.client_id) != str(client_id):
+                    return JsonResponse({"error": "client mismatch"}, status=400)
+
             base_qs = Product.objects.filter(
                 company=company,
                 client_id=client_id,
@@ -141,7 +150,6 @@ def cargos_table_view(request):
             # продолжаем выполнение ниже
             pass
 
-
     # POST-mode: создать груз и привязать выбранные товары
     if request.method == "POST":
         try:
@@ -149,6 +157,8 @@ def cargos_table_view(request):
             data = json.loads(request.body.decode("utf-8"))
         except Exception:
             return JsonResponse({"error": "bad json"}, status=400)
+
+        from cargo_acc.models import Client
 
         company = get_user_company(request)
         user = request.user
@@ -162,12 +172,24 @@ def cargos_table_view(request):
         if not client_id:
             return JsonResponse({"error": "client_id required"}, status=400)
 
+        try:
+            client_id = int(client_id)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "bad client_id"}, status=400)
+
+        client = Client.objects.filter(id=client_id, company=company).first()
+        if not client:
+            return JsonResponse({"error": "client not found"}, status=404)
+
         if cargo_id:
             # EDIT MODE
             try:
                 cargo = Cargo.objects.get(id=cargo_id, company=company)
             except Cargo.DoesNotExist:
                 return JsonResponse({"error": "cargo not found"}, status=404)
+
+            if cargo.client_id != client.id:
+                return JsonResponse({"error": "client mismatch"}, status=400)
         else:
             # CREATE MODE
             if not cargo_code:
@@ -176,20 +198,21 @@ def cargos_table_view(request):
         if not isinstance(product_ids, list) or not product_ids:
             return JsonResponse({"error": "product_ids required"}, status=400)
 
-        company = get_user_company(request)
-        user = request.user
-        role = getattr(user, "role", "")
         if role not in ("Admin", "Operator"):
             return JsonResponse({"error": "forbidden"}, status=403)
 
-        uniq_ids = sorted({int(x) for x in product_ids if str(x).strip()})
+        try:
+            uniq_ids = sorted({int(x) for x in product_ids if str(x).strip()})
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "bad product_ids"}, status=400)
+
         if not uniq_ids:
             return JsonResponse({"error": "product_ids required"}, status=400)
 
         if cargo_id:
             qs_products = Product.objects.filter(
                 company=company,
-                client_id=client_id,
+                client_id=client.id,
                 id__in=uniq_ids,
             ).filter(
                 Q(cargo_id__isnull=True) | Q(cargo_id=cargo.id)
@@ -197,7 +220,7 @@ def cargos_table_view(request):
         else:
             qs_products = Product.objects.filter(
                 company=company,
-                client_id=client_id,
+                client_id=client.id,
                 id__in=uniq_ids,
                 cargo_id__isnull=True,
             )
@@ -207,29 +230,28 @@ def cargos_table_view(request):
             missing = sorted(set(uniq_ids) - set(found_ids))
             return JsonResponse({"error": "some products not available", "missing": missing}, status=400)
 
-        if not cargo_id:
-            # CREATE — строгая проверка
-            cargo_status_id = data.get("cargo_status_id")
-            packaging_type_id = data.get("packaging_type_id")
-            warehouse_id = data.get("warehouse_id")
-        else:
+        if cargo_id:
             # EDIT — берём из POST
             warehouse_id = data.get("warehouse_id", cargo.warehouse_id)
             cargo_status_id = data.get("cargo_status_id", cargo.cargo_status_id)
             packaging_type_id = data.get("packaging_type_id", cargo.packaging_type_id)
+        else:
+            # CREATE — строгая проверка
+            cargo_status_id = data.get("cargo_status_id")
+            packaging_type_id = data.get("packaging_type_id")
+            warehouse_id = data.get("warehouse_id")
 
         with transaction.atomic():
             if cargo_id:
                 # --- EDIT ---
-                # убираем товары, которые сняли
                 Product.objects.filter(
                     company=company,
                     cargo_id=cargo.id
                 ).exclude(id__in=uniq_ids).update(cargo_id=None)
 
-                # добавляем новые
                 Product.objects.filter(
                     company=company,
+                    client_id=client.id,
                     id__in=uniq_ids
                 ).update(
                     cargo_id=cargo.id,
@@ -256,7 +278,7 @@ def cargos_table_view(request):
                 # --- CREATE ---
                 cargo = Cargo.objects.create(
                     company=company,
-                    client_id=client_id,
+                    client_id=client.id,
                     cargo_code=cargo_code,
                     cargo_status_id=cargo_status_id,
                     packaging_type_id=packaging_type_id,
@@ -265,7 +287,11 @@ def cargos_table_view(request):
                     updated_by=user,
                 )
 
-                Product.objects.filter(company=company, id__in=uniq_ids).update(
+                Product.objects.filter(
+                    company=company,
+                    client_id=client.id,
+                    id__in=uniq_ids
+                ).update(
                     cargo_id=cargo.id,
                     warehouse_id=warehouse_id,
                     cargo_status_id=cargo_status_id,
@@ -279,8 +305,8 @@ def cargos_table_view(request):
                 action=action,
                 old_data={},
                 new_data={
-                    "client_id": int(client_id),
-                    "cargo_code": cargo_code,
+                    "client_id": client.id,
+                    "cargo_code": cargo.cargo_code,
                     "cargo_status_id": int(cargo_status_id),
                     "packaging_type_id": int(packaging_type_id),
                     "warehouse_id": int(warehouse_id) if warehouse_id else None,
@@ -323,12 +349,10 @@ def cargos_table_view(request):
     elif role not in ("Admin", "Operator"):
         return JsonResponse({"results": [], "total": 0, "has_more": False})
 
-    # Подсчёт товаров в грузе (без предположений про related_name)
     cnt_sq = Product.objects.filter(company=company, cargo_id=OuterRef("pk")) \
                  .values("cargo_id").annotate(c=Count("id")).values("c")[:1]
     qs = qs.annotate(products_count=Subquery(cnt_sq, output_field=IntegerField()))
 
-    # Быстрый общий поиск
     if search:
         qs = qs.filter(
             Q(cargo_code__icontains=search) |
@@ -338,7 +362,6 @@ def cargos_table_view(request):
             Q(packaging_type__name__icontains=search)
         )
 
-    # -------- FILTERING (как товары) --------
     FILTERABLE = {
         "cargo_code": "cargo_code",
         "client": "client__client_code",
@@ -360,19 +383,18 @@ def cargos_table_view(request):
 
         qs = qs.filter(**{f"{orm_field}__icontains": val})
 
-    # SORTING
     SORTABLE = {
-            "cargo_code": "cargo_code",
-            "client": "client__client_code",
-            "products_count": "products_count",
-            "warehouse": "warehouse__name",
-            "cargo_status": "cargo_status__name",
-            "packaging_type": "packaging_type__name",
-            "weight_total": "weight_total",
-            "volume_total": "volume_total",
-            "is_locked": "is_locked",
-            "created_at": "created_at",
-        }
+        "cargo_code": "cargo_code",
+        "client": "client__client_code",
+        "products_count": "products_count",
+        "warehouse": "warehouse__name",
+        "cargo_status": "cargo_status__name",
+        "packaging_type": "packaging_type__name",
+        "weight_total": "weight_total",
+        "volume_total": "volume_total",
+        "is_locked": "is_locked",
+        "created_at": "created_at",
+    }
 
     if sort_by == "record_date":
         field = "id"

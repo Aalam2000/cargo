@@ -432,7 +432,9 @@ class VehicleViewSet(viewsets.ModelViewSet):
     serializer_class = VehicleSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset().filter(company=self.request.company)
+        queryset = super().get_queryset().filter(
+            carrier_company__company=self.request.company
+        )
         sort_by = self.request.query_params.get('sort_by', 'license_plate')
         return queryset.order_by(sort_by)
 

@@ -331,3 +331,55 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+// ===============================
+//  ПЕРЕКЛЮЧАТЕЛЬ ЯЗЫКА
+// ===============================
+(function () {
+    const COOKIE_NAME = 'ui_lang';
+    const SUPPORTED = ['ru', 'en', 'az', 'tr', 'zh-hans', 'zh-hant', 'zh-hk'];
+
+    function getCookie(name) {
+        const prefix = name + '=';
+        const cookies = document.cookie.split(';').map(v => v.trim());
+        for (const c of cookies) {
+            if (c.startsWith(prefix)) {
+                return decodeURIComponent(c.slice(prefix.length));
+            }
+        }
+        return '';
+    }
+
+    function setCookie(name, value, days = 365) {
+        const expires = new Date(Date.now() + days * 86400000).toUTCString();
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    }
+
+    function getCurrentLang() {
+        const fromCookie = getCookie(COOKIE_NAME);
+        if (SUPPORTED.includes(fromCookie)) return fromCookie;
+
+        const htmlLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+        if (SUPPORTED.includes(htmlLang)) return htmlLang;
+
+        return 'ru';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('langSwitch');
+        if (!select) return;
+
+        const currentLang = getCurrentLang();
+        select.value = currentLang;
+        document.documentElement.setAttribute('lang', currentLang);
+
+        select.addEventListener('change', () => {
+            const newLang = select.value;
+            if (!SUPPORTED.includes(newLang)) return;
+
+            setCookie(COOKIE_NAME, newLang);
+            document.documentElement.setAttribute('lang', newLang);
+            window.location.reload();
+        });
+    });
+})();

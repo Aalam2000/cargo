@@ -27,12 +27,14 @@ def add_or_edit_payment(request):
         AccrualType,
     )
 
+    company = request.company
+    user = request.user
+
     # ============================
     # GET (получение документа)
     # ============================
     if request.method == "GET":
         pay_id = request.GET.get("id")
-        company = get_user_company(request)
         p = Payment.objects.filter(id=pay_id, company=company).first()
         if not p:
             return JsonResponse({"error": "Платёж не найден"}, status=404)
@@ -64,19 +66,16 @@ def add_or_edit_payment(request):
     # ============================
     # POST / PUT (создание/редактирование)
     # ============================
-
     try:
         data = json.loads(request.body.decode("utf-8"))
     except Exception:
         return JsonResponse({"error": "Некорректный JSON"}, status=400)
 
-    user = request.user
     if user.role not in ["Admin", "Operator"]:
         return JsonResponse({"error": "Нет прав"}, status=403)
 
     # --- Клиент ---
     client_code = data.get("client_code")
-    company = get_user_company(request)
     client = Client.objects.filter(client_code=client_code, company=company).first()
     if not client:
         return JsonResponse({"error": "Клиент не найден"}, status=400)
@@ -100,13 +99,19 @@ def add_or_edit_payment(request):
     operation_type_id = data.get("operation_type_id")
 
     if operation_kind == 1:  # Оплата
-        operation_type = PaymentType.objects.filter(id=operation_type_id).first()
+        operation_type = PaymentType.objects.filter(
+            id=operation_type_id,
+            company=company,
+        ).first()
         if not operation_type:
             return JsonResponse({"error": "Некорректный вид оплаты"}, status=400)
         signed_amount = -abs(raw_amount)
 
     else:  # Начисление
-        operation_type = AccrualType.objects.filter(id=operation_type_id).first()
+        operation_type = AccrualType.objects.filter(
+            id=operation_type_id,
+            company=company,
+        ).first()
         if not operation_type:
             return JsonResponse({"error": "Некорректный вид начисления"}, status=400)
         signed_amount = abs(raw_amount)
@@ -119,7 +124,6 @@ def add_or_edit_payment(request):
     # ============================
     if request.method == "PUT":
         pay_id = data.get("id")
-        company = get_user_company(request)
         p = Payment.objects.filter(id=pay_id, company=company).first()
         if not p:
             return JsonResponse({"error": "Платёж не найден"}, status=404)
@@ -130,8 +134,10 @@ def add_or_edit_payment(request):
 
         # ❗ НЕЛЬЗЯ менять тип операции (Оплата/Начисление)
         if p.operation_kind != operation_kind:
-            return JsonResponse({"error": "Нельзя менять тип операции (Оплата/Начисление) при редактировании"},
-                                status=400)
+            return JsonResponse(
+                {"error": "Нельзя менять тип операции (Оплата/Начисление) при редактировании"},
+                status=400,
+            )
 
         # ❗ НЕЛЬЗЯ менять вид операции (PaymentType / AccrualType)
         old_type_id = p.payment_type_id if p.operation_kind == 1 else p.accrual_type_id
@@ -143,10 +149,7 @@ def add_or_edit_payment(request):
         p.amount_total = signed_amount
         p.currency = currency
         p.exchange_rate = exchange_rate
-
-        # ❗ Пересчёт строго на стороне сервера
         p.amount_usd = round(abs(signed_amount) / exchange_rate, 2)
-
         p.method = method
         p.comment = comment
         p.products = products
@@ -158,9 +161,8 @@ def add_or_edit_payment(request):
     # ============================
     # CREATE (POST)
     # ============================
-
     p = Payment.objects.create(
-        company=client.company,
+        company=company,
         client=client,
         payment_date=payment_date,
         amount_total=signed_amount,
@@ -263,6 +265,7 @@ def get_currency_rate(request):
 def client_balance(request):
     user = request.user
     role = getattr(user, "role", "")
+    company = request.company
 
     # --- 1. Определяем клиента ---
     if role == "Client":
@@ -273,7 +276,13 @@ def client_balance(request):
                 "last_payment_date": "",
                 "last_payment_amount": 0
             })
-        client = linked
+
+        client = Client.objects.filter(
+            id=linked.id,
+            company=company,
+        ).first()
+        if not client:
+            return JsonResponse({"error": "forbidden"}, status=403)
 
     elif role in ("Admin", "Operator"):
         code = request.GET.get("client_code", "").strip()
@@ -284,28 +293,34 @@ def client_balance(request):
                 "last_payment_amount": 0
             })
 
-        company = get_user_company(request)
-        client = Client.objects.filter(client_code__icontains=code, company=company).first()
+        client = Client.objects.filter(
+            client_code__icontains=code,
+            company=company,
+        ).first()
         if not client:
-
             return JsonResponse({
                 "total_paid": 0,
                 "last_payment_date": "",
                 "last_payment_amount": 0
             })
 
-
-
     else:
         return JsonResponse({"error": "forbidden"}, status=403)
 
     # --- 2. BALANCE + LAST PAYMENT + USER INFO ---
-    payments = Payment.objects.filter(client=client, company=client.company).order_by("-payment_date", "-id")
+    payments = Payment.objects.filter(
+        client=client,
+        company=company,
+    ).order_by("-payment_date", "-id")
 
     balance = sum(p.amount_usd for p in payments)
 
     last_payment = (
-        Payment.objects.filter(client=client, company=client.company, operation_kind=1)
+        Payment.objects.filter(
+            client=client,
+            company=company,
+            operation_kind=1,
+        )
         .order_by("-payment_date", "-id")
         .first()
     )
@@ -314,7 +329,10 @@ def client_balance(request):
     last_payment_amount = float(last_payment.amount_total) if last_payment else 0
 
     from accounts.models import CustomUser
-    user_obj = CustomUser.objects.filter(linked_client=client).first()
+    user_obj = CustomUser.objects.filter(
+        linked_client=client,
+        company=company,
+    ).first()
     user_name = f"{user_obj.first_name} {user_obj.last_name}".strip() if user_obj else ""
 
     return JsonResponse({

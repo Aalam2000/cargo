@@ -1,15 +1,19 @@
 # cargodb/views.py
 import json
+import os
 import sys
 
+from autoi18n import Translator
+from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.db.models import Q
 from django.db.models import Sum
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 
 from cargo_acc.models import Cargo
@@ -18,9 +22,54 @@ from cargo_acc.models import Product, Payment
 from .forms import UserLoginForm
 
 
-# @login_required
-# def profile_view(request):
-#     return render(request, 'accounts/profile.html')
+SUPPORTED_UI_LANGS = {"ru", "en", "az", "tr", "zh-hans", "zh-hant", "zh-hk"}
+_TRANSLATOR = None
+
+
+def _get_ui_lang(request):
+    lang = (request.COOKIES.get("ui_lang") or "ru").strip().lower()
+
+    aliases = {
+        "zh": "zh-hans",
+        "zh-cn": "zh-hans",
+        "zh-sg": "zh-hans",
+        "zh-tw": "zh-hant",
+        "zh-mo": "zh-hant",
+        "zh-hk": "zh-hk",
+    }
+    lang = aliases.get(lang, lang)
+
+    return lang if lang in SUPPORTED_UI_LANGS else "ru"
+
+
+def _get_translator():
+    global _TRANSLATOR
+    if _TRANSLATOR is None:
+        _TRANSLATOR = Translator(
+            cache_dir=os.path.join(settings.BASE_DIR, "translations"),
+            source_lang="ru",
+        )
+    return _TRANSLATOR
+
+
+def render_translated(request, template_name, context=None, page_name="page", status=200):
+    context = context or {}
+    html = render_to_string(template_name, context, request=request)
+
+    target_lang = _get_ui_lang(request)
+    if target_lang == "ru":
+        return HttpResponse(html, status=status)
+
+    try:
+        translated_html = _get_translator().translate_html(
+            html=html,
+            target_lang=target_lang,
+            page_name=page_name,
+        )
+        return HttpResponse(translated_html, status=status)
+    except Exception:
+        return HttpResponse(html, status=status)
+
 
 @csrf_exempt
 def js_log(request):
@@ -67,10 +116,8 @@ def cargo_table_view(request):
 
 @login_required
 def cargo_table_config(request):
-    user = request.user
-    role = getattr(user, "role", "")
+    role = request.role or ""
 
-    # дефолтные колонки
     admin_columns = [
         {"field": "cargo_code", "label": "Код", "visible": True},
         {"field": "cargo_description", "label": "Описание", "visible": True},
@@ -107,33 +154,30 @@ def cargo_table_config(request):
         {"field": "delivery_date", "label": "Дата доставки", "visible": True},
     ]
 
-    # выбираем базовый шаблон
     default_columns = admin_columns if role in ["Admin", "Operator"] else client_columns
     config = {"columns": default_columns, "page_size": 50}
 
-    # если у пользователя уже сохранены настройки — применяем
-    user_settings = getattr(user, "table_settings", None) or {}
-    if "cargo_table" in user_settings:
-        saved_cfg = user_settings["cargo_table"]
+    table_settings = request.table_settings or {}
+    if "cargo_table" in table_settings:
+        saved_cfg = table_settings["cargo_table"]
         if isinstance(saved_cfg, dict):
             saved_columns = {c["field"]: c for c in saved_cfg.get("columns", [])}
 
-            # объединяем дефолтные с сохранёнными (только visible и порядок)
             merged_columns = []
             for col in default_columns:
-                field = col["field"]
+                merged_col = col.copy()
+                field = merged_col["field"]
                 if field in saved_columns:
-                    col["visible"] = saved_columns[field].get("visible", col["visible"])
-                merged_columns.append(col)
+                    merged_col["visible"] = saved_columns[field].get("visible", merged_col["visible"])
+                merged_columns.append(merged_col)
 
-            # добавляем пользовательские поля, которых больше нет в дефолтах
+            existing_fields = {c["field"] for c in merged_columns}
             for field, col in saved_columns.items():
-                if field not in [c["field"] for c in merged_columns]:
+                if field not in existing_fields:
                     merged_columns.append(col)
 
             config["columns"] = merged_columns
 
-            # обновляем page_size, если есть
             if "page_size" in saved_cfg:
                 config["page_size"] = saved_cfg["page_size"]
 
@@ -142,24 +186,26 @@ def cargo_table_config(request):
 
 @login_required
 def cargo_table_data(request):
-    user = request.user
+    role = request.role or ""
     company = request.company
+    assigned_object = request.assigned_object
+
     offset = int(request.GET.get("offset", 0))
     limit = int(request.GET.get("limit", 50))
-    role = getattr(user, "role", "")
 
-    # все возможные фильтры, приходящие с фронта
     filters = {k: v for k, v in request.GET.items() if v}
 
     qs = Cargo.objects.select_related(
         "client", "cargo_status", "packaging_type"
     ).filter(company=company)
 
-    # --- РОЛЬ КЛИЕНТА ---
-    if role == "Client" and user.client_code:
-        qs = qs.filter(client__company=company, client__client_code=user.client_code)
+    if role == "Client":
+        client_obj = assigned_object if isinstance(assigned_object, Client) else None
+        if client_obj and client_obj.company_id == company.id:
+            qs = qs.filter(client=client_obj)
+        else:
+            qs = qs.none()
 
-    # --- Универсальная фильтрация (без числовых и суммовых полей) ---
     excluded_fields = [
         "weight", "volume", "cost", "insurance",
         "packaging_cost", "tariff_min", "tariff_weight",
@@ -331,7 +377,7 @@ def index_view(request):
     """
     if request.user.is_authenticated:
         return redirect("home")
-    return render(request, "index.html")
+    return render_translated(request, "index.html", page_name="index")
 
 
 # ==============================
@@ -382,14 +428,16 @@ def home_view(request):
     in_transit = products.exclude(id__in=delivered.values_list("id", flat=True))
     clients = Client.objects.filter(company=company).order_by("client_code") if role == "Operator" else []
 
-    return render(request, "home.html", {
+    context = {
         "role": role,
         "delivered": delivered,
         "in_transit": in_transit,
         "payments": payments.order_by("-payment_date"),
         "clients": clients,
         "selected_client": client_id,
-    })
+    }
+
+    return render_translated(request, "home.html", context=context, page_name="home")
 
 
 # ==============================
@@ -397,17 +445,18 @@ def home_view(request):
 # ==============================
 @login_required
 def client_balance(request):
-    user = request.user
-    role = getattr(user, "role", "")
+    role = request.role or ""
     company = request.company
+    assigned_object = request.assigned_object
     client_code = request.GET.get("client_code", "").strip()
+
     total_paid = 0.0
     last_payment_date = None
     last_payment_amount = 0.0
 
     if role == "Client":
-        client_obj = getattr(user, "linked_client", None)
-        if client_obj and getattr(client_obj, "company_id", None) == getattr(company, "id", None):
+        client_obj = assigned_object if isinstance(assigned_object, Client) else None
+        if client_obj and client_obj.company_id == company.id:
             payments = Payment.objects.filter(
                 company=company,
                 client=client_obj,
@@ -424,7 +473,7 @@ def client_balance(request):
 
         client = Client.objects.filter(
             company=company,
-            client_code__icontains=client_code,
+            client_code=client_code,
         ).first()
 
         if client:
