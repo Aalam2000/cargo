@@ -18,8 +18,10 @@ TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 if os.name == "nt":
     load_dotenv(PROJECT_ROOT / ".env.dev")
+    load_dotenv(PROJECT_ROOT / ".env.secrets")
 else:
     load_dotenv(PROJECT_ROOT / ".env.prod")
+    load_dotenv(PROJECT_ROOT / ".env.secrets")
 
 STAMP = time.strftime("%Y-%m-%d_%H-%M-%S")
 MODE = os.getenv("ENVIRONMENT", "development").lower()
