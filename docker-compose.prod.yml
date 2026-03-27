@@ -31,7 +31,7 @@ services:
     command: >
       sh -c "
       mkdir -p /app/translations &&
-      python manage.py translation_worker --interval 300
+      python -u manage.py translation_worker --interval 300
       "
 
     env_file:

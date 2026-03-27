@@ -178,3 +178,8 @@ SITE_URL = os.getenv("SITE_URL", "https://crm.bona-plus.ru/").rstrip("/") + "/"
 # === CargoChats SSO ===
 CARGOCHATS_URL = "https://openai.bona-plus.ru/ui/resources"
 CARGOCHATS_JWT_SECRET = os.getenv("CARGOCHATS_JWT_SECRET", SECRET_KEY)
+AUTO_I18N_TARGET_LANGS = [
+    item.strip()
+    for item in os.getenv("AUTO_I18N_TARGET_LANGS", "").split(",")
+    if item.strip()
+]
