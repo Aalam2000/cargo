@@ -602,11 +602,11 @@ html, body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: #fff3cd;
-    border: 2px solid #ff9800;
+    background: #fff;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 8px 12px;
-    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.25);
+    box-shadow: var(--shadow);
 }
 
 .lang-switcher__label {
