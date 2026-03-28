@@ -5,6 +5,7 @@ from django.template.loader import render_to_string
 from django.http import HttpResponse
 from weasyprint import HTML
 from .models import Product
+from cargodb.views import _get_translator, _get_ui_lang
 
 
 # ---------------------------------------------------------
@@ -64,6 +65,8 @@ def product_invoice_pdf(request, pk):
             "css_url": CSS_FILE_URL,
         }
     )
+    translator = _get_translator()
+    html = translator.translate_html(html, target_lang=_get_ui_lang(request), page_name="invoice/product_invoice.html")
 
     logger.debug("HTML rendered successfully")
     logger.debug("=== HTML START ===")

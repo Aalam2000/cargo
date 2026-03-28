@@ -11,11 +11,17 @@ from django.views.decorators.http import require_POST, require_http_methods
 from cargo_acc.company_utils import get_user_company, get_log_meta
 from cargo_acc.models import Cargo, Product
 from cargo_acc.models import SystemActionLog
+from cargodb.views import render_translated
 
 
 @login_required
 def cargos_page(request):
-    return render(request, "cargo_acc/cargo_table.html", {"role": getattr(request.user, "role", "")})
+    return render_translated(
+        request=request,
+        template_name="cargo_acc/cargo_table.html",
+        context={"role": getattr(request.user, "role", "")},
+        page_name="cargo_acc/cargo_table.html",
+    )
 
 
 @require_http_methods(["GET", "POST"])
