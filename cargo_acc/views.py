@@ -21,6 +21,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+from cargodb.views import render_translated
 
 from .models import Company, Warehouse, CargoType, CargoStatus, PackagingType, Image, Product, Cargo, \
     CarrierCompany, Vehicle, TransportBill, CargoMovement, Client
@@ -491,12 +492,22 @@ def sse_clients_stream(request):
 
 @login_required
 def references_page(request):
-    return render(request, 'cargo_acc/references.html', {
-        "company_id": request.user.company.id,
-        "company_name": request.user.company.name
-    })
+    return render_translated(
+        request=request,
+        template_name="cargo_acc/references.html",
+        context={
+            "company_id": request.user.company.id,
+            "company_name": request.user.company.name,
+        },
+        page_name="cargo_acc/references.html",
+    )
 
 
 @login_required
 def products_page(request):
-    return render(request, "cargo_acc/product_table.html")
+    return render_translated(
+        request=request,
+        template_name="cargo_acc/product_table.html",
+        context={},
+        page_name="cargo_acc/product_table.html",
+    )
