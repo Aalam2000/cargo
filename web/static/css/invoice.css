@@ -1,7 +1,7 @@
 @page { size: A4 landscape; }
 
 body {
-    font-family: DejaVu Sans, Arial, sans-serif;
+    font-family: "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "DejaVu Sans", Arial, sans-serif;
     font-size: 13px;
     color: #000;
 }

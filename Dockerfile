@@ -5,7 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 libcairo2-dev \
     libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 \
     libgdk-pixbuf-2.0-0 gdk-pixbuf2.0-bin gdk-pixbuf2.0-common \
-    libjpeg-dev libpng-dev libffi-dev shared-mime-info fonts-dejavu-core \
+    libjpeg-dev libpng-dev libffi-dev shared-mime-info \
+    fonts-dejavu-core fonts-noto-cjk \
     gcc libpq-dev postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
