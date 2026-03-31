@@ -50,6 +50,8 @@
                             🤖 Чаты / AI-настройки
                         </button>
                     </div>
+                    <a href="/bot/bot-help/" class="guest-help-link">🤖 Инструкция по боту</a>
+                    <a href="/bot/platform-help/" class="guest-help-link">📘 Инструкция по платформе</a>
 
 
                 {% elif user.role == "Operator" %}
@@ -60,6 +62,10 @@
 {#                    <a href="#" class="menu-item">💳 Оплаты (в процессе)</a>#}
                     <a href="{% url 'profile' %}" class="menu-item">👤 Профиль</a>
                     <a href="#" class="menu-item logout" onclick="logoutUser()">🚪 Выход</a>
+                    <div class="admin-block">
+                        <a href="/bot/bot-help/" class="guest-help-link">🤖 Инструкция по боту</a>
+                        <a href="/bot/platform-help/" class="guest-help-link">📘 Инструкция по платформе</a>
+                    </div>
 
                 {% elif user.role == "WarehouseWorker" %}
                     <a href="#" class="menu-item">📷 Сканировать (в разработке)</a>
@@ -77,16 +83,21 @@
                 {% csrf_token %}
             </form>
 
-        {% else %}
-            <!-- До авторизации -->
-            <form class="login-form" method="post" action="{% url 'login' %}">
-                {% csrf_token %}
-                <h2>Вход</h2>
-                <input type="text" name="username" placeholder="Имя пользователя" required>
-                <input type="password" name="password" placeholder="Пароль" required>
-                <button type="submit">Войти</button>
-            </form>
-        {% endif %}
+                {% else %}
+                    <!-- До авторизации -->
+                    <form class="login-form" method="post" action="{% url 'login' %}">
+                        {% csrf_token %}
+                        <h2>Вход</h2>
+                        <input type="text" name="username" placeholder="Имя пользователя" required>
+                        <input type="password" name="password" placeholder="Пароль" required>
+                        <button type="submit">Войти</button>
+                    </form>
+
+                    <div class="guest-help-links">
+                        <a href="/bot/bot-help/" class="guest-help-link">Инструкция по боту</a>
+                        <a href="/bot/platform-help/" class="guest-help-link">Инструкция по платформе</a>
+                    </div>
+                {% endif %}
     </aside>
 
     <!-- Основной контент -->

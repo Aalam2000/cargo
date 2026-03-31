@@ -20,6 +20,7 @@ from accounts.models import CustomUser
 from accounts.services.client_actions import safe_parse_ai_json
 from .models import ChatSession
 from .langgraph_bot import run_admin_bot_graph
+from cargodb.views import render_translated
 
 # Загрузка ключа OpenAI
 load_dotenv()
@@ -404,3 +405,21 @@ def send_tg_reply(chat_id, text):
         return JsonResponse({"status": "error", "detail": str(e)})
 
     return JsonResponse({"status": "sent"})
+
+
+def bot_help_view(request):
+    return render_translated(
+        request,
+        "chatgpt_ui/bot_help.html",
+        context={},
+        page_name="bot_help",
+    )
+
+
+def platform_help_view(request):
+    return render_translated(
+        request,
+        "chatgpt_ui/platform_help.html",
+        context={},
+        page_name="platform_help",
+    )

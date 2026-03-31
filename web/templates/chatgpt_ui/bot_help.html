@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="right-panel">
+
+    <div class="intro-block">
+        <h1 class="page-title">
+            <span style="font-size:1.4em;">🤖</span>
+            Инструкция по работе с ботом
+        </h1>
+
+        <p class="text">
+            Telegram-бот Cargo помогает работать с платформой и выполнять основные действия без поиска нужных разделов вручную.
+        </p>
+
+        <p class="text">
+            Ссылка на бота:
+            <a href="https://t.me/cargo_adm_bot" target="_blank" rel="noopener noreferrer"><b>@cargo_adm_bot</b></a>
+        </p>
+
+        <p class="text">
+            Бот понимает два основных режима работы:
+        </p>
+
+        <ul class="list">
+            <li><b>Telegram не найден в системе</b> — бот считает, что это новая компания.</li>
+            <li><b>Telegram найден в системе</b> — бот считает, что пользователь уже работает в компании.</li>
+        </ul>
+    </div>
+
+    <div class="info-block">
+        <h2 class="section-title">
+            <span style="font-size:1.3em;">🏢</span> Если Telegram не найден
+        </h2>
+
+        <p class="text">
+            В этом режиме бот:
+        </p>
+
+        <ul class="list">
+            <li>объясняет, как работать с ботом;</li>
+            <li>объясняет, как работать с платформой;</li>
+            <li>создаёт новую компанию в системе.</li>
+        </ul>
+
+        <p class="text">
+            Для создания компании отправьте боту сообщение, где указаны:
+        </p>
+
+        <ul class="list">
+            <li><b>название компании</b>;</li>
+            <li><b>email главного администратора</b>;</li>
+            <li><b>Telegram главного администратора</b> — если есть.</li>
+        </ul>
+
+        <p class="text">
+            Пример:
+        </p>
+
+        <p class="text">
+            <b>Создать компанию "Bona Cargo", admin email: admin@example.com, telegram: @bonacargo</b>
+        </p>
+    </div>
+
+    <div class="info-block">
+        <h2 class="section-title">
+            <span style="font-size:1.3em;">👤</span> Если Telegram найден
+        </h2>
+
+        <p class="text">
+            В этом режиме бот:
+        </p>
+
+        <ul class="list">
+            <li>объясняет, как работать с ботом;</li>
+            <li>объясняет, как работать с платформой;</li>
+            <li>создаёт клиента;</li>
+            <li>создаёт пользователя компании.</li>
+        </ul>
+
+        <p class="text">
+            Отчёты по клиентам, пользователям и рабочим данным компании будут подключены позже.
+        </p>
+    </div>
+
+    <div class="info-block">
+        <h2 class="section-title">
+            <span style="font-size:1.3em;">✉️</span> Примеры запросов боту
+        </h2>
+
+        <ul class="list">
+            <li><b>Помощь</b></li>
+            <li><b>Как работать с платформой?</b></li>
+            <li><b>Как создать компанию?</b></li>
+            <li><b>Создать клиента client@example.com</b></li>
+            <li><b>Создать пользователя user@example.com</b></li>
+        </ul>
+    </div>
+
+    <div class="info-block">
+        <h2 class="section-title">
+            <span style="font-size:1.3em;">📌</span> Ограничение работы бота
+        </h2>
+
+        <p class="text">
+            Бот отвечает только по работе в Cargo: создание компании, создание клиента, создание пользователя компании и помощь по работе в системе.
+        </p>
+    </div>
+
+</div>
+{% endblock %}

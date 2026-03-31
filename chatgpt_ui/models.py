@@ -8,14 +8,22 @@ class ChatSession(models.Model):
     Состояние диалога для каждого Telegram-пользователя.
     """
     telegram_id = models.CharField(max_length=50, unique=True)
-    user = models.ForeignKey(CustomUser, null=True, blank=True,
-                             on_delete=models.SET_NULL)
+    user = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
-    # последний системный промпт, чтобы бот знал режим (создание клиента, компании и т.д.)
     last_prompt = models.TextField(null=True, blank=True)
+
+    pending_action = models.CharField(max_length=100, blank=True, default="")
+    dialog_mode = models.CharField(max_length=100, blank=True, default="idle")
+    user_lang = models.CharField(max_length=20, blank=True, default="ru")
+    context_json = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return f"Session {self.telegram_id}"
