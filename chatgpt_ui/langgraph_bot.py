@@ -10,6 +10,8 @@ from accounts.models import CustomUser
 from accounts.services.company_actions import enqueue_create_company_action
 from chatgpt_ui.models import ChatMessage, ChatSession
 from langgraph.graph import END, START, StateGraph
+from chatgpt_ui.services.ai.lang_detect import detect_language
+from chatgpt_ui.services.knowledge.loader import load_help_pages
 
 
 class AdminBotState(TypedDict, total=False):
@@ -243,7 +245,12 @@ def _get_last_assistant_message(session: ChatSession) -> str:
 
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
+    text = _clean_text(state.get("text"))
+
     session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
+
+    saved_lang = _clean_text(getattr(session, "user_lang", "")) or "en"
+    detected_lang = detect_language(text, fallback=saved_lang)
 
     return {
         "session_id": session.id,
@@ -252,8 +259,9 @@ def node_load_context(state: AdminBotState) -> AdminBotState:
         "stop": False,
         "pending_action": _clean_text(getattr(session, "pending_action", "")),
         "dialog_mode": _clean_text(getattr(session, "dialog_mode", "")) or "idle",
+        "context_json": getattr(session, "context_json", {}) or {},
+        "user_lang": detected_lang,
     }
-
 
 def node_detect_actor(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
@@ -390,9 +398,30 @@ def node_action_router_stub(state: AdminBotState) -> AdminBotState:
 
 
 def node_info_router_stub(state: AdminBotState) -> AdminBotState:
+    text = _clean_text(state.get("text")).lower()
+    pages = load_help_pages()
+
+    if any(word in text for word in ("бот", "bot")):
+        return {
+            "info_level": "bot_help",
+            "reply_text": "Инструкция по боту:\nhttps://crm.bona-plus.ru/bot/bot-help/",
+            "stop": True,
+        }
+
+    if any(word in text for word in ("платформ", "система", "cargo")):
+        return {
+            "info_level": "platform_help",
+            "reply_text": "Инструкция по платформе:\nhttps://crm.bona-plus.ru/bot/platform-help/",
+            "stop": True,
+        }
+
     return {
-        "info_level": "stub",
-        "reply_text": "Блок инструкций пока подключён как заглушка.",
+        "info_level": "general_help",
+        "reply_text": (
+            "Инструкции:\n"
+            "Бот: https://crm.bona-plus.ru/bot/bot-help/\n"
+            "Платформа: https://crm.bona-plus.ru/bot/platform-help/"
+        ),
         "stop": True,
     }
 
@@ -462,17 +491,27 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
     reply_text = _clean_text(state.get("reply_text"))
     pending_action = _clean_text(state.get("pending_action"))
     dialog_mode = _clean_text(state.get("dialog_mode")) or "idle"
+    user_lang = _clean_text(state.get("user_lang")) or "ru"
+    context_json = state.get("context_json") or {}
 
     if hasattr(session, "pending_action"):
         session.pending_action = pending_action
     if hasattr(session, "dialog_mode"):
         session.dialog_mode = dialog_mode
+    if hasattr(session, "user_lang"):
+        session.user_lang = user_lang
+    if hasattr(session, "context_json"):
+        session.context_json = context_json
 
     update_fields = []
     if hasattr(session, "pending_action"):
         update_fields.append("pending_action")
     if hasattr(session, "dialog_mode"):
         update_fields.append("dialog_mode")
+    if hasattr(session, "user_lang"):
+        update_fields.append("user_lang")
+    if hasattr(session, "context_json"):
+        update_fields.append("context_json")
     if update_fields:
         session.save(update_fields=update_fields)
 
