@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+import json
+
 from typing import Any, Dict, Optional, TypedDict
 
 from django.db.models import Q
@@ -13,8 +15,6 @@ from langgraph.graph import END, START, StateGraph
 from chatgpt_ui.services.ai.lang_detect import detect_language
 from chatgpt_ui.services.knowledge.loader import load_help_pages
 from chatgpt_ui.services.ai.prompt_loader import load_intent_prompt
-from chatgpt_ui.views import client  # используем уже созданный OpenAI клиент
-import json
 
 
 class AdminBotState(TypedDict, total=False):
@@ -250,36 +250,59 @@ def _get_last_assistant_message(session: ChatSession) -> str:
 
 
 def node_ai(state: AdminBotState) -> AdminBotState:
-    text = _clean_text(state.get("text"))
+    import json
+    import os
+    from openai import OpenAI
 
+    text = _clean_text(state.get("text"))
     prompt = load_intent_prompt()
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text},
-        ],
-    )
-
-    raw = response.choices[0].message.content or ""
-
-    try:
-        data = json.loads(raw)
-    except Exception:
-        data = {
-            "intent": "unknown",
-            "params": {},
-            "reply": "Не понял. Скажи по-другому.",
-            "lang": "en",
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return {
+            "ai_intent": "unknown",
+            "ai_params": {},
+            "reply_text": "Ошибка конфигурации AI.",
+            "user_lang": state.get("user_lang") or "en",
         }
 
-    return {
-        "ai_intent": data.get("intent"),
-        "ai_params": data.get("params") or {},
-        "reply_text": data.get("reply") or "",
-        "user_lang": data.get("lang") or state.get("user_lang"),
-    }
+    client = OpenAI(api_key=api_key)
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": text},
+            ],
+            temperature=0,
+        )
+        raw = response.choices[0].message.content or ""
+
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = {
+                "intent": "unknown",
+                "params": {},
+                "reply": "Не понял. Скажи по-другому.",
+                "lang": state.get("user_lang") or "en",
+            }
+
+        return {
+            "ai_intent": data.get("intent") or "unknown",
+            "ai_params": data.get("params") or {},
+            "reply_text": data.get("reply") or "",
+            "user_lang": data.get("lang") or state.get("user_lang") or "en",
+        }
+
+    except Exception:
+        return {
+            "ai_intent": "unknown",
+            "ai_params": {},
+            "reply_text": "Ошибка AI. Попробуй еще раз.",
+            "user_lang": state.get("user_lang") or "en",
+        }
 
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
