@@ -1,21 +1,19 @@
 # chatgpt_ui/langgraph_bot.py
 from __future__ import annotations
+
 import json
 import os
-from openai import OpenAI
 import re
-import json
-
 from typing import Any, Dict, Optional, TypedDict
 
 from django.db.models import Q
+from langgraph.graph import END, START, StateGraph
+from openai import OpenAI
 
 from accounts.models import CustomUser
 from accounts.services.company_actions import enqueue_create_company_action
 from chatgpt_ui.models import ChatMessage, ChatSession
-from langgraph.graph import END, START, StateGraph
 from chatgpt_ui.services.ai.lang_detect import detect_language
-from chatgpt_ui.services.knowledge.loader import load_help_pages
 from chatgpt_ui.services.ai.prompt_loader import load_intent_prompt
 from chatgpt_ui.services.knowledge.loader import load_help_pages
 
@@ -252,21 +250,57 @@ def _get_last_assistant_message(session: ChatSession) -> str:
     return _clean_text(last_msg.content if last_msg else "")
 
 
+def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) -> str:
+    session = ChatSession.objects.filter(telegram_id=str(telegram_id)).first()
+    if not session:
+        return ""
+
+    messages = list(
+        ChatMessage.objects.filter(session=session)
+        .order_by("-created_at", "-id")[:limit]
+    )
+    messages.reverse()
+
+    parts = []
+    for msg in messages:
+        role = (msg.role or "").strip().lower()
+        content = _clean_text(msg.content)
+        if not content:
+            continue
+
+        if role == "user":
+            parts.append(f"USER: {content}")
+        elif role == "assistant":
+            parts.append(f"ASSISTANT: {content}")
+        elif role == "system":
+            parts.append(f"SYSTEM: {content}")
+
+    return "\n".join(parts)
+
+
 def node_ai(state: AdminBotState) -> AdminBotState:
+    import json
+    import os
+    from openai import OpenAI
+
+    def _strip_html(text: str) -> str:
+        cleaned = re.sub(r"<[^>]+>", " ", text or "")
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned.strip()
+
     text = _clean_text(state.get("text"))
+    telegram_id = str(state.get("telegram_id") or "").strip()
     prompt = load_intent_prompt()
     pages = load_help_pages()
 
-    def _strip_html(text: str) -> str:
-        return re.sub(r"<[^>]+>", " ", text or "").strip()
-
-    bot_help = _strip_html(pages.get("bot_help"))
-    platform_help = _strip_html(pages.get("platform_help"))
+    bot_help = _strip_html(pages.get("bot_help") or "")
+    platform_help = _strip_html(pages.get("platform_help") or "")
+    history_text = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return {
-            "ai_intent": "unknown",
+            "ai_intent": "clarify",
             "ai_params": {},
             "reply_text": "Ошибка конфигурации AI.",
             "user_lang": state.get("user_lang") or "en",
@@ -279,7 +313,9 @@ def node_ai(state: AdminBotState) -> AdminBotState:
         f"{bot_help}\n\n"
         "PLATFORM_HELP_PAGE:\n"
         f"{platform_help}\n\n"
-        "USER_MESSAGE:\n"
+        "DIALOG_HISTORY_LAST_20:\n"
+        f"{history_text}\n\n"
+        "CURRENT_USER_MESSAGE:\n"
         f"{text}"
     )
 
@@ -306,14 +342,14 @@ def node_ai(state: AdminBotState) -> AdminBotState:
             data = json.loads(raw)
         except Exception:
             data = {
-                "intent": "unknown",
+                "intent": "clarify",
                 "params": {},
-                "reply": "Не понял. Скажи по-другому.",
+                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
                 "lang": state.get("user_lang") or "en",
             }
 
         return {
-            "ai_intent": data.get("intent") or "unknown",
+            "ai_intent": data.get("intent") or "clarify",
             "ai_params": data.get("params") or {},
             "reply_text": data.get("reply") or "",
             "user_lang": data.get("lang") or state.get("user_lang") or "en",
@@ -321,11 +357,12 @@ def node_ai(state: AdminBotState) -> AdminBotState:
 
     except Exception:
         return {
-            "ai_intent": "unknown",
+            "ai_intent": "clarify",
             "ai_params": {},
-            "reply_text": "Ошибка AI. Попробуй еще раз.",
+            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
             "user_lang": state.get("user_lang") or "en",
         }
+
 
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
@@ -347,6 +384,7 @@ def node_load_context(state: AdminBotState) -> AdminBotState:
         "user_lang": detected_lang,
     }
 
+
 def node_detect_actor(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
     username = _clean_text(state.get("username"))
@@ -359,10 +397,10 @@ def node_detect_actor(state: AdminBotState) -> AdminBotState:
 
         if username:
             candidates |= (
-                Q(telegram__iexact=username)
-                | Q(telegram__iexact=f"@{username}")
-                | Q(telegram__iexact=username.lower())
-                | Q(telegram__iexact=f"@{username.lower()}")
+                    Q(telegram__iexact=username)
+                    | Q(telegram__iexact=f"@{username}")
+                    | Q(telegram__iexact=username.lower())
+                    | Q(telegram__iexact=f"@{username.lower()}")
             )
 
         candidates |= Q(telegram__iexact=str(telegram_id).strip())
@@ -625,6 +663,7 @@ def route_after_identified(state: AdminBotState) -> str:
 
     return "finalize"
 
+
 def build_admin_bot_graph():
     graph = StateGraph(AdminBotState)
 
@@ -685,12 +724,12 @@ ADMIN_BOT_GRAPH = build_admin_bot_graph()
 
 
 def run_admin_bot_graph(
-    *,
-    telegram_id: str,
-    username: str = "",
-    first_name: str = "",
-    last_name: str = "",
-    text: str = "",
+        *,
+        telegram_id: str,
+        username: str = "",
+        first_name: str = "",
+        last_name: str = "",
+        text: str = "",
 ) -> Dict[str, Any]:
     initial_state: AdminBotState = {
         "telegram_id": str(telegram_id),
