@@ -409,65 +409,43 @@ def node_route_unidentified(state: AdminBotState) -> AdminBotState:
 
 
 def node_route_identified(state: AdminBotState) -> AdminBotState:
-    text = _clean_text(state.get("text"))
+    ai_intent = _clean_text(state.get("ai_intent"))
+    reply_text = _clean_text(state.get("reply_text"))
 
-    if _is_smalltalk(text):
+    if ai_intent in ("explain_system", "explain_bot", "clarify", "make_report"):
         return {
-            "request_level": "smalltalk",
-            "reply_text": "На связи. Могу: создать компанию, пользователя компании, клиента, дать инструкцию.",
-            "stop": True,
-        }
-
-    if _is_help_request(text):
-        return {
-            "request_level": "help",
-            "reply_text": _build_instruction_reply(),
-            "stop": True,
-        }
-
-    if _is_complaint(text):
-        pending_action = _clean_text(state.get("pending_action"))
-        dialog_mode = _clean_text(state.get("dialog_mode"))
-
-        if pending_action == "create_company" and dialog_mode == "await_company_data":
-            return {
-                "request_level": "complaint",
-                "reply_text": "Пока нет. Я жду от тебя данные компании: название и email главного админа.",
-                "stop": True,
-            }
-
-        return {
-            "request_level": "complaint",
-            "reply_text": "Пока нет выполненного действия. Напиши команду точнее.",
+            "request_level": ai_intent or "ai_reply",
+            "reply_text": reply_text,
             "stop": True,
         }
 
     return {
-        "request_level": "route_main",
+        "request_level": ai_intent or "route_main",
         "stop": False,
     }
 
 
 def node_action_router_stub(state: AdminBotState) -> AdminBotState:
-    text = _normalize_text(state.get("text"))
+    ai_intent = _clean_text(state.get("ai_intent"))
+    reply_text = _clean_text(state.get("reply_text"))
 
-    if "пользоват" in text or "юзер" in text or "сотрудник" in text:
+    if ai_intent == "create_user":
         return {
             "pending_action": "create_company_user",
-            "reply_text": "Режим создания пользователя компании пока подключён как заглушка.",
+            "reply_text": reply_text or "Создание пользователя компании пока настраивается.",
             "stop": True,
         }
 
-    if "клиент" in text:
+    if ai_intent == "create_client":
         return {
             "pending_action": "create_client",
-            "reply_text": "Режим создания клиента будет переведён в LangGraph следующим шагом.",
+            "reply_text": reply_text or "Создание клиента пока настраивается.",
             "stop": True,
         }
 
     return {
         "pending_action": "",
-        "reply_text": "Не понял команду. Напиши: создать компанию / создать пользователя / создать клиента / помощь.",
+        "reply_text": reply_text or "Уточни, что нужно сделать.",
         "stop": True,
     }
 
