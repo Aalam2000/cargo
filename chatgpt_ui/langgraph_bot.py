@@ -651,6 +651,7 @@ def build_admin_bot_graph():
     graph.add_node("execute_company_action", node_execute_company_action)
     graph.add_node("finalize", node_finalize)
     graph.add_node("node_ai", node_ai)
+    graph.add_edge("load_context", "detect_actor")
 
     graph.add_edge(START, "node_ai")
     graph.add_edge("node_ai", "load_context")
