@@ -633,8 +633,10 @@ def route_after_identified(state: AdminBotState) -> str:
     if intent == "create_user":
         return "action_router_stub"
 
-    return "finalize"
+    if intent in ("explain_system", "explain_bot", "clarify"):
+        return "finalize"
 
+    return "finalize"
 
 def build_admin_bot_graph():
     graph = StateGraph(AdminBotState)
