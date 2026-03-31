@@ -1,6 +1,8 @@
 # chatgpt_ui/langgraph_bot.py
 from __future__ import annotations
-
+import json
+import os
+from openai import OpenAI
 import re
 import json
 
@@ -251,16 +253,15 @@ def _get_last_assistant_message(session: ChatSession) -> str:
 
 
 def node_ai(state: AdminBotState) -> AdminBotState:
-    import json
-    import os
-    from openai import OpenAI
-
     text = _clean_text(state.get("text"))
     prompt = load_intent_prompt()
     pages = load_help_pages()
 
-    bot_help = (pages.get("bot_help") or "").strip()
-    platform_help = (pages.get("platform_help") or "").strip()
+    def _strip_html(text: str) -> str:
+        return re.sub(r"<[^>]+>", " ", text or "").strip()
+
+    bot_help = _strip_html(pages.get("bot_help"))
+    platform_help = _strip_html(pages.get("platform_help"))
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -291,7 +292,15 @@ def node_ai(state: AdminBotState) -> AdminBotState:
             ],
             temperature=0,
         )
-        raw = response.choices[0].message.content or ""
+        raw = (response.choices[0].message.content or "").strip()
+
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
+            raw = raw.rstrip("```").strip()
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
 
         try:
             data = json.loads(raw)
