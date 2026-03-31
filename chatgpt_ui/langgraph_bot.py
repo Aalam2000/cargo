@@ -15,6 +15,7 @@ from langgraph.graph import END, START, StateGraph
 from chatgpt_ui.services.ai.lang_detect import detect_language
 from chatgpt_ui.services.knowledge.loader import load_help_pages
 from chatgpt_ui.services.ai.prompt_loader import load_intent_prompt
+from chatgpt_ui.services.knowledge.loader import load_help_pages
 
 
 class AdminBotState(TypedDict, total=False):
@@ -256,6 +257,10 @@ def node_ai(state: AdminBotState) -> AdminBotState:
 
     text = _clean_text(state.get("text"))
     prompt = load_intent_prompt()
+    pages = load_help_pages()
+
+    bot_help = (pages.get("bot_help") or "").strip()
+    platform_help = (pages.get("platform_help") or "").strip()
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -268,12 +273,21 @@ def node_ai(state: AdminBotState) -> AdminBotState:
 
     client = OpenAI(api_key=api_key)
 
+    user_payload = (
+        "BOT_HELP_PAGE:\n"
+        f"{bot_help}\n\n"
+        "PLATFORM_HELP_PAGE:\n"
+        f"{platform_help}\n\n"
+        "USER_MESSAGE:\n"
+        f"{text}"
+    )
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": text},
+                {"role": "user", "content": user_payload},
             ],
             temperature=0,
         )
