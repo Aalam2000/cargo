@@ -12,6 +12,9 @@ from chatgpt_ui.models import ChatMessage, ChatSession
 from langgraph.graph import END, START, StateGraph
 from chatgpt_ui.services.ai.lang_detect import detect_language
 from chatgpt_ui.services.knowledge.loader import load_help_pages
+from chatgpt_ui.services.ai.prompt_loader import load_intent_prompt
+from chatgpt_ui.views import client  # используем уже созданный OpenAI клиент
+import json
 
 
 class AdminBotState(TypedDict, total=False):
@@ -38,6 +41,9 @@ class AdminBotState(TypedDict, total=False):
     pending_action: str
     dialog_mode: str
     debug_note: str
+
+    ai_intent: str
+    ai_params: dict
 
 
 def _clean_text(value: str | None) -> str:
@@ -242,6 +248,38 @@ def _get_last_assistant_message(session: ChatSession) -> str:
     )
     return _clean_text(last_msg.content if last_msg else "")
 
+
+def node_ai(state: AdminBotState) -> AdminBotState:
+    text = _clean_text(state.get("text"))
+
+    prompt = load_intent_prompt()
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": text},
+        ],
+    )
+
+    raw = response.choices[0].message.content or ""
+
+    try:
+        data = json.loads(raw)
+    except Exception:
+        data = {
+            "intent": "unknown",
+            "params": {},
+            "reply": "Не понял. Скажи по-другому.",
+            "lang": "en",
+        }
+
+    return {
+        "ai_intent": data.get("intent"),
+        "ai_params": data.get("params") or {},
+        "reply_text": data.get("reply") or "",
+        "user_lang": data.get("lang") or state.get("user_lang"),
+    }
 
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
@@ -547,29 +585,18 @@ def route_after_security(state: AdminBotState) -> str:
 
 
 def route_after_identified(state: AdminBotState) -> str:
-    if state.get("stop"):
-        return "finalize"
+    intent = state.get("ai_intent")
 
-    text = _clean_text(state.get("text"))
-    dialog_mode = _clean_text(state.get("dialog_mode"))
-    pending_action = _clean_text(state.get("pending_action"))
-
-    if pending_action == "create_company" and dialog_mode == "await_company_data":
+    if intent == "create_company":
         return "execute_company_action"
 
-    parsed = _parse_create_company_request(text)
-    if parsed.get("intent") == "create_company":
-        return "execute_company_action"
-
-    lowered = text.lower()
-
-    if any(word in lowered for word in ("создать", "добавить", "нов", "пользоват", "юзер", "сотрудник", "клиент")):
+    if intent == "create_client":
         return "action_router_stub"
 
-    if any(word in lowered for word in ("как", "что", "инструкц", "помощ", "обуч", "консультац", "cargo", "диалог")):
-        return "info_router_stub"
+    if intent == "create_user":
+        return "action_router_stub"
 
-    return "action_router_stub"
+    return "finalize"
 
 
 def build_admin_bot_graph():
@@ -584,9 +611,10 @@ def build_admin_bot_graph():
     graph.add_node("info_router_stub", node_info_router_stub)
     graph.add_node("execute_company_action", node_execute_company_action)
     graph.add_node("finalize", node_finalize)
+    graph.add_node("node_ai", node_ai)
 
-    graph.add_edge(START, "load_context")
-    graph.add_edge("load_context", "detect_actor")
+    graph.add_edge(START, "node_ai")
+    graph.add_edge("node_ai", "load_context")
 
     graph.add_conditional_edges(
         "detect_actor",
