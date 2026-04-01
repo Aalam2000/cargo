@@ -368,7 +368,10 @@ def node_ai(state: AdminBotState) -> AdminBotState:
     from openai import OpenAI
 
     def _strip_html(text: str) -> str:
-        cleaned = re.sub(r"<[^>]+>", " ", text or "")
+        cleaned = text or ""
+        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned)
         return cleaned.strip()
 
@@ -380,12 +383,14 @@ def node_ai(state: AdminBotState) -> AdminBotState:
     bot_help = _strip_html(pages.get("bot_help") or "")
     platform_help = _strip_html(pages.get("platform_help") or "")
     history_text = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+    open_flows = state.get("context_json") or {}
 
     print("\n" + "=" * 80, flush=True)
     print("[BOT][node_ai] START", flush=True)
     print(f"[BOT][node_ai] telegram_id={telegram_id}", flush=True)
     print(f"[BOT][node_ai] text={text!r}", flush=True)
     print(f"[BOT][node_ai] user_lang_in={state.get('user_lang')!r}", flush=True)
+    print(f"[BOT][node_ai] open_flows={open_flows!r}", flush=True)
     print(f"[BOT][node_ai] history_text={history_text!r}", flush=True)
     print(f"[BOT][node_ai] prompt_loaded={bool(prompt)} prompt_len={len(prompt or '')}", flush=True)
     print(f"[BOT][node_ai] bot_help_len={len(bot_help)}", flush=True)
@@ -405,14 +410,31 @@ def node_ai(state: AdminBotState) -> AdminBotState:
     client = OpenAI(api_key=api_key)
 
     user_payload = (
-        "BOT_HELP_PAGE:\n"
+        "[TASK]\n"
+        "Classify the current user message for Cargo system. "
+        "Use dialog history, open flows and help only as supporting context.\n\n"
+
+        "[CURRENT_USER_MESSAGE]\n"
+        f"{text}\n\n"
+
+        "[OPEN_FLOWS]\n"
+        f"{json.dumps(open_flows, ensure_ascii=False)}\n\n"
+
+        "[DIALOG_HISTORY_LAST_20]\n"
+        f"{json.dumps(history_text, ensure_ascii=False)}\n\n"
+
+        "[BOT_HELP_SUPPORTING_CONTEXT]\n"
         f"{bot_help}\n\n"
-        "PLATFORM_HELP_PAGE:\n"
+
+        "[PLATFORM_HELP_SUPPORTING_CONTEXT]\n"
         f"{platform_help}\n\n"
-        "DIALOG_HISTORY_LAST_20:\n"
-        f"{history_text}\n\n"
-        "CURRENT_USER_MESSAGE:\n"
-        f"{text}"
+
+        "[RULES]\n"
+        "1. CURRENT_USER_MESSAGE is the main source for classification.\n"
+        "2. DIALOG_HISTORY_LAST_20 is supporting context.\n"
+        "3. OPEN_FLOWS shows unfinished company/client/user branches.\n"
+        "4. BOT_HELP_SUPPORTING_CONTEXT and PLATFORM_HELP_SUPPORTING_CONTEXT are reference only.\n"
+        "5. Return JSON only.\n"
     )
 
     print(f"[BOT][node_ai] user_payload={user_payload!r}", flush=True)
