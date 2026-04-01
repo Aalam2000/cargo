@@ -250,52 +250,129 @@ def _get_last_assistant_message(session: ChatSession) -> str:
     return _clean_text(last_msg.content if last_msg else "")
 
 
-def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) -> str:
-    session = ChatSession.objects.filter(telegram_id=str(telegram_id)).first()
+def _clean_help_html(value: str | None) -> str:
+    import html as html_lib
+
+    raw = value or ""
+    raw = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", raw)
+    raw = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", raw)
+    raw = re.sub(r"(?i)<br\s*/?>", "\n", raw)
+    raw = re.sub(r"(?i)</p\s*>", "\n", raw)
+    raw = re.sub(r"(?i)</div\s*>", "\n", raw)
+    raw = re.sub(r"(?i)</li\s*>", "\n", raw)
+    raw = re.sub(r"(?i)</h[1-6]\s*>", "\n", raw)
+    raw = re.sub(r"(?is)<[^>]+>", " ", raw)
+    raw = html_lib.unescape(raw)
+    raw = re.sub(r"\r\n?", "\n", raw)
+    raw = re.sub(r"[ \t\f\v]+", " ", raw)
+    raw = re.sub(r"\n{3,}", "\n\n", raw)
+    return raw.strip()
+
+
+def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) -> list[dict[str, str]]:
+    telegram_id = _clean_text(telegram_id)
+    if not telegram_id:
+        return []
+
+    session = (
+        ChatSession.objects
+        .filter(telegram_id=telegram_id)
+        .only("id")
+        .first()
+    )
     if not session:
-        return ""
+        return []
 
     messages = list(
-        ChatMessage.objects.filter(session=session)
+        ChatMessage.objects
+        .filter(session=session)
+        .only("role", "content", "created_at", "id")
         .order_by("-created_at", "-id")[:limit]
     )
     messages.reverse()
 
-    parts = []
+    history: list[dict[str, str]] = []
     for msg in messages:
-        role = (msg.role or "").strip().lower()
+        role = _clean_text(msg.role).lower()
         content = _clean_text(msg.content)
         if not content:
             continue
+        if role not in {"user", "assistant", "system"}:
+            continue
+        history.append(
+            {
+                "role": role,
+                "content": content,
+            }
+        )
 
-        if role == "user":
-            parts.append(f"USER: {content}")
-        elif role == "assistant":
-            parts.append(f"ASSISTANT: {content}")
-        elif role == "system":
-            parts.append(f"SYSTEM: {content}")
+    return history
 
-    return "\n".join(parts)
+
+def _safe_parse_ai_json(ai_text: str, fallback_lang: str = "ru") -> dict:
+    raw = _clean_text(ai_text)
+
+    if not raw:
+        return {
+            "intent": "clarify",
+            "params": {},
+            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+            "lang": fallback_lang or "ru",
+        }
+
+    code_block_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
+    if code_block_match:
+        raw = code_block_match.group(1).strip()
+    else:
+        json_match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        if json_match:
+            raw = json_match.group(0).strip()
+
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {
+            "intent": "clarify",
+            "params": {},
+            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+            "lang": fallback_lang or "ru",
+        }
+
+    if not isinstance(data, dict):
+        return {
+            "intent": "clarify",
+            "params": {},
+            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+            "lang": fallback_lang or "ru",
+        }
+
+    intent = _clean_text(data.get("intent")) or "clarify"
+    params = data.get("params")
+    reply = _clean_text(data.get("reply")) or "Уточни, пожалуйста, что именно ты хочешь сделать или понять."
+    lang = _clean_text(data.get("lang")) or (fallback_lang or "ru")
+
+    if not isinstance(params, dict):
+        params = {}
+
+    return {
+        "intent": intent,
+        "params": params,
+        "reply": reply,
+        "lang": lang,
+    }
 
 
 def node_ai(state: AdminBotState) -> AdminBotState:
-    import json
-    import os
-    from openai import OpenAI
-
-    def _strip_html(text: str) -> str:
-        cleaned = re.sub(r"<[^>]+>", " ", text or "")
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        return cleaned.strip()
-
     text = _clean_text(state.get("text"))
-    telegram_id = str(state.get("telegram_id") or "").strip()
+    telegram_id = _clean_text(state.get("telegram_id"))
+    fallback_lang = _clean_text(state.get("user_lang")) or "ru"
+
     prompt = load_intent_prompt()
     pages = load_help_pages()
 
-    bot_help = _strip_html(pages.get("bot_help") or "")
-    platform_help = _strip_html(pages.get("platform_help") or "")
-    history_text = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+    bot_help = _clean_help_html(pages.get("bot_help"))
+    platform_help = _clean_help_html(pages.get("platform_help"))
+    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -303,56 +380,46 @@ def node_ai(state: AdminBotState) -> AdminBotState:
             "ai_intent": "clarify",
             "ai_params": {},
             "reply_text": "Ошибка конфигурации AI.",
-            "user_lang": state.get("user_lang") or "en",
+            "user_lang": fallback_lang,
         }
 
     client = OpenAI(api_key=api_key)
 
-    user_payload = (
-        "BOT_HELP_PAGE:\n"
-        f"{bot_help}\n\n"
-        "PLATFORM_HELP_PAGE:\n"
-        f"{platform_help}\n\n"
-        "DIALOG_HISTORY_LAST_20:\n"
-        f"{history_text}\n\n"
-        "CURRENT_USER_MESSAGE:\n"
-        f"{text}"
-    )
+    llm_messages: list[dict[str, str]] = [
+        {"role": "system", "content": prompt},
+        {
+            "role": "system",
+            "content": (
+                "Ниже справка по боту:\n"
+                f"{bot_help}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Ниже справка по платформе Cargo:\n"
+                f"{platform_help}"
+            ),
+        },
+    ]
+
+    llm_messages.extend(history_messages)
+    llm_messages.append({"role": "user", "content": text})
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_payload},
-            ],
+            messages=llm_messages,
             temperature=0,
         )
-        raw = (response.choices[0].message.content or "").strip()
-
-        if raw.startswith("```"):
-            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
-            raw = raw.rstrip("```").strip()
-
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-
-        try:
-            data = json.loads(raw)
-        except Exception:
-            data = {
-                "intent": "clarify",
-                "params": {},
-                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-                "lang": state.get("user_lang") or "en",
-            }
+        raw = _clean_text(response.choices[0].message.content if response.choices else "")
+        data = _safe_parse_ai_json(raw, fallback_lang=fallback_lang)
 
         return {
-            "ai_intent": data.get("intent") or "clarify",
-            "ai_params": data.get("params") or {},
-            "reply_text": data.get("reply") or "",
-            "user_lang": data.get("lang") or state.get("user_lang") or "en",
+            "ai_intent": data["intent"],
+            "ai_params": data["params"],
+            "reply_text": data["reply"],
+            "user_lang": data["lang"],
         }
 
     except Exception:
@@ -360,7 +427,7 @@ def node_ai(state: AdminBotState) -> AdminBotState:
             "ai_intent": "clarify",
             "ai_params": {},
             "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
-            "user_lang": state.get("user_lang") or "en",
+            "user_lang": fallback_lang,
         }
 
 
@@ -397,10 +464,10 @@ def node_detect_actor(state: AdminBotState) -> AdminBotState:
 
         if username:
             candidates |= (
-                    Q(telegram__iexact=username)
-                    | Q(telegram__iexact=f"@{username}")
-                    | Q(telegram__iexact=username.lower())
-                    | Q(telegram__iexact=f"@{username.lower()}")
+                Q(telegram__iexact=username)
+                | Q(telegram__iexact=f"@{username}")
+                | Q(telegram__iexact=username.lower())
+                | Q(telegram__iexact=f"@{username.lower()}")
             )
 
         candidates |= Q(telegram__iexact=str(telegram_id).strip())
@@ -724,12 +791,12 @@ ADMIN_BOT_GRAPH = build_admin_bot_graph()
 
 
 def run_admin_bot_graph(
-        *,
-        telegram_id: str,
-        username: str = "",
-        first_name: str = "",
-        last_name: str = "",
-        text: str = "",
+    *,
+    telegram_id: str,
+    username: str = "",
+    first_name: str = "",
+    last_name: str = "",
+    text: str = "",
 ) -> Dict[str, Any]:
     initial_state: AdminBotState = {
         "telegram_id": str(telegram_id),
