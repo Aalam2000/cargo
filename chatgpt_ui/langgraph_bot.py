@@ -611,6 +611,7 @@ def node_ai_classify(state: AdminBotState) -> AdminBotState:
             "ai_params": {},
             "reply_text": "Ошибка конфигурации AI.",
             "user_lang": state.get("user_lang") or "en",
+            "stop": False,
         }
 
     client = OpenAI(api_key=api_key)
@@ -677,6 +678,7 @@ def node_ai_classify(state: AdminBotState) -> AdminBotState:
             "ai_params": data.get("params") or {},
             "reply_text": data.get("reply") or "",
             "user_lang": data.get("lang") or state.get("user_lang") or "en",
+            "stop": False,
         }
         print(f"[BOT][node_ai_classify] result={result!r}", flush=True)
         print("=" * 80 + "\n", flush=True)
@@ -690,6 +692,7 @@ def node_ai_classify(state: AdminBotState) -> AdminBotState:
             "ai_params": {},
             "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
             "user_lang": state.get("user_lang") or "en",
+            "stop": False,
         }
 
 
@@ -1078,6 +1081,8 @@ def build_admin_bot_graph():
 
     return graph.compile()
 
+
+ADMIN_BOT_GRAPH = build_admin_bot_graph()
 
 def run_admin_bot_graph(
     *,
