@@ -270,28 +270,17 @@ def _clean_help_html(value: str | None) -> str:
 
 
 def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) -> list[dict[str, str]]:
-    telegram_id = _clean_text(telegram_id)
-    if not telegram_id:
-        return []
-
-    session = (
-        ChatSession.objects
-        .filter(telegram_id=telegram_id)
-        .only("id")
-        .first()
-    )
+    session = ChatSession.objects.filter(telegram_id=str(telegram_id)).first()
     if not session:
         return []
 
     messages = list(
-        ChatMessage.objects
-        .filter(session=session)
-        .only("role", "content", "created_at", "id")
+        ChatMessage.objects.filter(session=session)
         .order_by("-created_at", "-id")[:limit]
     )
     messages.reverse()
 
-    history: list[dict[str, str]] = []
+    result: list[dict[str, str]] = []
     for msg in messages:
         role = _clean_text(msg.role).lower()
         content = _clean_text(msg.content)
@@ -299,14 +288,14 @@ def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) ->
             continue
         if role not in {"user", "assistant", "system"}:
             continue
-        history.append(
+        result.append(
             {
                 "role": role,
                 "content": content,
             }
         )
 
-    return history
+    return result
 
 
 def _safe_parse_ai_json(ai_text: str, fallback_lang: str = "ru") -> dict:
@@ -495,6 +484,215 @@ def node_ai(state: AdminBotState) -> AdminBotState:
         }
 
 
+def node_ai_answer(state: AdminBotState) -> AdminBotState:
+    def _strip_html(text: str) -> str:
+        cleaned = text or ""
+        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned.strip()
+
+    text = _clean_text(state.get("text"))
+    telegram_id = _clean_text(state.get("telegram_id"))
+    request_level = _clean_text(state.get("request_level"))
+    user_lang = _clean_text(state.get("user_lang")) or "ru"
+    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+    open_flows = state.get("context_json") or {}
+    pages = load_help_pages()
+
+    bot_help = _strip_html(pages.get("bot_help") or "")
+    platform_help = _strip_html(pages.get("platform_help") or "")
+
+    print("\n" + "=" * 80, flush=True)
+    print("[BOT][node_ai_answer] START", flush=True)
+    print(f"[BOT][node_ai_answer] telegram_id={telegram_id}", flush=True)
+    print(f"[BOT][node_ai_answer] text={text!r}", flush=True)
+    print(f"[BOT][node_ai_answer] request_level={request_level!r}", flush=True)
+    print(f"[BOT][node_ai_answer] user_lang={user_lang!r}", flush=True)
+    print(f"[BOT][node_ai_answer] open_flows={open_flows!r}", flush=True)
+    print(f"[BOT][node_ai_answer] history_messages={history_messages!r}", flush=True)
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("[BOT][node_ai_answer] ERROR: OPENAI_API_KEY is empty", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return {
+            "reply_text": "Ошибка конфигурации AI.",
+            "stop": True,
+        }
+
+    client = OpenAI(api_key=api_key)
+
+    system_prompt = (
+        "Ты помощник Cargo.\n"
+        "Сейчас твоя задача: дать обычный человеческий ответ пользователю.\n"
+        f"Текущий режим ответа: {request_level or 'general'}.\n"
+        f"Язык ответа: {user_lang}.\n"
+        "Не повторяйся.\n"
+        "Отвечай кратко и по делу.\n"
+        "Используй историю только как контекст.\n"
+        "Если вопрос про систему — объясни систему.\n"
+        "Если вопрос про бота — объясни бота.\n"
+        "Если запрос неясен — задай один конкретный вопрос.\n"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": f"[OPEN_FLOWS]\n{json.dumps(open_flows, ensure_ascii=False)}"},
+        {"role": "system", "content": f"[BOT_HELP]\n{bot_help}"},
+        {"role": "system", "content": f"[PLATFORM_HELP]\n{platform_help}"},
+    ]
+
+    messages.extend(history_messages)
+    messages.append({"role": "user", "content": text})
+
+    print(f"[BOT][node_ai_answer] messages={messages!r}", flush=True)
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0,
+        )
+        raw = _clean_text(response.choices[0].message.content if response.choices else "")
+        print(f"[BOT][node_ai_answer] raw_openai_response={raw!r}", flush=True)
+
+        result = {
+            "reply_text": raw or "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+            "stop": True,
+        }
+        print(f"[BOT][node_ai_answer] result={result!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return result
+
+    except Exception as ai_error:
+        print(f"[BOT][node_ai_answer] OPENAI_ERROR={ai_error!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return {
+            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
+            "stop": True,
+        }
+
+
+def node_ai_classify(state: AdminBotState) -> AdminBotState:
+    def _strip_html(text: str) -> str:
+        cleaned = text or ""
+        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned.strip()
+
+    text = _clean_text(state.get("text"))
+    telegram_id = _clean_text(state.get("telegram_id"))
+    prompt = load_intent_prompt()
+    pages = load_help_pages()
+
+    bot_help = _strip_html(pages.get("bot_help") or "")
+    platform_help = _strip_html(pages.get("platform_help") or "")
+    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+    open_flows = state.get("context_json") or {}
+
+    print("\n" + "=" * 80, flush=True)
+    print("[BOT][node_ai_classify] START", flush=True)
+    print(f"[BOT][node_ai_classify] telegram_id={telegram_id}", flush=True)
+    print(f"[BOT][node_ai_classify] text={text!r}", flush=True)
+    print(f"[BOT][node_ai_classify] user_lang_in={state.get('user_lang')!r}", flush=True)
+    print(f"[BOT][node_ai_classify] open_flows={open_flows!r}", flush=True)
+    print(f"[BOT][node_ai_classify] history_messages={history_messages!r}", flush=True)
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("[BOT][node_ai_classify] ERROR: OPENAI_API_KEY is empty", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return {
+            "ai_intent": "clarify",
+            "ai_params": {},
+            "reply_text": "Ошибка конфигурации AI.",
+            "user_lang": state.get("user_lang") or "en",
+        }
+
+    client = OpenAI(api_key=api_key)
+
+    user_payload = (
+        "[TASK]\n"
+        "Classify the current user message for Cargo system.\n\n"
+        "[CURRENT_USER_MESSAGE]\n"
+        f"{text}\n\n"
+        "[OPEN_FLOWS]\n"
+        f"{json.dumps(open_flows, ensure_ascii=False)}\n\n"
+        "[DIALOG_HISTORY_LAST_20]\n"
+        f"{json.dumps(history_messages, ensure_ascii=False)}\n\n"
+        "[BOT_HELP_SUPPORTING_CONTEXT]\n"
+        f"{bot_help}\n\n"
+        "[PLATFORM_HELP_SUPPORTING_CONTEXT]\n"
+        f"{platform_help}\n\n"
+        "[RULES]\n"
+        "1. CURRENT_USER_MESSAGE is the main source.\n"
+        "2. DIALOG_HISTORY_LAST_20 is supporting context.\n"
+        "3. OPEN_FLOWS contains unfinished company/client/user branches.\n"
+        "4. Return JSON only.\n"
+    )
+
+    print(f"[BOT][node_ai_classify] user_payload={user_payload!r}", flush=True)
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_payload},
+            ],
+            temperature=0,
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        print(f"[BOT][node_ai_classify] raw_openai_response={raw!r}", flush=True)
+
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
+            raw = raw.rstrip("```").strip()
+            print(f"[BOT][node_ai_classify] raw_after_codeblock_strip={raw!r}", flush=True)
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+            print(f"[BOT][node_ai_classify] raw_after_json_extract={raw!r}", flush=True)
+
+        try:
+            data = json.loads(raw)
+            print(f"[BOT][node_ai_classify] parsed_json={data!r}", flush=True)
+        except Exception as parse_error:
+            print(f"[BOT][node_ai_classify] JSON_PARSE_ERROR={parse_error!r}", flush=True)
+            data = {
+                "intent": "clarify",
+                "params": {},
+                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+                "lang": state.get("user_lang") or "en",
+            }
+            print(f"[BOT][node_ai_classify] fallback_json={data!r}", flush=True)
+
+        result = {
+            "ai_intent": data.get("intent") or "clarify",
+            "ai_params": data.get("params") or {},
+            "reply_text": data.get("reply") or "",
+            "user_lang": data.get("lang") or state.get("user_lang") or "en",
+        }
+        print(f"[BOT][node_ai_classify] result={result!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return result
+
+    except Exception as ai_error:
+        print(f"[BOT][node_ai_classify] OPENAI_ERROR={ai_error!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return {
+            "ai_intent": "clarify",
+            "ai_params": {},
+            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
+            "user_lang": state.get("user_lang") or "en",
+        }
+
+
 def node_load_context(state: AdminBotState) -> AdminBotState:
     telegram_id = state["telegram_id"]
     text = _clean_text(state.get("text"))
@@ -588,19 +786,27 @@ def node_route_unidentified(state: AdminBotState) -> AdminBotState:
 
 def node_route_identified(state: AdminBotState) -> AdminBotState:
     ai_intent = _clean_text(state.get("ai_intent"))
-    reply_text = _clean_text(state.get("reply_text"))
+
+    print("\n" + "-" * 80, flush=True)
+    print("[BOT][node_route_identified] START", flush=True)
+    print(f"[BOT][node_route_identified] ai_intent={ai_intent!r}", flush=True)
 
     if ai_intent in ("explain_system", "explain_bot", "clarify", "make_report"):
-        return {
+        result = {
             "request_level": ai_intent or "ai_reply",
-            "reply_text": reply_text,
-            "stop": True,
+            "stop": False,
         }
+        print(f"[BOT][node_route_identified] result={result!r}", flush=True)
+        print("-" * 80 + "\n", flush=True)
+        return result
 
-    return {
+    result = {
         "request_level": ai_intent or "route_main",
         "stop": False,
     }
+    print(f"[BOT][node_route_identified] result={result!r}", flush=True)
+    print("-" * 80 + "\n", flush=True)
+    return result
 
 
 def node_action_router_stub(state: AdminBotState) -> AdminBotState:
@@ -800,6 +1006,9 @@ def route_after_security(state: AdminBotState) -> str:
 def route_after_identified(state: AdminBotState) -> str:
     intent = state.get("ai_intent")
 
+    if intent in ("explain_system", "explain_bot", "clarify", "make_report"):
+        return "node_ai_answer"
+
     if intent == "create_company":
         return "execute_company_action"
 
@@ -809,29 +1018,26 @@ def route_after_identified(state: AdminBotState) -> str:
     if intent == "create_user":
         return "action_router_stub"
 
-    if intent in ("explain_system", "explain_bot", "clarify"):
-        return "finalize"
-
-    return "finalize"
-
+    return "node_ai_answer"
 
 def build_admin_bot_graph():
     graph = StateGraph(AdminBotState)
 
     graph.add_node("load_context", node_load_context)
+    graph.add_node("node_ai_classify", node_ai_classify)
     graph.add_node("detect_actor", node_detect_actor)
     graph.add_node("security_guard", node_security_guard)
     graph.add_node("route_unidentified", node_route_unidentified)
     graph.add_node("route_identified", node_route_identified)
+    graph.add_node("node_ai_answer", node_ai_answer)
     graph.add_node("action_router_stub", node_action_router_stub)
     graph.add_node("info_router_stub", node_info_router_stub)
     graph.add_node("execute_company_action", node_execute_company_action)
     graph.add_node("finalize", node_finalize)
-    graph.add_node("node_ai", node_ai)
-    graph.add_edge("load_context", "detect_actor")
 
-    graph.add_edge(START, "node_ai")
-    graph.add_edge("node_ai", "load_context")
+    graph.add_edge(START, "load_context")
+    graph.add_edge("load_context", "node_ai_classify")
+    graph.add_edge("node_ai_classify", "detect_actor")
 
     graph.add_conditional_edges(
         "detect_actor",
@@ -855,6 +1061,7 @@ def build_admin_bot_graph():
         "route_identified",
         route_after_identified,
         {
+            "node_ai_answer": "node_ai_answer",
             "execute_company_action": "execute_company_action",
             "action_router_stub": "action_router_stub",
             "info_router_stub": "info_router_stub",
@@ -862,6 +1069,7 @@ def build_admin_bot_graph():
         },
     )
 
+    graph.add_edge("node_ai_answer", "finalize")
     graph.add_edge("route_unidentified", "finalize")
     graph.add_edge("action_router_stub", "finalize")
     graph.add_edge("info_router_stub", "finalize")
@@ -869,9 +1077,6 @@ def build_admin_bot_graph():
     graph.add_edge("finalize", END)
 
     return graph.compile()
-
-
-ADMIN_BOT_GRAPH = build_admin_bot_graph()
 
 
 def run_admin_bot_graph(
