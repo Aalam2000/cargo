@@ -363,71 +363,113 @@ def _safe_parse_ai_json(ai_text: str, fallback_lang: str = "ru") -> dict:
 
 
 def node_ai(state: AdminBotState) -> AdminBotState:
-    text = _clean_text(state.get("text"))
-    telegram_id = _clean_text(state.get("telegram_id"))
-    fallback_lang = _clean_text(state.get("user_lang")) or "ru"
+    import json
+    import os
+    from openai import OpenAI
 
+    def _strip_html(text: str) -> str:
+        cleaned = re.sub(r"<[^>]+>", " ", text or "")
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned.strip()
+
+    text = _clean_text(state.get("text"))
+    telegram_id = str(state.get("telegram_id") or "").strip()
     prompt = load_intent_prompt()
     pages = load_help_pages()
 
-    bot_help = _clean_help_html(pages.get("bot_help"))
-    platform_help = _clean_help_html(pages.get("platform_help"))
-    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+    bot_help = _strip_html(pages.get("bot_help") or "")
+    platform_help = _strip_html(pages.get("platform_help") or "")
+    history_text = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
+
+    print("\n" + "=" * 80, flush=True)
+    print("[BOT][node_ai] START", flush=True)
+    print(f"[BOT][node_ai] telegram_id={telegram_id}", flush=True)
+    print(f"[BOT][node_ai] text={text!r}", flush=True)
+    print(f"[BOT][node_ai] user_lang_in={state.get('user_lang')!r}", flush=True)
+    print(f"[BOT][node_ai] history_text={history_text!r}", flush=True)
+    print(f"[BOT][node_ai] prompt_loaded={bool(prompt)} prompt_len={len(prompt or '')}", flush=True)
+    print(f"[BOT][node_ai] bot_help_len={len(bot_help)}", flush=True)
+    print(f"[BOT][node_ai] platform_help_len={len(platform_help)}", flush=True)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
+        print("[BOT][node_ai] ERROR: OPENAI_API_KEY is empty", flush=True)
+        print("=" * 80 + "\n", flush=True)
         return {
             "ai_intent": "clarify",
             "ai_params": {},
             "reply_text": "Ошибка конфигурации AI.",
-            "user_lang": fallback_lang,
+            "user_lang": state.get("user_lang") or "en",
         }
 
     client = OpenAI(api_key=api_key)
 
-    llm_messages: list[dict[str, str]] = [
-        {"role": "system", "content": prompt},
-        {
-            "role": "system",
-            "content": (
-                "Ниже справка по боту:\n"
-                f"{bot_help}"
-            ),
-        },
-        {
-            "role": "system",
-            "content": (
-                "Ниже справка по платформе Cargo:\n"
-                f"{platform_help}"
-            ),
-        },
-    ]
+    user_payload = (
+        "BOT_HELP_PAGE:\n"
+        f"{bot_help}\n\n"
+        "PLATFORM_HELP_PAGE:\n"
+        f"{platform_help}\n\n"
+        "DIALOG_HISTORY_LAST_20:\n"
+        f"{history_text}\n\n"
+        "CURRENT_USER_MESSAGE:\n"
+        f"{text}"
+    )
 
-    llm_messages.extend(history_messages)
-    llm_messages.append({"role": "user", "content": text})
+    print(f"[BOT][node_ai] user_payload={user_payload!r}", flush=True)
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=llm_messages,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_payload},
+            ],
             temperature=0,
         )
-        raw = _clean_text(response.choices[0].message.content if response.choices else "")
-        data = _safe_parse_ai_json(raw, fallback_lang=fallback_lang)
+        raw = (response.choices[0].message.content or "").strip()
+        print(f"[BOT][node_ai] raw_openai_response={raw!r}", flush=True)
 
-        return {
-            "ai_intent": data["intent"],
-            "ai_params": data["params"],
-            "reply_text": data["reply"],
-            "user_lang": data["lang"],
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
+            raw = raw.rstrip("```").strip()
+            print(f"[BOT][node_ai] raw_after_codeblock_strip={raw!r}", flush=True)
+
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+            print(f"[BOT][node_ai] raw_after_json_extract={raw!r}", flush=True)
+
+        try:
+            data = json.loads(raw)
+            print(f"[BOT][node_ai] parsed_json={data!r}", flush=True)
+        except Exception as parse_error:
+            print(f"[BOT][node_ai] JSON_PARSE_ERROR={parse_error!r}", flush=True)
+            data = {
+                "intent": "clarify",
+                "params": {},
+                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
+                "lang": state.get("user_lang") or "en",
+            }
+            print(f"[BOT][node_ai] fallback_json={data!r}", flush=True)
+
+        result = {
+            "ai_intent": data.get("intent") or "clarify",
+            "ai_params": data.get("params") or {},
+            "reply_text": data.get("reply") or "",
+            "user_lang": data.get("lang") or state.get("user_lang") or "en",
         }
+        print(f"[BOT][node_ai] result={result!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
+        return result
 
-    except Exception:
+    except Exception as ai_error:
+        print(f"[BOT][node_ai] OPENAI_ERROR={ai_error!r}", flush=True)
+        print("=" * 80 + "\n", flush=True)
         return {
             "ai_intent": "clarify",
             "ai_params": {},
             "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
-            "user_lang": fallback_lang,
+            "user_lang": state.get("user_lang") or "en",
         }
 
 
@@ -661,6 +703,16 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
     user_lang = _clean_text(state.get("user_lang")) or "ru"
     context_json = state.get("context_json") or {}
 
+    print("\n" + "-" * 80, flush=True)
+    print("[BOT][node_finalize] START", flush=True)
+    print(f"[BOT][node_finalize] session_id={session.id}", flush=True)
+    print(f"[BOT][node_finalize] text={text!r}", flush=True)
+    print(f"[BOT][node_finalize] reply_text={reply_text!r}", flush=True)
+    print(f"[BOT][node_finalize] pending_action={pending_action!r}", flush=True)
+    print(f"[BOT][node_finalize] dialog_mode={dialog_mode!r}", flush=True)
+    print(f"[BOT][node_finalize] user_lang={user_lang!r}", flush=True)
+    print(f"[BOT][node_finalize] context_json={context_json!r}", flush=True)
+
     if hasattr(session, "pending_action"):
         session.pending_action = pending_action
     if hasattr(session, "dialog_mode"):
@@ -681,8 +733,10 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
         update_fields.append("context_json")
     if update_fields:
         session.save(update_fields=update_fields)
+        print(f"[BOT][node_finalize] session_saved_fields={update_fields!r}", flush=True)
 
     last_assistant_text = _get_last_assistant_message(session)
+    print(f"[BOT][node_finalize] last_assistant_text={last_assistant_text!r}", flush=True)
 
     if text:
         ChatMessage.objects.create(
@@ -690,6 +744,9 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
             role="user",
             content=text,
         )
+        print("[BOT][node_finalize] saved_user_message=YES", flush=True)
+    else:
+        print("[BOT][node_finalize] saved_user_message=NO", flush=True)
 
     if reply_text and reply_text != last_assistant_text:
         ChatMessage.objects.create(
@@ -697,7 +754,12 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
             role="assistant",
             content=reply_text,
         )
+        print("[BOT][node_finalize] saved_assistant_message=YES", flush=True)
+    else:
+        print("[BOT][node_finalize] saved_assistant_message=NO", flush=True)
 
+    print("[BOT][node_finalize] END", flush=True)
+    print("-" * 80 + "\n", flush=True)
     return {}
 
 
