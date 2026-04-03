@@ -23,7 +23,9 @@
     <aside class="sidebar">
         <button id="burger" class="burger" onclick="toggleSidebar()">☰</button>
         <div class="logo-block">
-            <img src="{% static 'img/logo.png' %}" alt="Logo" class="logo">
+            <a href="{% url 'index' %}">
+                <img src="{% static 'img/logo.png' %}" alt="Logo" class="logo">
+            </a>
         </div>
 
         {% if user.is_authenticated %}
