@@ -385,16 +385,16 @@ def tg_webhook(request):
 
 # --- Функция отправки сообщений в Telegram ---
 def send_tg_reply(chat_id, text):
-    token = os.getenv("ADMIN_BOT_TG")
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
     if not token:
-        print("ERROR: ADMIN_BOT_TG env variable is missing!")
+        print("ERROR: TELEGRAM_BOT_TOKEN env variable is missing!")
         return JsonResponse({"status": "no_token"})
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
     payload = {
         "chat_id": chat_id,
-        "text": text
+        "text": text,
     }
 
     try:
