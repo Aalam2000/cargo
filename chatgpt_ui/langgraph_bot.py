@@ -266,12 +266,27 @@ def node_no_access(state: AdminBotState) -> AdminBotState:
 
 
 def node_authorized(state: AdminBotState) -> AdminBotState:
-    session = ChatSession.objects.select_related("user").get(id=state["session_id"])
+    session = ChatSession.objects.select_related("user", "user__company").get(id=state["session_id"])
     user_lang = _normalize_lang(state.get("user_lang"))
+
     company_name = ""
+    placeholder_values = {
+        "",
+        "не указано",
+        "не указан",
+        "not specified",
+        "none",
+        "-",
+    }
 
     if session.user:
-        company_name = _clean_text(getattr(session.user, "company_name", ""))
+        company_from_fk = _clean_text(getattr(getattr(session.user, "company", None), "name", ""))
+        company_from_field = _clean_text(getattr(session.user, "company_name", ""))
+
+        if company_from_fk and company_from_fk.lower() not in placeholder_values:
+            company_name = company_from_fk
+        elif company_from_field and company_from_field.lower() not in placeholder_values:
+            company_name = company_from_field
 
     if company_name:
         return {
@@ -290,7 +305,6 @@ def node_authorized(state: AdminBotState) -> AdminBotState:
             default="Здравствуйте. Могу помочь создать клиента, пользователя или подготовить отчет.",
         ),
     }
-
 
 def node_finalize(state: AdminBotState) -> AdminBotState:
     session = ChatSession.objects.get(id=state["session_id"])
