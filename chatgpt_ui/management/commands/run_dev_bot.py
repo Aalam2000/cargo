@@ -4,7 +4,7 @@ import time
 import requests
 from django.core.management.base import BaseCommand
 
-from chatgpt_ui.langgraph_bot import run_admin_bot_graph
+from chatgpt_ui.langgraph_bot import TRANSLATOR, run_admin_bot_graph
 
 BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
 
@@ -59,7 +59,16 @@ class Command(BaseCommand):
                         text=text,
                     )
 
-                    reply_text = (result.get("reply_text") or "").strip() or "Запрос принят."
+                    user_lang = (result.get("user_lang") or "ru").strip().lower()
+                    reply_text = (result.get("reply_text") or "").strip()
+
+                    if not reply_text:
+                        reply_text = TRANSLATOR.translate_key(
+                            key="system.request_accepted",
+                            lang=user_lang,
+                            default="Запрос принят.",
+                            dict_name="bot",
+                        )
 
                     send_resp = requests.post(
                         f"{api_url}/sendMessage",

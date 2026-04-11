@@ -1,21 +1,16 @@
-# chatgpt_ui/langgraph_bot.py
 from __future__ import annotations
 
-import json
 import os
-import re
 from typing import Any, Dict, Optional, TypedDict
 
+from autoi18n import Translator
+from django.conf import settings
 from django.db.models import Q
 from langgraph.graph import END, START, StateGraph
-from openai import OpenAI
 
 from accounts.models import CustomUser
-from accounts.services.company_actions import enqueue_create_company_action
 from chatgpt_ui.models import ChatMessage, ChatSession
 from chatgpt_ui.services.ai.lang_detect import detect_language
-from chatgpt_ui.services.ai.prompt_loader import load_intent_prompt
-from chatgpt_ui.services.knowledge.loader import load_help_pages
 
 
 class AdminBotState(TypedDict, total=False):
@@ -31,214 +26,111 @@ class AdminBotState(TypedDict, total=False):
 
     identified: bool
     actor_level: str
-    request_level: str
-    info_level: str
-    safety_level: str
-
     reply_text: str
     stop: bool
 
-    onboarding_mode: str
-    pending_action: str
-    dialog_mode: str
-    debug_note: str
+    user_lang: str
+    context_json: dict
 
-    ai_intent: str
-    ai_params: dict
+    session_user_exists: bool
+    customuser_lookup_performed: bool
+    customuser_found: bool
+    matched_by: str
+
+
+ALLOWED_BOT_ROLES = {"Admin", "Operator"}
+NO_ACCESS_ROLES = {"WarehouseWorker", "Driver", "Client"}
+
+TRANSLATOR = Translator(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    cache_dir=os.path.join(settings.BASE_DIR, "translations"),
+    source_lang="ru",
+    target_langs=getattr(settings, "AUTO_I18N_TARGET_LANGS", []),
+)
+
+TRANSLATOR.register_keys(
+    {
+        "bot.no_access": "У вас нет доступа к функционалу бота. Я могу соединить вас с администратором.",
+        "bot.anonymous_welcome": "Здравствуйте. Я могу помочь создать вашу компанию в системе. Напишите название компании и email главного администратора.",
+        "bot.authorized_welcome_with_company": "Здравствуйте. Вы работаете в компании {company_name}. Могу помочь создать клиента, пользователя или подготовить отчет.",
+        "bot.authorized_welcome_no_company": "Здравствуйте. Могу помочь создать клиента, пользователя или подготовить отчет.",
+        "system.request_accepted": "Запрос принят.",
+    },
+    dict_name="bot",
+)
 
 
 def _clean_text(value: str | None) -> str:
     return (value or "").strip()
 
 
-def _normalize_text(value: str | None) -> str:
-    return _clean_text(value).lower()
+def _normalize_lang(lang: str | None) -> str:
+    return _clean_text(lang).lower() or "ru"
 
 
-def _build_unidentified_reply(state: AdminBotState) -> str:
-    username = _clean_text(state.get("username"))
-    telegram_id = _clean_text(state.get("telegram_id"))
-    first_name = _clean_text(state.get("first_name"))
-    last_name = _clean_text(state.get("last_name"))
+def _translate_bot_text(key: str, lang: str, default: str, **kwargs) -> str:
+    text = TRANSLATOR.translate_key(
+        key=key,
+        lang=_normalize_lang(lang),
+        default=default,
+        dict_name="bot",
+    )
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except Exception:
+            return default.format(**kwargs) if kwargs else default
+    return text
 
-    show_username = f"@{username}" if username else "нет"
 
-    return (
-        "Ваш Telegram ещё не привязан к системе.\n"
-        "Откройте CargoAdmin и заполните поле Telegram в карточке пользователя.\n\n"
-        f"ID: {telegram_id}\n"
-        f"Username: {show_username}\n"
-        f"Имя: {first_name or 'нет'}\n"
-        f"Фамилия: {last_name or 'нет'}"
+def _normalize_telegram_candidates(telegram_id: str, username: str) -> list[str]:
+    result: list[str] = []
+
+    cleaned_id = _clean_text(telegram_id)
+    cleaned_username = _clean_text(username).lstrip("@")
+
+    if cleaned_id:
+        result.append(cleaned_id)
+
+    if cleaned_username:
+        result.append(cleaned_username)
+        result.append(f"@{cleaned_username}")
+
+    unique_result: list[str] = []
+    seen: set[str] = set()
+
+    for value in result:
+        lowered = value.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        unique_result.append(value)
+
+    return unique_result
+
+
+def _find_user_by_telegram(telegram_id: str, username: str) -> tuple[Optional[CustomUser], str]:
+    candidates = _normalize_telegram_candidates(telegram_id, username)
+    if not candidates:
+        return None, ""
+
+    query = Q()
+    for value in candidates:
+        query |= Q(telegram__iexact=value)
+
+    users = list(
+        CustomUser.objects.filter(query).only("id", "role", "telegram")[:50]
     )
 
+    normalized_map = {value.lower(): value for value in candidates}
 
-def _build_identified_reply(state: AdminBotState) -> str:
-    first_name = _clean_text(state.get("first_name"))
-    username = _clean_text(state.get("username"))
-    role = _clean_text(state.get("user_role"))
+    for candidate_lower, original_value in normalized_map.items():
+        for user in users:
+            user_telegram = _clean_text(user.telegram).lower()
+            if user_telegram == candidate_lower:
+                return user, original_value
 
-    name_block = first_name or (f"@{username}" if username else "коллега")
-
-    return (
-        f"Принято, {name_block}.\n"
-        f"Роль: {role}.\n\n"
-        "Доступно:\n"
-        "1. Создание компании\n"
-        "2. Создание пользователя компании\n"
-        "3. Создание клиента\n"
-        "4. Инструкции"
-    )
-
-
-def _build_instruction_reply() -> str:
-    return (
-        "Инструкция:\n"
-        "1. Для создания компании напиши название и email главного админа.\n"
-        "2. Можно сразу добавить Telegram админа.\n\n"
-        "Пример:\n"
-        'Создать компанию "Ромашка", admin email: boss@example.com, telegram: @boss'
-    )
-
-
-def _is_smalltalk(text: str) -> bool:
-    lowered = _normalize_text(text)
-    return any(
-        phrase in lowered
-        for phrase in (
-            "привет",
-            "здрав",
-            "даров",
-            "дароф",
-            "салам",
-            "чего молчишь",
-            "давай поговорим",
-            "поговорим",
-        )
-    )
-
-
-def _is_help_request(text: str) -> bool:
-    lowered = _normalize_text(text)
-    return any(
-        phrase in lowered
-        for phrase in (
-            "что умеешь",
-            "помощь",
-            "help",
-            "инструкц",
-            "дай инструкц",
-            "инструкция",
-            "что ты умеешь",
-            "меню",
-        )
-    )
-
-
-def _is_complaint(text: str) -> bool:
-    lowered = _normalize_text(text)
-    return any(
-        phrase in lowered
-        for phrase in (
-            "не сделал",
-            "ни хера не сделал",
-            "ничего не сделал",
-            "ты сделал",
-            "что сделал",
-        )
-    )
-
-
-def _extract_email(text: str) -> str:
-    match = re.search(r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", text or "")
-    return (match.group(1) if match else "").strip().lower()
-
-
-def _extract_telegram(text: str) -> str:
-    raw = text or ""
-    matches = re.findall(r"(?<![A-Za-z0-9._%+-])(@[A-Za-z0-9_]{4,})\b", raw)
-    if not matches:
-        return ""
-
-    for value in matches:
-        if value.lower() not in ("@gmail", "@mail", "@yahoo", "@outlook", "@hotmail", "@icloud"):
-            return value.strip()
-
-    return ""
-
-
-def _extract_company_name(text: str) -> str:
-    raw = _clean_text(text)
-
-    quoted = re.search(r'["«“](.+?)["»”]', raw)
-    if quoted:
-        value = quoted.group(1).strip(" .,:;\"'«»")
-        if value:
-            return value
-
-    patterns = [
-        r"(?:компан(?:ию|ия|ии|ией)|фирм(?:у|а|ы|е)|организац(?:ию|ия|ии))\s+([A-Za-zА-Яа-я0-9 _.\-]+?)(?:,|;|\n|$)",
-        r"(?:название|company)\s*[:\-]\s*(.+?)(?:,|;|\n|$)",
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, raw, flags=re.IGNORECASE)
-        if match:
-            value = match.group(1).strip(" .,:;\"'«»")
-            if value:
-                return value
-
-    return ""
-
-
-def _parse_create_company_request(text: str) -> dict:
-    raw = _clean_text(text)
-    lowered = raw.lower()
-
-    company_words = ("создай", "создать", "добавь", "добавить", "зарегистрируй", "регистрация", "сделай")
-    entity_words = ("компан", "фирм", "организац")
-
-    wants_create = any(word in lowered for word in company_words) and any(word in lowered for word in entity_words)
-
-    company_name = _extract_company_name(raw)
-    admin_email = _extract_email(raw)
-    admin_telegram = _extract_telegram(raw)
-
-    return {
-        "intent": "create_company" if wants_create else "",
-        "company_name": company_name,
-        "admin_email": admin_email,
-        "admin_telegram": admin_telegram,
-        "missing_fields": [
-            field
-            for field, value in (
-                ("company_name", company_name),
-                ("admin_email", admin_email),
-            )
-            if not value
-        ],
-    }
-
-
-def _parse_company_data_from_followup(text: str) -> dict:
-    raw = _clean_text(text)
-    company_name = _extract_company_name(raw)
-    admin_email = _extract_email(raw)
-    admin_telegram = _extract_telegram(raw)
-
-    return {
-        "company_name": company_name,
-        "admin_email": admin_email,
-        "admin_telegram": admin_telegram,
-        "missing_fields": [
-            field
-            for field, value in (
-                ("company_name", company_name),
-                ("admin_email", admin_email),
-            )
-            if not value
-        ],
-    }
+    return None, ""
 
 
 def _get_last_assistant_message(session: ChatSession) -> str:
@@ -250,678 +142,153 @@ def _get_last_assistant_message(session: ChatSession) -> str:
     return _clean_text(last_msg.content if last_msg else "")
 
 
-def _clean_help_html(value: str | None) -> str:
-    import html as html_lib
+def _resolve_actor_level(user_role: str) -> str:
+    cleaned_role = _clean_text(user_role)
 
-    raw = value or ""
-    raw = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", raw)
-    raw = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", raw)
-    raw = re.sub(r"(?i)<br\s*/?>", "\n", raw)
-    raw = re.sub(r"(?i)</p\s*>", "\n", raw)
-    raw = re.sub(r"(?i)</div\s*>", "\n", raw)
-    raw = re.sub(r"(?i)</li\s*>", "\n", raw)
-    raw = re.sub(r"(?i)</h[1-6]\s*>", "\n", raw)
-    raw = re.sub(r"(?is)<[^>]+>", " ", raw)
-    raw = html_lib.unescape(raw)
-    raw = re.sub(r"\r\n?", "\n", raw)
-    raw = re.sub(r"[ \t\f\v]+", " ", raw)
-    raw = re.sub(r"\n{3,}", "\n\n", raw)
-    return raw.strip()
+    if cleaned_role in ALLOWED_BOT_ROLES:
+        return "authorized"
 
+    if cleaned_role in NO_ACCESS_ROLES:
+        return "no_access"
 
-def _get_recent_dialog_history_by_telegram(telegram_id: str, limit: int = 20) -> list[dict[str, str]]:
-    session = ChatSession.objects.filter(telegram_id=str(telegram_id)).first()
-    if not session:
-        return []
-
-    messages = list(
-        ChatMessage.objects.filter(session=session)
-        .order_by("-created_at", "-id")[:limit]
-    )
-    messages.reverse()
-
-    result: list[dict[str, str]] = []
-    for msg in messages:
-        role = _clean_text(msg.role).lower()
-        content = _clean_text(msg.content)
-        if not content:
-            continue
-        if role not in {"user", "assistant", "system"}:
-            continue
-        result.append(
-            {
-                "role": role,
-                "content": content,
-            }
-        )
-
-    return result
-
-
-def _safe_parse_ai_json(ai_text: str, fallback_lang: str = "ru") -> dict:
-    raw = _clean_text(ai_text)
-
-    if not raw:
-        return {
-            "intent": "clarify",
-            "params": {},
-            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-            "lang": fallback_lang or "ru",
-        }
-
-    code_block_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL | re.IGNORECASE)
-    if code_block_match:
-        raw = code_block_match.group(1).strip()
-    else:
-        json_match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-        if json_match:
-            raw = json_match.group(0).strip()
-
-    try:
-        data = json.loads(raw)
-    except Exception:
-        return {
-            "intent": "clarify",
-            "params": {},
-            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-            "lang": fallback_lang or "ru",
-        }
-
-    if not isinstance(data, dict):
-        return {
-            "intent": "clarify",
-            "params": {},
-            "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-            "lang": fallback_lang or "ru",
-        }
-
-    intent = _clean_text(data.get("intent")) or "clarify"
-    params = data.get("params")
-    reply = _clean_text(data.get("reply")) or "Уточни, пожалуйста, что именно ты хочешь сделать или понять."
-    lang = _clean_text(data.get("lang")) or (fallback_lang or "ru")
-
-    if not isinstance(params, dict):
-        params = {}
-
-    return {
-        "intent": intent,
-        "params": params,
-        "reply": reply,
-        "lang": lang,
-    }
-
-
-def node_ai(state: AdminBotState) -> AdminBotState:
-    import json
-    import os
-    from openai import OpenAI
-
-    def _strip_html(text: str) -> str:
-        cleaned = text or ""
-        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        return cleaned.strip()
-
-    text = _clean_text(state.get("text"))
-    telegram_id = str(state.get("telegram_id") or "").strip()
-    prompt = load_intent_prompt()
-    pages = load_help_pages()
-
-    bot_help = _strip_html(pages.get("bot_help") or "")
-    platform_help = _strip_html(pages.get("platform_help") or "")
-    history_text = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
-    open_flows = state.get("context_json") or {}
-
-    print("\n" + "=" * 80, flush=True)
-    print("[BOT][node_ai] START", flush=True)
-    print(f"[BOT][node_ai] telegram_id={telegram_id}", flush=True)
-    print(f"[BOT][node_ai] text={text!r}", flush=True)
-    print(f"[BOT][node_ai] user_lang_in={state.get('user_lang')!r}", flush=True)
-    print(f"[BOT][node_ai] open_flows={open_flows!r}", flush=True)
-    print(f"[BOT][node_ai] history_text={history_text!r}", flush=True)
-    print(f"[BOT][node_ai] prompt_loaded={bool(prompt)} prompt_len={len(prompt or '')}", flush=True)
-    print(f"[BOT][node_ai] bot_help_len={len(bot_help)}", flush=True)
-    print(f"[BOT][node_ai] platform_help_len={len(platform_help)}", flush=True)
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("[BOT][node_ai] ERROR: OPENAI_API_KEY is empty", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "ai_intent": "clarify",
-            "ai_params": {},
-            "reply_text": "Ошибка конфигурации AI.",
-            "user_lang": state.get("user_lang") or "en",
-        }
-
-    client = OpenAI(api_key=api_key)
-
-    user_payload = (
-        "[TASK]\n"
-        "Classify the current user message for Cargo system. "
-        "Use dialog history, open flows and help only as supporting context.\n\n"
-
-        "[CURRENT_USER_MESSAGE]\n"
-        f"{text}\n\n"
-
-        "[OPEN_FLOWS]\n"
-        f"{json.dumps(open_flows, ensure_ascii=False)}\n\n"
-
-        "[DIALOG_HISTORY_LAST_20]\n"
-        f"{json.dumps(history_text, ensure_ascii=False)}\n\n"
-
-        "[BOT_HELP_SUPPORTING_CONTEXT]\n"
-        f"{bot_help}\n\n"
-
-        "[PLATFORM_HELP_SUPPORTING_CONTEXT]\n"
-        f"{platform_help}\n\n"
-
-        "[RULES]\n"
-        "1. CURRENT_USER_MESSAGE is the main source for classification.\n"
-        "2. DIALOG_HISTORY_LAST_20 is supporting context.\n"
-        "3. OPEN_FLOWS shows unfinished company/client/user branches.\n"
-        "4. BOT_HELP_SUPPORTING_CONTEXT and PLATFORM_HELP_SUPPORTING_CONTEXT are reference only.\n"
-        "5. Return JSON only.\n"
-    )
-
-    print(f"[BOT][node_ai] user_payload={user_payload!r}", flush=True)
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_payload},
-            ],
-            temperature=0,
-        )
-        raw = (response.choices[0].message.content or "").strip()
-        print(f"[BOT][node_ai] raw_openai_response={raw!r}", flush=True)
-
-        if raw.startswith("```"):
-            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
-            raw = raw.rstrip("```").strip()
-            print(f"[BOT][node_ai] raw_after_codeblock_strip={raw!r}", flush=True)
-
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-            print(f"[BOT][node_ai] raw_after_json_extract={raw!r}", flush=True)
-
-        try:
-            data = json.loads(raw)
-            print(f"[BOT][node_ai] parsed_json={data!r}", flush=True)
-        except Exception as parse_error:
-            print(f"[BOT][node_ai] JSON_PARSE_ERROR={parse_error!r}", flush=True)
-            data = {
-                "intent": "clarify",
-                "params": {},
-                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-                "lang": state.get("user_lang") or "en",
-            }
-            print(f"[BOT][node_ai] fallback_json={data!r}", flush=True)
-
-        result = {
-            "ai_intent": data.get("intent") or "clarify",
-            "ai_params": data.get("params") or {},
-            "reply_text": data.get("reply") or "",
-            "user_lang": data.get("lang") or state.get("user_lang") or "en",
-        }
-        print(f"[BOT][node_ai] result={result!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return result
-
-    except Exception as ai_error:
-        print(f"[BOT][node_ai] OPENAI_ERROR={ai_error!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "ai_intent": "clarify",
-            "ai_params": {},
-            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
-            "user_lang": state.get("user_lang") or "en",
-        }
-
-
-def node_ai_answer(state: AdminBotState) -> AdminBotState:
-    def _strip_html(text: str) -> str:
-        cleaned = text or ""
-        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        return cleaned.strip()
-
-    text = _clean_text(state.get("text"))
-    telegram_id = _clean_text(state.get("telegram_id"))
-    request_level = _clean_text(state.get("request_level"))
-    user_lang = _clean_text(state.get("user_lang")) or "ru"
-    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
-    open_flows = state.get("context_json") or {}
-    pages = load_help_pages()
-
-    bot_help = _strip_html(pages.get("bot_help") or "")
-    platform_help = _strip_html(pages.get("platform_help") or "")
-
-    print("\n" + "=" * 80, flush=True)
-    print("[BOT][node_ai_answer] START", flush=True)
-    print(f"[BOT][node_ai_answer] telegram_id={telegram_id}", flush=True)
-    print(f"[BOT][node_ai_answer] text={text!r}", flush=True)
-    print(f"[BOT][node_ai_answer] request_level={request_level!r}", flush=True)
-    print(f"[BOT][node_ai_answer] user_lang={user_lang!r}", flush=True)
-    print(f"[BOT][node_ai_answer] open_flows={open_flows!r}", flush=True)
-    print(f"[BOT][node_ai_answer] history_messages={history_messages!r}", flush=True)
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("[BOT][node_ai_answer] ERROR: OPENAI_API_KEY is empty", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "reply_text": "Ошибка конфигурации AI.",
-            "stop": True,
-        }
-
-    client = OpenAI(api_key=api_key)
-
-    system_prompt = (
-        "Ты помощник Cargo.\n"
-        "Сейчас твоя задача: дать обычный человеческий ответ пользователю.\n"
-        f"Текущий режим ответа: {request_level or 'general'}.\n"
-        f"Язык ответа: {user_lang}.\n"
-        "Не повторяйся.\n"
-        "Отвечай кратко и по делу.\n"
-        "Используй историю только как контекст.\n"
-        "Если вопрос про систему — объясни систему.\n"
-        "Если вопрос про бота — объясни бота.\n"
-        "Если запрос неясен — задай один конкретный вопрос.\n"
-    )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "system", "content": f"[OPEN_FLOWS]\n{json.dumps(open_flows, ensure_ascii=False)}"},
-        {"role": "system", "content": f"[BOT_HELP]\n{bot_help}"},
-        {"role": "system", "content": f"[PLATFORM_HELP]\n{platform_help}"},
-    ]
-
-    messages.extend(history_messages)
-    messages.append({"role": "user", "content": text})
-
-    print(f"[BOT][node_ai_answer] messages={messages!r}", flush=True)
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0,
-        )
-        raw = _clean_text(response.choices[0].message.content if response.choices else "")
-        print(f"[BOT][node_ai_answer] raw_openai_response={raw!r}", flush=True)
-
-        result = {
-            "reply_text": raw or "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-            "stop": True,
-        }
-        print(f"[BOT][node_ai_answer] result={result!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return result
-
-    except Exception as ai_error:
-        print(f"[BOT][node_ai_answer] OPENAI_ERROR={ai_error!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
-            "stop": True,
-        }
-
-
-def node_ai_classify(state: AdminBotState) -> AdminBotState:
-    def _strip_html(text: str) -> str:
-        cleaned = text or ""
-        cleaned = re.sub(r"{%.*?%}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"{{.*?}}", " ", cleaned, flags=re.DOTALL)
-        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        return cleaned.strip()
-
-    text = _clean_text(state.get("text"))
-    telegram_id = _clean_text(state.get("telegram_id"))
-    prompt = load_intent_prompt()
-    pages = load_help_pages()
-
-    bot_help = _strip_html(pages.get("bot_help") or "")
-    platform_help = _strip_html(pages.get("platform_help") or "")
-    history_messages = _get_recent_dialog_history_by_telegram(telegram_id, limit=20)
-    open_flows = state.get("context_json") or {}
-
-    print("\n" + "=" * 80, flush=True)
-    print("[BOT][node_ai_classify] START", flush=True)
-    print(f"[BOT][node_ai_classify] telegram_id={telegram_id}", flush=True)
-    print(f"[BOT][node_ai_classify] text={text!r}", flush=True)
-    print(f"[BOT][node_ai_classify] user_lang_in={state.get('user_lang')!r}", flush=True)
-    print(f"[BOT][node_ai_classify] open_flows={open_flows!r}", flush=True)
-    print(f"[BOT][node_ai_classify] history_messages={history_messages!r}", flush=True)
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("[BOT][node_ai_classify] ERROR: OPENAI_API_KEY is empty", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "ai_intent": "clarify",
-            "ai_params": {},
-            "reply_text": "Ошибка конфигурации AI.",
-            "user_lang": state.get("user_lang") or "en",
-            "stop": False,
-        }
-
-    client = OpenAI(api_key=api_key)
-
-    user_payload = (
-        "[TASK]\n"
-        "Classify the current user message for Cargo system.\n\n"
-        "[CURRENT_USER_MESSAGE]\n"
-        f"{text}\n\n"
-        "[OPEN_FLOWS]\n"
-        f"{json.dumps(open_flows, ensure_ascii=False)}\n\n"
-        "[DIALOG_HISTORY_LAST_20]\n"
-        f"{json.dumps(history_messages, ensure_ascii=False)}\n\n"
-        "[BOT_HELP_SUPPORTING_CONTEXT]\n"
-        f"{bot_help}\n\n"
-        "[PLATFORM_HELP_SUPPORTING_CONTEXT]\n"
-        f"{platform_help}\n\n"
-        "[RULES]\n"
-        "1. CURRENT_USER_MESSAGE is the main source.\n"
-        "2. DIALOG_HISTORY_LAST_20 is supporting context.\n"
-        "3. OPEN_FLOWS contains unfinished company/client/user branches.\n"
-        "4. Return JSON only.\n"
-    )
-
-    print(f"[BOT][node_ai_classify] user_payload={user_payload!r}", flush=True)
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_payload},
-            ],
-            temperature=0,
-        )
-        raw = (response.choices[0].message.content or "").strip()
-        print(f"[BOT][node_ai_classify] raw_openai_response={raw!r}", flush=True)
-
-        if raw.startswith("```"):
-            raw = re.sub(r"^```[a-zA-Z]*", "", raw)
-            raw = raw.rstrip("```").strip()
-            print(f"[BOT][node_ai_classify] raw_after_codeblock_strip={raw!r}", flush=True)
-
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-            print(f"[BOT][node_ai_classify] raw_after_json_extract={raw!r}", flush=True)
-
-        try:
-            data = json.loads(raw)
-            print(f"[BOT][node_ai_classify] parsed_json={data!r}", flush=True)
-        except Exception as parse_error:
-            print(f"[BOT][node_ai_classify] JSON_PARSE_ERROR={parse_error!r}", flush=True)
-            data = {
-                "intent": "clarify",
-                "params": {},
-                "reply": "Уточни, пожалуйста, что именно ты хочешь сделать или понять.",
-                "lang": state.get("user_lang") or "en",
-            }
-            print(f"[BOT][node_ai_classify] fallback_json={data!r}", flush=True)
-
-        result = {
-            "ai_intent": data.get("intent") or "clarify",
-            "ai_params": data.get("params") or {},
-            "reply_text": data.get("reply") or "",
-            "user_lang": data.get("lang") or state.get("user_lang") or "en",
-            "stop": False,
-        }
-        print(f"[BOT][node_ai_classify] result={result!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return result
-
-    except Exception as ai_error:
-        print(f"[BOT][node_ai_classify] OPENAI_ERROR={ai_error!r}", flush=True)
-        print("=" * 80 + "\n", flush=True)
-        return {
-            "ai_intent": "clarify",
-            "ai_params": {},
-            "reply_text": "Сбой AI. Повтори, пожалуйста, короче.",
-            "user_lang": state.get("user_lang") or "en",
-            "stop": False,
-        }
+    return "no_access"
 
 
 def node_load_context(state: AdminBotState) -> AdminBotState:
-    telegram_id = state["telegram_id"]
+    telegram_id = _clean_text(state.get("telegram_id"))
     text = _clean_text(state.get("text"))
 
     session, _ = ChatSession.objects.get_or_create(telegram_id=telegram_id)
 
-    saved_lang = _clean_text(getattr(session, "user_lang", "")) or "en"
+    saved_lang = _clean_text(getattr(session, "user_lang", "")) or "ru"
     detected_lang = detect_language(text, fallback=saved_lang)
+
+    session_role = _clean_text(session.user.role if session.user else "")
+    actor_level = _resolve_actor_level(session_role) if session.user_id else "anonymous"
 
     return {
         "session_id": session.id,
         "user_id": session.user_id,
+        "user_role": session_role,
         "identified": bool(session.user_id),
+        "actor_level": actor_level,
         "stop": False,
-        "pending_action": _clean_text(getattr(session, "pending_action", "")),
-        "dialog_mode": _clean_text(getattr(session, "dialog_mode", "")) or "idle",
         "context_json": getattr(session, "context_json", {}) or {},
         "user_lang": detected_lang,
+        "session_user_exists": bool(session.user_id),
+        "customuser_lookup_performed": False,
+        "customuser_found": bool(session.user_id),
+        "matched_by": "session.user" if session.user_id else "",
     }
 
 
-def node_detect_actor(state: AdminBotState) -> AdminBotState:
-    telegram_id = state["telegram_id"]
+def node_identify_telegram_user(state: AdminBotState) -> AdminBotState:
+    session = ChatSession.objects.select_related("user").get(id=state["session_id"])
+
+    telegram_id = _clean_text(state.get("telegram_id"))
     username = _clean_text(state.get("username"))
 
-    session = ChatSession.objects.select_related("user").get(id=state["session_id"])
-    matched_user = session.user
-
-    if matched_user is None:
-        candidates = Q()
-
-        if username:
-            candidates |= (
-                Q(telegram__iexact=username)
-                | Q(telegram__iexact=f"@{username}")
-                | Q(telegram__iexact=username.lower())
-                | Q(telegram__iexact=f"@{username.lower()}")
-            )
-
-        candidates |= Q(telegram__iexact=str(telegram_id).strip())
-        matched_user = CustomUser.objects.filter(candidates).first()
-
-        if matched_user:
-            session.user = matched_user
-            session.save(update_fields=["user"])
-
-    if matched_user is None:
+    if session.user_id:
+        user_role = _clean_text(session.user.role if session.user else "")
         return {
-            "identified": False,
-            "actor_level": "unidentified",
-            "user_id": None,
-            "user_role": "",
+            "identified": True,
+            "user_id": session.user_id,
+            "user_role": user_role,
+            "actor_level": _resolve_actor_level(user_role),
+            "session_user_exists": True,
+            "customuser_lookup_performed": False,
+            "customuser_found": True,
+            "matched_by": "session.user",
         }
 
-    return {
-        "identified": True,
-        "actor_level": "identified",
-        "user_id": matched_user.id,
-        "user_role": matched_user.role or "",
-    }
-
-
-def node_security_guard(state: AdminBotState) -> AdminBotState:
-    if not state.get("identified"):
-        return {
-            "safety_level": "allow_unidentified",
-        }
-
-    user_role = _clean_text(state.get("user_role"))
-
-    if user_role not in ("Admin", "Operator"):
-        return {
-            "safety_level": "forbidden_role",
-            "reply_text": "У вас нет прав для работы с административным чат-ботом.",
-            "stop": True,
-        }
-
-    return {
-        "safety_level": "allow_admin",
-    }
-
-
-def node_route_unidentified(state: AdminBotState) -> AdminBotState:
-    return {
-        "request_level": "unknown",
-        "info_level": "link_account",
-        "reply_text": _build_unidentified_reply(state),
-        "stop": True,
-    }
-
-
-def node_route_identified(state: AdminBotState) -> AdminBotState:
-    ai_intent = _clean_text(state.get("ai_intent"))
-
-    print("\n" + "-" * 80, flush=True)
-    print("[BOT][node_route_identified] START", flush=True)
-    print(f"[BOT][node_route_identified] ai_intent={ai_intent!r}", flush=True)
-
-    if ai_intent in ("explain_system", "explain_bot", "clarify", "make_report"):
-        result = {
-            "request_level": ai_intent or "ai_reply",
-            "stop": False,
-        }
-        print(f"[BOT][node_route_identified] result={result!r}", flush=True)
-        print("-" * 80 + "\n", flush=True)
-        return result
-
-    result = {
-        "request_level": ai_intent or "route_main",
-        "stop": False,
-    }
-    print(f"[BOT][node_route_identified] result={result!r}", flush=True)
-    print("-" * 80 + "\n", flush=True)
-    return result
-
-
-def node_action_router_stub(state: AdminBotState) -> AdminBotState:
-    ai_intent = _clean_text(state.get("ai_intent"))
-    reply_text = _clean_text(state.get("reply_text"))
-
-    if ai_intent == "create_user":
-        return {
-            "pending_action": "create_company_user",
-            "reply_text": reply_text or "Создание пользователя компании пока настраивается.",
-            "stop": True,
-        }
-
-    if ai_intent == "create_client":
-        return {
-            "pending_action": "create_client",
-            "reply_text": reply_text or "Создание клиента пока настраивается.",
-            "stop": True,
-        }
-
-    return {
-        "pending_action": "",
-        "reply_text": reply_text or "Уточни, что нужно сделать.",
-        "stop": True,
-    }
-
-
-def node_info_router_stub(state: AdminBotState) -> AdminBotState:
-    text = _clean_text(state.get("text")).lower()
-    pages = load_help_pages()
-
-    if any(word in text for word in ("бот", "bot")):
-        return {
-            "info_level": "bot_help",
-            "reply_text": "Инструкция по боту:\nhttps://crm.bona-plus.ru/bot/bot-help/",
-            "stop": True,
-        }
-
-    if any(word in text for word in ("платформ", "система", "cargo")):
-        return {
-            "info_level": "platform_help",
-            "reply_text": "Инструкция по платформе:\nhttps://crm.bona-plus.ru/bot/platform-help/",
-            "stop": True,
-        }
-
-    return {
-        "info_level": "general_help",
-        "reply_text": (
-            "Инструкции:\n"
-            "Бот: https://crm.bona-plus.ru/bot/bot-help/\n"
-            "Платформа: https://crm.bona-plus.ru/bot/platform-help/"
-        ),
-        "stop": True,
-    }
-
-
-def node_execute_company_action(state: AdminBotState) -> AdminBotState:
-    session = ChatSession.objects.select_related("user").get(id=state["session_id"])
-    operator_user = session.user
-    text = _clean_text(state.get("text"))
-    dialog_mode = _clean_text(state.get("dialog_mode"))
-
-    if not operator_user:
-        return {
-            "reply_text": "❗ Оператор не определён.",
-            "stop": True,
-        }
-
-    if dialog_mode == "await_company_data":
-        parsed = _parse_company_data_from_followup(text)
-    else:
-        parsed = _parse_create_company_request(text)
-
-    missing_fields = parsed.get("missing_fields") or []
-    if missing_fields:
-        hints = []
-        if "company_name" in missing_fields:
-            hints.append("название компании")
-        if "admin_email" in missing_fields:
-            hints.append("email главного админа")
-
-        return {
-            "pending_action": "create_company",
-            "dialog_mode": "await_company_data",
-            "reply_text": (
-                "Для создания компании не хватает данных.\n"
-                f"Нужно прислать: {', '.join(hints)}.\n\n"
-                "Пример:\n"
-                'Создать компанию "Ромашка", admin email: boss@example.com, telegram: @boss'
-            ),
-            "stop": True,
-        }
-
-    enqueue_create_company_action(
-        telegram_id=state["telegram_id"],
-        operator_user_id=operator_user.id,
-        company_name=parsed["company_name"],
-        admin_email=parsed["admin_email"],
-        admin_telegram=parsed["admin_telegram"],
-        admin_name="",
+    matched_user, matched_by = _find_user_by_telegram(
+        telegram_id=telegram_id,
+        username=username,
     )
 
+    if matched_user:
+        session.user = matched_user
+        session.save(update_fields=["user"])
+
+        user_role = _clean_text(matched_user.role)
+        return {
+            "identified": True,
+            "user_id": matched_user.id,
+            "user_role": user_role,
+            "actor_level": _resolve_actor_level(user_role),
+            "session_user_exists": False,
+            "customuser_lookup_performed": True,
+            "customuser_found": True,
+            "matched_by": matched_by,
+        }
+
     return {
-        "pending_action": "",
-        "dialog_mode": "idle",
-        "reply_text": (
-            "Команда принята.\n"
-            f"Создаю компанию: {parsed['company_name']}\n"
-            f"Главный админ: {parsed['admin_email']}\n"
-            f"Telegram: {parsed['admin_telegram'] or '—'}"
+        "identified": False,
+        "user_id": None,
+        "user_role": "",
+        "actor_level": "anonymous",
+        "session_user_exists": False,
+        "customuser_lookup_performed": True,
+        "customuser_found": False,
+        "matched_by": "",
+    }
+
+
+def route_after_identify(state: AdminBotState) -> str:
+    actor_level = _clean_text(state.get("actor_level"))
+    if actor_level == "authorized":
+        return "authorized"
+    if actor_level == "no_access":
+        return "no_access"
+    return "anonymous"
+
+
+def node_anonymous(state: AdminBotState) -> AdminBotState:
+    user_lang = _normalize_lang(state.get("user_lang"))
+    return {
+        "reply_text": _translate_bot_text(
+            key="bot.anonymous_welcome",
+            lang=user_lang,
+            default="Здравствуйте. Я могу помочь создать вашу компанию в системе. Напишите название компании и email главного администратора.",
         ),
-        "stop": True,
+    }
+
+
+def node_no_access(state: AdminBotState) -> AdminBotState:
+    user_lang = _normalize_lang(state.get("user_lang"))
+    return {
+        "reply_text": _translate_bot_text(
+            key="bot.no_access",
+            lang=user_lang,
+            default="У вас нет доступа к функционалу бота. Я могу соединить вас с администратором.",
+        ),
+    }
+
+
+def node_authorized(state: AdminBotState) -> AdminBotState:
+    session = ChatSession.objects.select_related("user").get(id=state["session_id"])
+    user_lang = _normalize_lang(state.get("user_lang"))
+    company_name = ""
+
+    if session.user:
+        company_name = _clean_text(getattr(session.user, "company_name", ""))
+
+    if company_name:
+        return {
+            "reply_text": _translate_bot_text(
+                key="bot.authorized_welcome_with_company",
+                lang=user_lang,
+                default="Здравствуйте. Вы работаете в компании {company_name}. Могу помочь создать клиента, пользователя или подготовить отчет.",
+                company_name=company_name,
+            ),
+        }
+
+    return {
+        "reply_text": _translate_bot_text(
+            key="bot.authorized_welcome_no_company",
+            lang=user_lang,
+            default="Здравствуйте. Могу помочь создать клиента, пользователя или подготовить отчет.",
+        ),
     }
 
 
@@ -929,45 +296,23 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
     session = ChatSession.objects.get(id=state["session_id"])
     text = _clean_text(state.get("text"))
     reply_text = _clean_text(state.get("reply_text"))
-    pending_action = _clean_text(state.get("pending_action"))
-    dialog_mode = _clean_text(state.get("dialog_mode")) or "idle"
-    user_lang = _clean_text(state.get("user_lang")) or "ru"
+    user_lang = _normalize_lang(state.get("user_lang"))
     context_json = state.get("context_json") or {}
 
-    print("\n" + "-" * 80, flush=True)
-    print("[BOT][node_finalize] START", flush=True)
-    print(f"[BOT][node_finalize] session_id={session.id}", flush=True)
-    print(f"[BOT][node_finalize] text={text!r}", flush=True)
-    print(f"[BOT][node_finalize] reply_text={reply_text!r}", flush=True)
-    print(f"[BOT][node_finalize] pending_action={pending_action!r}", flush=True)
-    print(f"[BOT][node_finalize] dialog_mode={dialog_mode!r}", flush=True)
-    print(f"[BOT][node_finalize] user_lang={user_lang!r}", flush=True)
-    print(f"[BOT][node_finalize] context_json={context_json!r}", flush=True)
-
-    if hasattr(session, "pending_action"):
-        session.pending_action = pending_action
-    if hasattr(session, "dialog_mode"):
-        session.dialog_mode = dialog_mode
     if hasattr(session, "user_lang"):
         session.user_lang = user_lang
     if hasattr(session, "context_json"):
         session.context_json = context_json
 
     update_fields = []
-    if hasattr(session, "pending_action"):
-        update_fields.append("pending_action")
-    if hasattr(session, "dialog_mode"):
-        update_fields.append("dialog_mode")
     if hasattr(session, "user_lang"):
         update_fields.append("user_lang")
     if hasattr(session, "context_json"):
         update_fields.append("context_json")
     if update_fields:
         session.save(update_fields=update_fields)
-        print(f"[BOT][node_finalize] session_saved_fields={update_fields!r}", flush=True)
 
     last_assistant_text = _get_last_assistant_message(session)
-    print(f"[BOT][node_finalize] last_assistant_text={last_assistant_text!r}", flush=True)
 
     if text:
         ChatMessage.objects.create(
@@ -975,9 +320,6 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
             role="user",
             content=text,
         )
-        print("[BOT][node_finalize] saved_user_message=YES", flush=True)
-    else:
-        print("[BOT][node_finalize] saved_user_message=NO", flush=True)
 
     if reply_text and reply_text != last_assistant_text:
         ChatMessage.objects.create(
@@ -985,104 +327,43 @@ def node_finalize(state: AdminBotState) -> AdminBotState:
             role="assistant",
             content=reply_text,
         )
-        print("[BOT][node_finalize] saved_assistant_message=YES", flush=True)
-    else:
-        print("[BOT][node_finalize] saved_assistant_message=NO", flush=True)
 
-    print("[BOT][node_finalize] END", flush=True)
-    print("-" * 80 + "\n", flush=True)
     return {}
 
-
-def route_after_detect_actor(state: AdminBotState) -> str:
-    if state.get("identified"):
-        return "security_guard"
-    return "route_unidentified"
-
-
-def route_after_security(state: AdminBotState) -> str:
-    if state.get("stop"):
-        return "finalize"
-    return "route_identified"
-
-
-def route_after_identified(state: AdminBotState) -> str:
-    intent = state.get("ai_intent")
-
-    if intent in ("explain_system", "explain_bot", "clarify", "make_report"):
-        return "node_ai_answer"
-
-    if intent == "create_company":
-        return "execute_company_action"
-
-    if intent == "create_client":
-        return "action_router_stub"
-
-    if intent == "create_user":
-        return "action_router_stub"
-
-    return "node_ai_answer"
 
 def build_admin_bot_graph():
     graph = StateGraph(AdminBotState)
 
     graph.add_node("load_context", node_load_context)
-    graph.add_node("node_ai_classify", node_ai_classify)
-    graph.add_node("detect_actor", node_detect_actor)
-    graph.add_node("security_guard", node_security_guard)
-    graph.add_node("route_unidentified", node_route_unidentified)
-    graph.add_node("route_identified", node_route_identified)
-    graph.add_node("node_ai_answer", node_ai_answer)
-    graph.add_node("action_router_stub", node_action_router_stub)
-    graph.add_node("info_router_stub", node_info_router_stub)
-    graph.add_node("execute_company_action", node_execute_company_action)
+    graph.add_node("identify_telegram_user", node_identify_telegram_user)
+    graph.add_node("anonymous", node_anonymous)
+    graph.add_node("no_access", node_no_access)
+    graph.add_node("authorized", node_authorized)
     graph.add_node("finalize", node_finalize)
 
     graph.add_edge(START, "load_context")
-    graph.add_edge("load_context", "node_ai_classify")
-    graph.add_edge("node_ai_classify", "detect_actor")
+    graph.add_edge("load_context", "identify_telegram_user")
 
     graph.add_conditional_edges(
-        "detect_actor",
-        route_after_detect_actor,
+        "identify_telegram_user",
+        route_after_identify,
         {
-            "security_guard": "security_guard",
-            "route_unidentified": "route_unidentified",
+            "anonymous": "anonymous",
+            "no_access": "no_access",
+            "authorized": "authorized",
         },
     )
 
-    graph.add_conditional_edges(
-        "security_guard",
-        route_after_security,
-        {
-            "route_identified": "route_identified",
-            "finalize": "finalize",
-        },
-    )
-
-    graph.add_conditional_edges(
-        "route_identified",
-        route_after_identified,
-        {
-            "node_ai_answer": "node_ai_answer",
-            "execute_company_action": "execute_company_action",
-            "action_router_stub": "action_router_stub",
-            "info_router_stub": "info_router_stub",
-            "finalize": "finalize",
-        },
-    )
-
-    graph.add_edge("node_ai_answer", "finalize")
-    graph.add_edge("route_unidentified", "finalize")
-    graph.add_edge("action_router_stub", "finalize")
-    graph.add_edge("info_router_stub", "finalize")
-    graph.add_edge("execute_company_action", "finalize")
+    graph.add_edge("anonymous", "finalize")
+    graph.add_edge("no_access", "finalize")
+    graph.add_edge("authorized", "finalize")
     graph.add_edge("finalize", END)
 
     return graph.compile()
 
 
 ADMIN_BOT_GRAPH = build_admin_bot_graph()
+
 
 def run_admin_bot_graph(
     *,
