@@ -337,7 +337,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // ===============================
 (function () {
     const COOKIE_NAME = 'ui_lang';
-    const SUPPORTED = ['ru', 'en', 'az', 'tr', 'zh-hans', 'zh-hant', 'zh-hk'];
 
     function getCookie(name) {
         const prefix = name + '=';
@@ -355,12 +354,27 @@ document.addEventListener("DOMContentLoaded", () => {
         document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
     }
 
-    function getCurrentLang() {
+    function getSupportedLanguages() {
+        const dataEl = document.getElementById('app-languages-data');
+        if (!dataEl) return ['ru'];
+
+        try {
+            const parsed = JSON.parse(dataEl.textContent || '[]');
+            return Array.isArray(parsed)
+                ? parsed.map(v => String(v).trim().toLowerCase()).filter(Boolean)
+                : ['ru'];
+        } catch (e) {
+            console.error('Failed to parse app languages', e);
+            return ['ru'];
+        }
+    }
+
+    function getCurrentLang(supported) {
         const fromCookie = getCookie(COOKIE_NAME);
-        if (SUPPORTED.includes(fromCookie)) return fromCookie;
+        if (supported.includes(fromCookie)) return fromCookie;
 
         const htmlLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
-        if (SUPPORTED.includes(htmlLang)) return htmlLang;
+        if (supported.includes(htmlLang)) return htmlLang;
 
         return 'ru';
     }
@@ -369,13 +383,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const select = document.getElementById('langSwitch');
         if (!select) return;
 
-        const currentLang = getCurrentLang();
+        const supported = getSupportedLanguages();
+        const currentLang = getCurrentLang(supported);
+
         select.value = currentLang;
         document.documentElement.setAttribute('lang', currentLang);
 
         select.addEventListener('change', () => {
-            const newLang = select.value;
-            if (!SUPPORTED.includes(newLang)) return;
+            const newLang = String(select.value || '').trim().toLowerCase();
+            if (!supported.includes(newLang)) return;
 
             setCookie(COOKIE_NAME, newLang);
             document.documentElement.setAttribute('lang', newLang);

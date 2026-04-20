@@ -22,24 +22,21 @@ from cargo_acc.models import Product, Payment
 from .forms import UserLoginForm
 
 
-SUPPORTED_UI_LANGS = {"ru", "en", "az", "tr", "zh-hans", "zh-hant", "zh-hk"}
 _TRANSLATOR = None
 
 
+def get_supported_ui_languages():
+    return [
+        str(code).strip().lower()
+        for code in (settings.AUTO_I18N_TARGET_LANGS or [])
+        if str(code).strip()
+    ]
+
+
 def _get_ui_lang(request):
-    lang = (request.COOKIES.get("ui_lang") or "ru").strip().lower()
-
-    aliases = {
-        "zh": "zh-hans",
-        "zh-cn": "zh-hans",
-        "zh-sg": "zh-hans",
-        "zh-tw": "zh-hant",
-        "zh-mo": "zh-hant",
-        "zh-hk": "zh-hk",
-    }
-    lang = aliases.get(lang, lang)
-
-    return lang if lang in SUPPORTED_UI_LANGS else "ru"
+    lang = (request.COOKIES.get("ui_lang") or "").strip().lower()
+    supported = set(get_supported_ui_languages())
+    return lang if lang in supported else "ru"
 
 
 def _get_translator():
@@ -52,9 +49,21 @@ def _get_translator():
     return _TRANSLATOR
 
 
+def get_base_template_context(request):
+    return {
+        "app_languages": get_supported_ui_languages(),
+        "current_ui_lang": _get_ui_lang(request),
+    }
+
+
 def render_translated(request, template_name, context=None, page_name="page", status=200):
     context = context or {}
-    html = render_to_string(template_name, context, request=request)
+    merged_context = {
+        **get_base_template_context(request),
+        **context,
+    }
+
+    html = render_to_string(template_name, merged_context, request=request)
 
     target_lang = _get_ui_lang(request)
     if target_lang == "ru":

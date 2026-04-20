@@ -1,7 +1,7 @@
 {#web/templates/base.html#}
 {% load static %}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ current_ui_lang|default:'ru' }}">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -108,13 +108,9 @@
             <div class="lang-switcher">
                 <label for="langSwitch" class="lang-switcher__label">🌐</label>
                 <select id="langSwitch" class="lang-switcher__select" aria-label="Language switcher">
-                    <option value="ru">Русский</option>
-                    <option value="en">English</option>
-                    <option value="az">Azərbaycan</option>
-                    <option value="tr">Türkçe</option>
-                    <option value="zh-hans">中文(简体)</option>
-                    <option value="zh-hant">中文(繁體)</option>
-                    <option value="zh-hk">中文(香港)</option>
+                    {% for lang in app_languages %}
+                        <option value="{{ lang }}">{{ lang }}</option>
+                    {% endfor %}
                 </select>
             </div>
         </div>
@@ -127,6 +123,8 @@
         {% endblock %}
     </main>
 </div>
+
+{{ app_languages|json_script:"app-languages-data" }}
 
 <script>
     function logoutUser() {
