@@ -40,3 +40,6 @@ jobs:
             docker compose -f /var/www/cargodb/docker-compose.prod.yml run --rm cargo_app python manage.py collectstatic --clear --noinput
 
             docker compose -f /var/www/cargodb/docker-compose.prod.yml restart cargo_app
+            
+            docker image prune -a -f
+            docker builder prune -a -f
