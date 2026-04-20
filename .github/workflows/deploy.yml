@@ -35,7 +35,7 @@ jobs:
 
             rm -rf /var/www/cargodb/staticfiles/*
 
-            docker compose -f /var/www/cargodb/docker-compose.prod.yml up -d
+            docker compose -f /var/www/cargodb/docker-compose.prod.yml up -d --pull always --force-recreate
 
             docker compose -f /var/www/cargodb/docker-compose.prod.yml run --rm cargo_app python manage.py collectstatic --clear --noinput
 
