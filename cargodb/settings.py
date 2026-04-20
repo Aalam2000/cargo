@@ -163,15 +163,16 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 # Почта уведомлений
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-EMAIL_HOST = "smtp.mail.ru"
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "True") == "True"
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False") == "True"
 
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-SERVER_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", EMAIL_HOST_USER)
 
 SITE_URL = os.getenv("SITE_URL", "https://crm.bona-plus.ru/").rstrip("/") + "/"
 

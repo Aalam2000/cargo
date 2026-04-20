@@ -378,8 +378,10 @@ def tg_webhook(request):
     )
 
     reply_text = (result.get("reply_text") or "").strip()
-    if not reply_text:
-        reply_text = "Запрос принят."
+    stop = bool(result.get("stop"))
+
+    if stop or not reply_text:
+        return JsonResponse({"status": "no_reply"})
 
     return send_tg_reply(telegram_id, reply_text)
 

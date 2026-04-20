@@ -59,16 +59,12 @@ class Command(BaseCommand):
                         text=text,
                     )
 
-                    user_lang = (result.get("user_lang") or "ru").strip().lower()
                     reply_text = (result.get("reply_text") or "").strip()
+                    stop = bool(result.get("stop"))
 
-                    if not reply_text:
-                        reply_text = TRANSLATOR.translate_key(
-                            key="system.request_accepted",
-                            lang=user_lang,
-                            default="Запрос принят.",
-                            dict_name="bot",
-                        )
+                    if stop or not reply_text:
+                        print("NO REPLY")
+                        continue
 
                     send_resp = requests.post(
                         f"{api_url}/sendMessage",

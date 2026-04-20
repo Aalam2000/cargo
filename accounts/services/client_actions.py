@@ -2,17 +2,16 @@
 import json
 import re
 from typing import Dict, Any
+
 from django.conf import settings
 from django.core.mail import send_mail
-from django.urls import reverse
 from accounts.models import CustomUser
-from django.utils.crypto import get_random_string
 
 import os
 import threading
 import requests
 from django.db import transaction, IntegrityError
-from cargo_acc.models import Client
+from cargo_acc.models import Client, SystemActionLog
 from cargo_acc.services.code_generator import generate_client_code
 
 import logging
@@ -21,11 +20,6 @@ logger = logging.getLogger("pol")
 
 
 def build_client_action_preview(ai_json: str) -> str:
-    """
-    Принимает JSON-строку от OpenAI и возвращает текст,
-    который бот отправит оператору: что именно система
-    собирается сделать.
-    """
     try:
         data = safe_parse_ai_json(ai_json)
     except json.JSONDecodeError:
@@ -41,9 +35,8 @@ def build_client_action_preview(ai_json: str) -> str:
             "Никаких действий выполнено не будет."
         )
 
-    # Базовое описание
     parts = [
-        f"Будет выполнено действие: *создание/поиск клиента*.",
+        "Будет выполнено действие: *создание/поиск клиента*.",
         f"E-mail: {email}.",
     ]
     if name:
@@ -61,16 +54,11 @@ def build_client_action_preview(ai_json: str) -> str:
 
 
 def safe_parse_ai_json(ai_text: str) -> Dict[str, Any]:
-    """
-    Гарантированно извлекает JSON из ответа OpenAI
-    """
     if not ai_text:
         return {"action": "unknown", "email": "", "name": ""}
 
-    # убираем ```json ``` и ```
     cleaned = re.sub(r"```json|```", "", ai_text).strip()
 
-    # берём JSON между первой { и последней }
     start = cleaned.find("{")
     end = cleaned.rfind("}")
 
@@ -94,14 +82,6 @@ def send_client_email_notification(
     client_code: str | None = None,
     password_reset_token: str | None = None,
 ) -> None:
-    """
-    Универсальная отправка e-mail клиенту.
-
-    notification_type:
-    - invite_visit
-    - invite_register
-    """
-
     base_url = settings.SITE_URL.rstrip("/")
 
     if notification_type == "invite_visit":
@@ -115,33 +95,20 @@ def send_client_email_notification(
         )
 
     elif notification_type == "invite_register":
-
         subject = "Вы зарегистрированы в системе Cargo"
-
         link = f"{base_url}/login/"
-
         body = (
-
             "Здравствуйте!\n\n"
-
             "Для вас создана учетная запись в системе Cargo.\n\n"
-
             "Данные для входа:\n"
-
             f"Логин (email): {email}\n"
-
             f"Код клиента: {client_code}\n"
-
             f"Пароль: {password}\n\n"
-
             f"Ссылка для входа:\n{link}\n\n"
-
             "Рекомендуем сменить пароль после первого входа."
-
         )
-
     else:
-        return  # неизвестный тип — молча выходим
+        return
 
     try:
         send_mail(
@@ -156,9 +123,14 @@ def send_client_email_notification(
 
 
 def send_tg_message(chat_id: str, text: str) -> None:
-    token = os.getenv("ADMIN_BOT_TG")
+    token = (
+        os.getenv("TELEGRAM_BOT_TOKEN")
+        or os.getenv("ADMIN_BOT_TG")
+        or ""
+    ).strip()
+
     if not token:
-        logger.error("ADMIN_BOT_TG env variable is missing")
+        logger.error("TELEGRAM_BOT_TOKEN / ADMIN_BOT_TG env variable is missing")
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -170,24 +142,45 @@ def send_tg_message(chat_id: str, text: str) -> None:
         logger.exception(f"Telegram send failed: {e}")
 
 
+def _log_bot_creation(*, operator_user: CustomUser, model_name: str, object_id: int, new_data: dict) -> None:
+    try:
+        SystemActionLog.objects.create(
+            company=operator_user.company,
+            model_name=model_name,
+            object_id=object_id,
+            action="create",
+            diff={
+                "source": "telegram_bot",
+                "channel": "telegram",
+                "created_from": "bot",
+            },
+            old_data=None,
+            new_data=new_data,
+            operator=operator_user,
+        )
+    except Exception as e:
+        logger.exception(f"SystemActionLog create failed: {e}")
+
+
 def _create_client_with_user_once(*, email: str, operator_user: CustomUser, name: str = "") -> str:
-    """
-    Одна попытка создания клиента/пользователя в транзакции.
-    Внешняя функция делает retry при IntegrityError.
-    """
     email = (email or "").strip()
     if not email:
         return "❗ E-mail пустой."
 
     with transaction.atomic():
-        # 1) Пользователь существует?
         user = CustomUser.objects.filter(email__iexact=email).first()
         if user:
-            send_client_email_notification(email=email, notification_type="invite_visit", operator_user=None)
-            return f"✅ Клиент уже существует: {email}\n📩 Приглашение отправлено."
+            send_client_email_notification(
+                email=email,
+                notification_type="invite_visit",
+                operator_user=None,
+            )
+            return (
+                f"✅ Клиент уже существует: {email}\n"
+                "📩 Приглашение отправлено."
+            )
 
-        # 2) Создаём нового пользователя (БЕЗ create_user)
-        raw_password = get_random_string(12)
+        raw_password = os.urandom(9).hex()
 
         user = CustomUser.objects.create(
             email=email,
@@ -196,25 +189,43 @@ def _create_client_with_user_once(*, email: str, operator_user: CustomUser, name
             first_name=name or "",
             is_active=True,
         )
-
         user.set_password(raw_password)
         user.save(update_fields=["password"])
 
-        # 3) Генерируем код клиента (атомарно, с блокировкой Company)
         client_code = generate_client_code(operator_user.company)
 
-        # 4) Создаём клиента
         client = Client.objects.create(
             company=operator_user.company,
             client_code=client_code,
+            description="Создано из Telegram-бота Cargo",
         )
 
-        # 5) Привязываем
         user.linked_client = client
         user.client_code = client_code
         user.save(update_fields=["linked_client", "client_code"])
 
-    # 6) Письмо новому (вне транзакции, чтобы не держать блокировки)
+        _log_bot_creation(
+            operator_user=operator_user,
+            model_name="accounts.CustomUser",
+            object_id=user.id,
+            new_data={
+                "email": user.email,
+                "role": user.role,
+                "client_code": user.client_code,
+                "source": "telegram_bot",
+            },
+        )
+        _log_bot_creation(
+            operator_user=operator_user,
+            model_name="cargo_acc.Client",
+            object_id=client.id,
+            new_data={
+                "client_code": client.client_code,
+                "description": client.description,
+                "source": "telegram_bot",
+            },
+        )
+
     send_client_email_notification(
         email=email,
         notification_type="invite_register",
@@ -228,20 +239,15 @@ def _create_client_with_user_once(*, email: str, operator_user: CustomUser, name
         f"📧 Email: {email}\n"
         f"🆔 Код клиента: {client_code}\n"
         f"🔑 Пароль: {raw_password}\n"
+        f"🏢 Компания: {operator_user.company.name}\n"
+        "🤖 Источник: Telegram-бот Cargo\n"
         "📩 Данные отправлены клиенту на почту."
     )
 
 
 def create_client_with_user(*, email: str, operator_user: CustomUser, name: str = "") -> str:
-    """
-    Создание клиента с защитным retry на случай гонок/параллельных путей создания.
-
-    Критично: IntegrityError может прилететь не только по client_code,
-    но и по другим UNIQUE (например, email). В этом случае повтор обычно
-    безопасен: при повторе мы попадём в ветку "пользователь уже существует".
-    """
     last_exc: Exception | None = None
-    for attempt in range(1, 4):  # 1–3 попытки
+    for attempt in range(1, 4):
         try:
             return _create_client_with_user_once(email=email, operator_user=operator_user, name=name)
         except IntegrityError as e:
@@ -257,7 +263,14 @@ def enqueue_create_client_action(*, telegram_id: str, operator_user_id: int, ema
     def _job():
         try:
             operator_user = CustomUser.objects.get(id=operator_user_id)
+
+            send_tg_message(
+                telegram_id,
+                f"⏳ Начал создание клиента {email}"
+            )
+
             result = create_client_with_user(email=email, operator_user=operator_user, name=name)
+
             send_tg_message(telegram_id, result)
         except Exception as e:
             logger.exception(f"create_client job failed: {e}")
