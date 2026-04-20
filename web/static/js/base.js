@@ -373,10 +373,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const fromCookie = getCookie(COOKIE_NAME);
         if (supported.includes(fromCookie)) return fromCookie;
 
+        const browserLang = String(navigator.language || '').trim().toLowerCase();
+        if (supported.includes(browserLang)) return browserLang;
+
+        const browserBaseLang = browserLang.split('-')[0];
+        if (supported.includes(browserBaseLang)) return browserBaseLang;
+
         const htmlLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
         if (supported.includes(htmlLang)) return htmlLang;
 
-        return 'ru';
+        return supported[0] || 'ru';
     }
 
     document.addEventListener('DOMContentLoaded', () => {

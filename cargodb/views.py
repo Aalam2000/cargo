@@ -26,17 +26,19 @@ _TRANSLATOR = None
 
 
 def get_supported_ui_languages():
-    return [
+    langs = [settings.LANGUAGE_CODE]
+    langs.extend(
         str(code).strip().lower()
         for code in (settings.AUTO_I18N_TARGET_LANGS or [])
         if str(code).strip()
-    ]
+    )
+    return list(dict.fromkeys(langs))
 
 
 def _get_ui_lang(request):
     lang = (request.COOKIES.get("ui_lang") or "").strip().lower()
     supported = set(get_supported_ui_languages())
-    return lang if lang in supported else "ru"
+    return lang if lang in supported else settings.LANGUAGE_CODE
 
 
 def _get_translator():
@@ -44,7 +46,7 @@ def _get_translator():
     if _TRANSLATOR is None:
         _TRANSLATOR = Translator(
             cache_dir=os.path.join(settings.BASE_DIR, "translations"),
-            source_lang="ru",
+            source_lang=settings.LANGUAGE_CODE,
         )
     return _TRANSLATOR
 
