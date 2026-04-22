@@ -1,0 +1,7 @@
+{
+  "bk::bot.ai_error": "Hozir sizning so'rovingizni to'g'ri tushunolmadim. Iltimos, biroz aniqroq yozing.",
+  "bk::bot.client_action_started": "Qabul qilindi. Mijoz yaratishni boshlayapman.",
+  "bk::bot.create_user_not_connected": "Ushbu tarmoqda kompaniya foydalanuvchisini yaratish hozircha ulanishda emas. Hozirda faqat mijoz yaratish haqiqatan ham ulanishda.",
+  "bk::bot.fallback": "Men bot, platforma va Cargo'dagi asosiy harakatlar bo'yicha yordam bera olaman.",
+  "bk::system.request_accepted": "So'rov qabul qilindi."
+}

@@ -17,12 +17,14 @@ from openai import OpenAI
 
 from accounts.models import CustomUser
 from accounts.services.client_actions import enqueue_create_client_action
+from accounts.services.company_actions import enqueue_create_company_action
 from chatgpt_ui.models import ChatMessage, ChatSession
 from chatgpt_ui.services.ai.lang_detect import detect_language
 from chatgpt_ui.services.ai.prompt_loader import load_prompt
 
 
 class AdminBotState(TypedDict, total=False):
+    ai_action_company_name: str
     telegram_id: str
     username: str
     first_name: str
@@ -609,6 +611,7 @@ def _analyze_branch_with_ai(
                 "name": "none",
                 "email": "",
                 "person_name": "",
+                "company_name": "",
             },
         },
     }
@@ -712,10 +715,10 @@ def node_identify_telegram_user(state: AdminBotState) -> AdminBotState:
 def route_after_identify(state: AdminBotState) -> str:
     actor_level = _clean_text(state.get("actor_level"))
     if actor_level == "authorized":
-        return "authorized_prepare"
+        return "authorized"
     if actor_level == "no_access":
-        return "no_access_prepare"
-    return "anonymous_prepare"
+        return "no_access"
+    return "anonymous"
 
 
 def _prepare_branch_common(state: AdminBotState) -> AdminBotState:
@@ -804,6 +807,7 @@ def _run_ai_for_branch(state: AdminBotState, branch_type: str) -> AdminBotState:
     ai_action = _clean_text(action_data.get("name")) or "none"
     ai_action_email = _clean_text(action_data.get("email"))
     ai_action_name = _clean_text(action_data.get("person_name"))
+    ai_action_company_name = _clean_text(action_data.get("company_name"))
 
     merged_memory = _merge_memory_facts(memory_facts, memory_update)
     context_json["memory"] = dict(context_json.get("memory") or {})
@@ -834,9 +838,9 @@ def _run_ai_for_branch(state: AdminBotState, branch_type: str) -> AdminBotState:
         "ai_action": ai_action,
         "ai_action_email": ai_action_email,
         "ai_action_name": ai_action_name,
+        "ai_action_company_name": ai_action_company_name,
         "stop": False,
     }
-
 
 def node_anonymous_ai_analyze(state: AdminBotState) -> AdminBotState:
     return _run_ai_for_branch(state, "anonymous")
@@ -861,8 +865,27 @@ def node_reply(state: AdminBotState) -> AdminBotState:
     ai_action = _clean_text(state.get("ai_action"))
     ai_action_email = _clean_text(state.get("ai_action_email"))
     ai_action_name = _clean_text(state.get("ai_action_name"))
+    ai_action_company_name = _clean_text(state.get("ai_action_company_name"))
 
-    if ai_action == "create_client" and session.user_id:
+    if ai_action == "create_company":
+        if _is_valid_email(ai_action_email) and ai_action_company_name:
+            enqueue_create_company_action(
+                telegram_id=_clean_text(state.get("telegram_id")),
+                company_name=ai_action_company_name,
+                admin_email=ai_action_email,
+                admin_telegram=_clean_text(state.get("username")),
+                admin_name=ai_action_name,
+            )
+            if not reply_text:
+                reply_text = "Принял. Запускаю создание компании."
+        else:
+            if not reply_text:
+                if not ai_action_company_name:
+                    reply_text = "Для создания компании нужно название компании."
+                else:
+                    reply_text = "Для создания компании нужен корректный email."
+
+    elif ai_action == "create_client" and session.user_id:
         if _is_valid_email(ai_action_email):
             enqueue_create_client_action(
                 telegram_id=_clean_text(state.get("telegram_id")),
@@ -992,7 +1015,7 @@ def build_admin_bot_graph():
         {
             "anonymous": "anonymous_prepare",
             "no_access": "no_access_prepare",
-            "authorized_prepare": "authorized_prepare",
+            "authorized": "authorized_prepare",
         },
     )
 

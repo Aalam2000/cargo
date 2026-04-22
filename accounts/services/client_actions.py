@@ -1,22 +1,23 @@
-# accounts/services/client_actions.py
 import json
+import os
 import re
+import threading
 from typing import Dict, Any
 
+import requests
 from django.conf import settings
 from django.core.mail import send_mail
-from accounts.models import CustomUser
-
-import os
-import threading
-import requests
 from django.db import transaction, IntegrityError
+
+from accounts.models import CustomUser
 from cargo_acc.models import Client, SystemActionLog
 from cargo_acc.services.code_generator import generate_client_code
 
 import logging
 
 logger = logging.getLogger("pol")
+
+ADMIN_NOTIFY_CHAT_ID = (os.getenv("ADMIN_NOTIFY_TELEGRAM_CHAT_ID") or "").strip()
 
 
 def build_client_action_preview(ai_json: str) -> str:
@@ -133,13 +134,78 @@ def send_tg_message(chat_id: str, text: str) -> None:
         logger.error("TELEGRAM_BOT_TOKEN / ADMIN_BOT_TG env variable is missing")
         return
 
+    if not chat_id:
+        logger.error("Telegram send failed: empty chat_id")
+        return
+
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
 
     try:
-        requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
+        response_text = response.text
+
+        if response.status_code != 200:
+            logger.error(
+                "Telegram send failed: status=%s chat_id=%s response=%s",
+                response.status_code,
+                chat_id,
+                response_text,
+            )
+            return
+
+        try:
+            data = response.json()
+        except Exception:
+            logger.error(
+                "Telegram send failed: non-json response chat_id=%s response=%s",
+                chat_id,
+                response_text,
+            )
+            return
+
+        if not data.get("ok"):
+            logger.error(
+                "Telegram send failed: chat_id=%s response=%s",
+                chat_id,
+                data,
+            )
+            return
+
+        logger.info("Telegram sent successfully: chat_id=%s", chat_id)
+
     except Exception as e:
         logger.exception(f"Telegram send failed: {e}")
+
+
+def _notify_admin_chat(text: str) -> None:
+    if not ADMIN_NOTIFY_CHAT_ID:
+        return
+    send_tg_message(ADMIN_NOTIFY_CHAT_ID, text)
+
+
+def _build_admin_action_message(
+    *,
+    action_name: str,
+    request_telegram_id: str,
+    email: str = "",
+    name: str = "",
+    company_name: str = "",
+    result: str = "",
+) -> str:
+    parts = [
+        f"🔔 Результат команды: {action_name}",
+        f"👤 Инициатор TG: {request_telegram_id or '—'}",
+    ]
+    if company_name:
+        parts.append(f"🏢 Компания: {company_name}")
+    if email:
+        parts.append(f"📧 Email: {email}")
+    if name:
+        parts.append(f"🙍 Имя: {name}")
+    parts.append("")
+    parts.append(result or "—")
+    return "\n".join(parts)
 
 
 def _log_bot_creation(*, operator_user: CustomUser, model_name: str, object_id: int, new_data: dict) -> None:
@@ -272,9 +338,29 @@ def enqueue_create_client_action(*, telegram_id: str, operator_user_id: int, ema
             result = create_client_with_user(email=email, operator_user=operator_user, name=name)
 
             send_tg_message(telegram_id, result)
+            _notify_admin_chat(
+                _build_admin_action_message(
+                    action_name="create_client",
+                    request_telegram_id=telegram_id,
+                    email=email,
+                    name=name,
+                    company_name=getattr(operator_user.company, "name", ""),
+                    result=result,
+                )
+            )
         except Exception as e:
             logger.exception(f"create_client job failed: {e}")
-            send_tg_message(telegram_id, "❗ Ошибка при создании клиента. Смотрите police.log")
+            error_text = "❗ Ошибка при создании клиента. Смотрите police.log"
+            send_tg_message(telegram_id, error_text)
+            _notify_admin_chat(
+                _build_admin_action_message(
+                    action_name="create_client",
+                    request_telegram_id=telegram_id,
+                    email=email,
+                    name=name,
+                    result=error_text,
+                )
+            )
 
     t = threading.Thread(target=_job, daemon=True)
     t.start()

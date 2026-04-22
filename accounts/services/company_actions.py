@@ -1,10 +1,9 @@
-# accounts/services/company_actions.py
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
-from typing import Optional
 
 from django.apps import apps
 from django.db import IntegrityError, transaction
@@ -14,6 +13,8 @@ from accounts.models import CustomUser
 from accounts.services.client_actions import send_tg_message
 
 logger = logging.getLogger("pol")
+
+ADMIN_NOTIFY_CHAT_ID = (os.getenv("ADMIN_NOTIFY_TELEGRAM_CHAT_ID") or "").strip()
 
 
 def _clean(value: str | None) -> str:
@@ -27,6 +28,39 @@ def _normalize_email(value: str | None) -> str:
 def _is_valid_email(value: str | None) -> bool:
     email = _normalize_email(value)
     return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email))
+
+
+def _notify_admin_chat(text: str) -> None:
+    if not ADMIN_NOTIFY_CHAT_ID:
+        return
+    send_tg_message(ADMIN_NOTIFY_CHAT_ID, text)
+
+
+def _build_admin_action_message(
+    *,
+    action_name: str,
+    request_telegram_id: str,
+    company_name: str = "",
+    admin_email: str = "",
+    admin_telegram: str = "",
+    admin_name: str = "",
+    result: str = "",
+) -> str:
+    parts = [
+        f"🔔 Результат команды: {action_name}",
+        f"👤 Инициатор TG: {request_telegram_id or '—'}",
+    ]
+    if company_name:
+        parts.append(f"🏢 Компания: {company_name}")
+    if admin_email:
+        parts.append(f"📧 Email: {admin_email}")
+    if admin_telegram:
+        parts.append(f"🧷 Telegram: {admin_telegram}")
+    if admin_name:
+        parts.append(f"🙍 Имя: {admin_name}")
+    parts.append("")
+    parts.append(result or "—")
+    return "\n".join(parts)
 
 
 def build_create_company_preview(
@@ -62,7 +96,6 @@ def _create_company_with_admin_once(
     *,
     company_name: str,
     admin_email: str,
-    operator_user: CustomUser,
     admin_telegram: str = "",
     admin_name: str = "",
 ) -> str:
@@ -130,8 +163,6 @@ def _create_company_with_admin_once(
         user.set_password(raw_password)
         user.save(update_fields=["password"])
 
-    operator_company_id = getattr(operator_user, "company_id", None)
-
     return (
         "✅ Компания создана\n"
         f"🏢 Компания: {company_name}\n"
@@ -140,7 +171,6 @@ def _create_company_with_admin_once(
         f"🧷 Telegram: {admin_telegram or '—'}\n"
         f"🔑 Пароль: {raw_password}\n"
         f"🔒 Изоляция данных: user.company_id = {company.id}\n"
-        f"👨‍💼 Инициатор: operator.company_id = {operator_company_id}\n"
         "ℹ️ Новый пользователь будет видеть только данные своей компании."
     )
 
@@ -149,7 +179,6 @@ def create_company_with_admin(
     *,
     company_name: str,
     admin_email: str,
-    operator_user: CustomUser,
     admin_telegram: str = "",
     admin_name: str = "",
 ) -> str:
@@ -160,7 +189,6 @@ def create_company_with_admin(
             return _create_company_with_admin_once(
                 company_name=company_name,
                 admin_email=admin_email,
-                operator_user=operator_user,
                 admin_telegram=admin_telegram,
                 admin_name=admin_name,
             )
@@ -179,7 +207,6 @@ def create_company_with_admin(
 def enqueue_create_company_action(
     *,
     telegram_id: str,
-    operator_user_id: int,
     company_name: str,
     admin_email: str,
     admin_telegram: str = "",
@@ -187,18 +214,39 @@ def enqueue_create_company_action(
 ) -> None:
     def _job():
         try:
-            operator_user = CustomUser.objects.get(id=operator_user_id)
             result = create_company_with_admin(
                 company_name=company_name,
                 admin_email=admin_email,
-                operator_user=operator_user,
                 admin_telegram=admin_telegram,
                 admin_name=admin_name,
             )
             send_tg_message(telegram_id, result)
+            _notify_admin_chat(
+                _build_admin_action_message(
+                    action_name="create_company",
+                    request_telegram_id=telegram_id,
+                    company_name=company_name,
+                    admin_email=admin_email,
+                    admin_telegram=admin_telegram,
+                    admin_name=admin_name,
+                    result=result,
+                )
+            )
         except Exception as exc:
             logger.exception("create_company job failed: %s", exc)
-            send_tg_message(telegram_id, "❗ Ошибка при создании компании. Смотрите police.log")
+            error_text = "❗ Ошибка при создании компании. Смотрите police.log"
+            send_tg_message(telegram_id, error_text)
+            _notify_admin_chat(
+                _build_admin_action_message(
+                    action_name="create_company",
+                    request_telegram_id=telegram_id,
+                    company_name=company_name,
+                    admin_email=admin_email,
+                    admin_telegram=admin_telegram,
+                    admin_name=admin_name,
+                    result=error_text,
+                )
+            )
 
     t = threading.Thread(target=_job, daemon=True)
     t.start()
