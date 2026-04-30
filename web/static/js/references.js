@@ -33,8 +33,8 @@ function initTable(card) {
         loading: false,
         finished: false,
         search: "",
-        sortField: "id",
-        sortDir: "asc",
+        sortField: card.dataset.defaultSortField || "id",
+        sortDir: card.dataset.defaultSortDir || "asc",
     };
 
     // ⚠ ВАЖНО: привязываем состояние к блоку таблицы
