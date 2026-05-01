@@ -19,6 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from cargo_acc.models import Cargo
 from cargo_acc.models import Client
 from cargo_acc.models import Product, Payment
+from .ui_i18n_keys import UI_TABLE_HEADER_KEYS
 from .forms import UserLoginForm
 
 
@@ -52,9 +53,25 @@ def _get_translator():
 
 
 def get_base_template_context(request):
+    ui_lang = _get_ui_lang(request)
+    ui_labels = {}
+    translator = _get_translator()
+    for key, default_text in UI_TABLE_HEADER_KEYS.items():
+        try:
+            translated_value = translator.translate_key(
+                key=key,
+                lang=ui_lang,
+                default=default_text,
+                dict_name="system",
+            )
+            ui_labels[key] = translated_value
+        except Exception:
+            ui_labels[key] = default_text
+
     return {
         "app_languages": get_supported_ui_languages(),
-        "current_ui_lang": _get_ui_lang(request),
+        "current_ui_lang": ui_lang,
+        "ui_labels": ui_labels,
     }
 
 

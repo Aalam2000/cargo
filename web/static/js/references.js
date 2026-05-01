@@ -90,7 +90,8 @@ function renderHeader(table, state) {
 
     state.fields.forEach(field => {
         const th = document.createElement("th");
-        th.textContent = prettify(field);
+        const headerText = prettify(field);
+        th.textContent = headerText;
         th.dataset.field = field;
         th.style.cursor = "pointer";
 
@@ -530,23 +531,24 @@ document.addEventListener("DOMContentLoaded", () => {
 //          ПРЕОБРАЗОВАНИЕ ИМЁН ПОЛЕЙ
 // =========================================
 function prettify(f) {
-    if (f === "name") return "Название";
-    if (f === "address") return "Адрес";
-    if (f === "company") return "Компания";
-    if (f === "description") return "Примечание";
-    if (f === "default_amount") return "Сумма по умолчанию";
-    if (f === "cargo_type") return "Тип товара";
-    if (f === "calc_mode") return "Метод расчёта";
-    if (f === "base_rate") return "Базовая ставка";
-    if (f === "packaging_rate") return "Ставка упаковки";
-    if (f === "insurance_percent") return "Страховка (%)";
-    if (f === "minimal_cost") return "Минимальная стоимость";
+    const tr = window.uiT || ((_, fallback) => fallback);
+    if (f === "name") return tr("table.header.name", "Название");
+    if (f === "address") return tr("table.header.address", "Адрес");
+    if (f === "company") return tr("table.header.company", "Компания");
+    if (f === "description") return tr("table.header.description", "Примечание");
+    if (f === "default_amount") return tr("table.header.default_amount", "Сумма по умолчанию");
+    if (f === "cargo_type") return tr("table.header.cargo_type", "Тип товара");
+    if (f === "calc_mode") return tr("table.header.calc_mode", "Метод расчёта");
+    if (f === "base_rate") return tr("table.header.base_rate", "Базовая ставка");
+    if (f === "packaging_rate") return tr("table.header.packaging_rate", "Ставка упаковки");
+    if (f === "insurance_percent") return tr("table.header.insurance_percent", "Страховка (%)");
+    if (f === "minimal_cost") return tr("table.header.minimal_cost", "Минимальная стоимость");
 
-    if (f === "date") return "Дата";
-    if (f === "currency") return "Валюта";
-    if (f === "rate") return "Курс";
-    if (f === "custom_rate") return "Наш курс";
-    if (f === "conversion_percent") return "Коррекция (%)";
+    if (f === "date") return tr("table.header.date", "Дата");
+    if (f === "currency") return tr("table.header.currency", "Валюта");
+    if (f === "rate") return tr("table.header.rate", "Курс");
+    if (f === "custom_rate") return tr("table.header.custom_rate", "Наш курс");
+    if (f === "conversion_percent") return tr("table.header.conversion_percent", "Коррекция (%)");
 
     return f;
 }

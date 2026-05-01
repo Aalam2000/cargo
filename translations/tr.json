@@ -113,6 +113,7 @@
   "{% if user.role == 'Admin' or user.role == 'Operator' %}": "{% if user.role == 'Admin' or user.role == 'Operator' %}",
   "{% load static %}": "{% load static %}",
   "{{ app_languages|json_script:\"app-languages-data\" }}": "{{ app_languages|json_script:\"app-dil-verileri\" }}",
+  "{{ app_languages|json_script:\"app-languages-data\" }}\n{{ ui_labels|json_script:\"ui-labels-data\" }}": "{{ app_languages|json_script:\"app-languages-data\" }}\n{{ ui_labels|json_script:\"ui-labels-data\" }}",
   "{{ client_account }}": "{{ client_account }}",
   "{{ client_actual_address }}": "{{ client_actual_address }}",
   "{{ client_bank_name }}": "{{ client_bank_name }}",

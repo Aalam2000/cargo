@@ -336,6 +336,31 @@ document.addEventListener("DOMContentLoaded", () => {
 //  ПЕРЕКЛЮЧАТЕЛЬ ЯЗЫКА
 // ===============================
 (function () {
+    let uiLabelsCache = null;
+
+    function getUiLabels() {
+        if (uiLabelsCache) return uiLabelsCache;
+        const el = document.getElementById("ui-labels-data");
+        if (!el) {
+            uiLabelsCache = {};
+            return uiLabelsCache;
+        }
+
+        try {
+            uiLabelsCache = JSON.parse(el.textContent || "{}");
+        } catch (e) {
+            console.error("Failed to parse ui labels", e);
+            uiLabelsCache = {};
+        }
+        return uiLabelsCache;
+    }
+
+    window.uiT = function (key, fallback = "") {
+        const labels = getUiLabels();
+        const value = labels[key];
+        return typeof value === "string" && value.trim() ? value : fallback;
+    };
+
     const COOKIE_NAME = 'ui_lang';
 
     function getCookie(name) {

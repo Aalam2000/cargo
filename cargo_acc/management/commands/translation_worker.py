@@ -6,6 +6,7 @@ from pathlib import Path
 from autoi18n import Translator
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from cargodb.ui_i18n_keys import UI_TABLE_HEADER_KEYS
 
 
 def get_target_langs() -> list[str]:
@@ -116,19 +117,33 @@ class Command(BaseCommand):
                     templates_dir=templates_dir,
                     target_langs=target_langs,
                 )
+                registered_keys = translator.register_keys(
+                    items=UI_TABLE_HEADER_KEYS,
+                    dict_name="system",
+                    target_langs=target_langs,
+                )
 
                 self.stdout.write(
                     self.style.WARNING(
                         f"templates scanned: {len(registered_pages)}"
                     )
                 )
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"ui keys registered: {registered_keys}"
+                    )
+                )
                 for page_name in registered_pages:
                     self.stdout.write(f" - {page_name}")
 
                 report = translator.process_all_translations(batch_size=batch_size)
+                backend_report = translator.process_all_backend_key_translations(batch_size=batch_size)
 
                 self.stdout.write(
                     self.style.SUCCESS(f"translation report: {report}")
+                )
+                self.stdout.write(
+                    self.style.SUCCESS(f"backend key translation report: {backend_report}")
                 )
 
             except KeyboardInterrupt:

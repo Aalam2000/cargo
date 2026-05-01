@@ -8,25 +8,26 @@
 // Глобальное состояние
 // ----------------------------
 let ROLE = "";
+const tr = window.uiT || ((_, fallback) => fallback);
 
 const PRODUCT_COLUMN_LABELS = {
-    product_code: "Номер товара",
-    client: "Код клиента",
-    cargo: "Груз",
-    cargo_status: "Статус",
-    warehouse: "Склад",
+    product_code: tr("table.header.product_code", "Номер товара"),
+    client: tr("table.header.client", "Код клиента"),
+    cargo: tr("table.header.cargo", "Груз"),
+    cargo_status: tr("table.header.cargo_status", "Статус"),
+    warehouse: tr("table.header.warehouse", "Склад"),
 
-    record_date: "Дата записи",
-    shipping_date: "Дата отправки",
-    delivery_date: "Дата доставки",
+    record_date: tr("table.header.record_date", "Дата записи"),
+    shipping_date: tr("table.header.shipping_date", "Дата отправки"),
+    delivery_date: tr("table.header.delivery_date", "Дата доставки"),
 
-    cargo_description: "Описание груза",
-    comment: "Комментарий",
+    cargo_description: tr("table.header.cargo_description", "Описание груза"),
+    comment: tr("table.header.comment", "Комментарий"),
 
-    weight: "Вес",
-    volume: "Объём",
-    cost: "Стоимость",
-    images: "Фото",
+    weight: tr("table.header.weight", "Вес"),
+    volume: tr("table.header.volume", "Объём"),
+    cost: tr("table.header.cost", "Стоимость"),
+    images: tr("table.header.images", "Фото"),
 };
 
 
@@ -380,13 +381,13 @@ async function fetchPayments({offset = 0}) {
 function buildPaymentsHeader() {
     const table = document.querySelector("#tab-payments table");
     const cols = [
-        {label: "Дата", field: "payment_date"},
-        {label: "Тип операции", field: "operation_kind_label"},
-        {label: "Вид оплаты", field: "operation_type"},
-        {label: "Сумма USD", field: "amount_usd"},
-        {label: "Комментарий", field: "comment"},
-        {label: "Товары", field: "products"},
-        {label: "Грузы", field: "cargos"}
+        {label: tr("table.header.date", "Дата"), field: "payment_date"},
+        {label: tr("table.header.operation_kind_label", "Тип операции"), field: "operation_kind_label"},
+        {label: tr("table.header.operation_type", "Вид оплаты"), field: "operation_type"},
+        {label: tr("table.header.amount_usd", "Сумма USD"), field: "amount_usd"},
+        {label: tr("table.header.comment", "Комментарий"), field: "comment"},
+        {label: tr("table.header.products", "Товары"), field: "products"},
+        {label: tr("table.header.cargos", "Грузы"), field: "cargos"}
     ];
 
 
