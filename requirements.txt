@@ -42,3 +42,4 @@ PyJWT==2.10.1
 langgraph==1.1.0
 auto-i18n-lib==0.5.1
 boto3==1.42.77
+djangorestframework-simplejwt==5.5.0

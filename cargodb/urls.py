@@ -9,6 +9,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from django.views.generic import RedirectView
 from . import views
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,9 @@ urlpatterns = [
         url=settings.STATIC_URL + 'favicon.ico',
         permanent=True
     )),
+    # добавить в urlpatterns:
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 
 # ==============================
