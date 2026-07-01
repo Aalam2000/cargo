@@ -1,162 +1,146 @@
----
+# CargoDB
 
-# 📦 Cargo Tracking Platform — Техническое описание
+**A platform for cargo companies: products, shipments, statuses, and finances.**
 
-## 🔹 Назначение системы 2
-
-Платформа мультиязычна и предназначена для **учёта, фотофиксации и отслеживания движения товаров и грузов** в международной транспортной компании.
-Она объединяет в единую базу все этапы: от заказа товара у поставщика до его выдачи клиенту, включая оплату, упаковку, транспортировку и подтверждение каждого действия через QR-код.
+The core idea is to **work through an AI chat in Telegram**. You don't have to open a browser — many tasks are handled with a simple message to the bot. The web interface is there for full control, but Telegram is the fastest way to get started and handle day-to-day work.
 
 ---
 
-## 🔹 Логическая структура данных
+## Get started in a minute — via Telegram
 
-| Уровень | Объект                              | Назначение                                                                           |
-| ------- | ----------------------------------- | ------------------------------------------------------------------------------------ |
-| **1**   | 🧾 **Product**                      | Заказ клиента — отдельная товарная позиция (будет активирована позже)                |
-| **2**   | 📦 **Cargo**                        | Груз, в котором объединяются один или несколько товаров; участвует в транспортировке |
-| **3**   | 🚚 **TransportBill**                | Накладная (поездка/рейс), фиксирует перемещения грузов между складами                |
-| **4**   | 💰 **Payment**                      | Финансовые операции клиентов; связываются с одним или несколькими грузами            |
-| **5**   | 📸 **Image / QRScan**               | Фотофиксация и распознавание QR-кодов (точки событий)                                |
-| **6**   | 🏢 **Client / Company / Warehouse** | Справочники клиентов, компаний и складов (основа для всех связей)                    |
+Bot: **[@cargo_adm_bot](https://t.me/cargo_adm_bot)**
 
----
+Write to the bot in plain language — it will understand your request, perform the action, or tell you what to do next.
 
-### 2. **Таблица `cargo_acc_payment`**
+**Without signing up in the system, you can:**
 
-Используется для фиксации **платежей от клиентов**.
+- learn what the platform and bot can do;
+- register a **new company** (name + administrator email);
+- get step-by-step instructions.
 
-| Поле                                                         | Назначение                                      |
-| ------------------------------------------------------------ | ----------------------------------------------- |
-| `payment_code`                                               | Внутренний идентификатор (PAY-XXXXXX)           |
-| `payment_date`                                               | Дата поступления средств                        |
-| `client_id`, `company_id`                                    | От кого и кому поступил платёж                  |
-| `currency`, `amount_original`, `exchange_rate`, `amount_usd` | Финансовые показатели                           |
-| `payment_source`                                             | Источник: `manual`, `import_csv`, `SBP`, `bank` |
-| `reference_number`                                           | Номер транзакции банка / СБП                    |
-| `qr_payload`                                                 | JSON-строка, зашитая в QR-код при оплате        |
-| `payer_phone`                                                | Телефон плательщика (СБП)                       |
-| `operator_id`, `verified_at`, `comment`                      | Учёт оператора и подтверждения                  |
+**After linking Telegram to your account (Admin / Operator):**
 
----
+- create a **client** by email;
+- get help on any part of the system;
+- handle work tasks without opening the CRM.
 
-### 3. **Таблица связи `cargo_acc_paymentcargo`**
-
-Позволяет связать один платёж с несколькими грузами
-и наоборот — один груз может быть закрыт несколькими платежами.
-
-| Поле         | Назначение                       |
-| ------------ | -------------------------------- |
-| `payment_id` | Ссылка на платёж                 |
-| `cargo_id`   | Ссылка на груз                   |
-| `amount_usd` | Сумма, идущая на конкретный груз |
-| `comment`    | Примечание оператора             |
-
----
-
-## 🔹 Логика работы и загрузки данных
-
-### 1. 📥 Импорт исходных грузов
-
-1. Из CSV (`tmp/files/gruzfull.csv`) берутся поля:
-
-   * `cargo_code`, `client_id`, `weight`, `volume`, `КОЛ. МЕСТ`, `ТИП ТОВАРА`, `СТ ТОВАРА`,
-     `тариф (по весу)`, `тариф от 298`, `СТ.УПАК`, `insurance`, `cost`, `delivery_time`, `delivery_date`.
-2. Для каждого `client_id` система ищет клиента по `client_code`.
-   Если нет — создаёт нового.
-3. Формируются записи в `cargo_acc_cargo`.
-4. Статус груза устанавливается `"Принят"`.
-5. QR-код (`qr_code = cargo_code`) генерируется автоматически.
-
----
-
-### 2. 💰 Импорт оплат (если есть)
-
-1. Если в CSV заполнены поля `Оплата (дата)` и `ОПЛАТА $`:
-
-   * создаётся `Payment` с `payment_source='import_csv'`;
-   * в `PaymentCargo` добавляется связь с соответствующим `Cargo`.
-2. Если поле пустое — груз остаётся без оплаты (ждёт поступления).
-
----
-
-### 3. 📸 Работа механизма фотофиксации (QR-цепочка)
-
-1. Оператор делает фото с QR-кодом.
-   → создаётся `Image` в `cargo_acc_image`.
-2. После анализа изображения
-   → создаётся `QRScan` (распознанный объект, результат действия).
-3. Система автоматически:
-
-   * обновляет `object_id` в `Image`;
-   * при необходимости создаёт запись в `CargoMovement` или `CargoStatusLog`.
-
----
-
-### 4. 🔄 Перемещения и накладные
-
-Каждое движение груза между складами фиксируется через:
-
-* `TransportBill` (общая накладная);
-* `CargoMovement` (конкретное перемещение, фото, оператор).
-
----
-
-### 5. 💳 Онлайн-платежи и QR-идентификация
-
-1. При генерации счёта клиенту формируется JSON-строка:
-
-   ```json
-   {
-     "client_code": "KH7285",
-     "cargo_codes": ["KH7285-0517-1"],
-     "amount": 440.08,
-     "payment_code": "PAY-KH7285-0517-1"
-   }
-   ```
-2. Она кодируется в QR-код для оплаты через СБП.
-   После поступления денег система распознаёт `qr_payload`, создаёт `Payment` и `PaymentCargo`.
-
----
-
-## 🔹 Будущая логика (после активации учёта товаров)
-
-1. **`Product`** станет основным объектом приёмки (из заказов клиента).
-2. **`Cargo`** будет агрегировать несколько товаров (`cargo_products`),
-   автоматически пересчитывая общий вес, объём, сумму и страховку.
-3. Фотофиксация и QR-механизм останутся теми же — но QR можно будет сканировать как на уровне товара, так и груза.
-
----
-
-## 🔹 Архитектура и интеграции
-
-| Компонент                   | Назначение                                                |
-| --------------------------- | --------------------------------------------------------- |
-| **Django REST API**         | обмен между мобильным приложением и веб-интерфейсом       |
-| **Frontend (templates/js)** | страницы: `dashboard`, `cargo_table`, `client_table`      |
-| **Docker Compose**          | контейнеры `cargo_app` (Django) и `cargo_db` (PostgreSQL) |
-| **CI/CD**                   | GitHub Actions (`.github/workflows/deploy.yml`)           |
-| **Миграции**                | применяются автоматически при деплое                      |
-| **Хранилище фото**          | `media/` (автоматическая привязка к Image/QRScan)         |
-
----
-
-## 🔹 Итоговая схема связей
+Example messages to the bot:
 
 ```
-Client ─┬──< Cargo >──┬──< CargoMovement >── TransportBill
-         │             │
-         │             └──< CargoStatusLog >
-         │
-         └──< Payment >──< PaymentCargo >── Cargo
+Help
+How do I use the platform?
+Create company "Bona Cargo", admin email: admin@example.com
+Create client client@example.com
 ```
-## Механизм обновления курсов валют
 
-В системе реализовано автоматическое ежедневное обновление справочника курсов валют через Django management command `update_rates`. На production-сервере запуск выполняется по расписанию `cron` один раз в сутки в `06:00 UTC` внутри рабочего контейнера `cargo_app`. Результаты выполнения и возможные ошибки записываются в лог `/var/www/cargodb/logs/update_rates.log`, что позволяет контролировать корректность обновления и быстро диагностировать сбои.
+> The bot replies in the user's language. It understands messy and short messages — no need to memorize commands.
+
 ---
-## Работа admin chat-бота
 
-Admin chat-бот работает через Telegram Webhook.  
-Точка входа в Django: `/bot/tg_webhook/`, обработчик — `chatgpt_ui.views.tg_webhook`.  
-Webhook в Telegram должен быть зарегистрирован на полный URL: `https://crm.bona-plus.ru/bot/tg_webhook/`.  
-Бот принимает входящие сообщения, создаёт или находит `ChatSession` по `telegram_id`, затем пытается сопоставить Telegram-пользователя с `accounts_customuser` по полю `telegram`. Если пользователь не привязан, бот отправляет инструкцию по привязке аккаунта в CRM. Если привязка есть, бот проверяет роль пользователя и допускает к административным действиям только роли `Admin` и `Operator`. Текущий OpenAI-вызов выполняется напрямую из Django, а следующий этап развития — перенос сценариев в LangGraph для более безопасной и управляемой логики обработки.
+## Who it's for
+
+| Who | How they work |
+|-----|---------------|
+| **Cargo company owner / administrator** | Sign up via the bot, configure reference data, oversee operations |
+| **Operator** | Products, shipments, statuses, payments — in the browser or via the bot |
+| **Cargo company client** | Personal account: their shipments, balance, contract, payments |
+
+---
+
+## What the platform does
+
+### Products and shipments
+
+- **Product** — a single client line item: description, weight, volume, warehouse, status, photos, QR code.
+- **Shipment (cargo)** — several products from one client combined for transport.
+- Changing a shipment's status or warehouse automatically updates all products inside it.
+- Shipment contents can be **locked** to prevent accidental changes.
+- PDF document per product for shipping paperwork.
+
+### Statuses and tracking
+
+- Configurable **shipment statuses** in company reference data.
+- Home page tabs: **In transit**, **Delivered**, **Payments**.
+- Filters by client and product number.
+
+### Finance
+
+- **Charges** and **payments** per client.
+- Multiple currencies with exchange-rate conversion.
+- **Client balance** and transaction history on the home page.
+- QR code for payment in the client profile.
+
+### Client portal
+
+- View **their own** products and payments.
+- Fill in profile and billing details (individual / legal entity).
+- **Contract** — PDF generation, signing via email link.
+
+### Reference data
+
+Warehouses, cargo and packaging types, statuses, charge and payment types, **delivery tariffs**, exchange rates — all configurable for your company.
+
+### Multilingual interface
+
+Default language is Russian, with switching to English, Turkish, Chinese, Kazakh, Uzbek, Azerbaijani, Kyrgyz, and others.
+
+---
+
+## User roles
+
+| Role | Access |
+|------|--------|
+| **Admin** | Full access: reference data, products, shipments, finance, Django Admin, AI chats |
+| **Operator** | Same as Admin, without technical admin panel |
+| **Client** | Own data only: products, payments, profile, contract |
+| **WarehouseWorker** | Warehouse (QR scanning — in development), profile |
+
+Each company's data is isolated — users only see their own organization.
+
+---
+
+## A typical workday
+
+### Via Telegram (without logging into the CRM)
+
+1. Message the bot — register a company or create a client.
+2. Ask "how do I add a product?" or "how do I record a payment?" — the bot explains step by step.
+3. Get answers to work questions in your language.
+
+### In the web interface
+
+1. Fill in **reference data** (warehouses, statuses, tariffs).
+2. Create client **products**.
+3. Build a **shipment** from products, update status when it moves.
+4. Record a **charge** or **payment**, monitor balance on the home page.
+
+### For clients
+
+1. Log in with client code or email.
+2. Sign the **contract**.
+3. Track shipments and payments on the home page.
+
+---
+
+## CargoChat — AI automation
+
+**CargoChat** is a separate product that connects to CargoDB.
+
+It automates customer communication, document processing, and AI service workflows. Available to administrators from the web interface.
+
+---
+
+## In development
+
+- Warehouse QR scanning (photo-based movement tracking).
+- Dedicated **Payments** menu section (currently on the home page).
+- Reports via the Telegram bot.
+- Creating company users through the bot (partially enabled).
+
+---
+
+## Free to use
+
+Community Edition is **free** for cargo companies of any size.
+
+For more on the product strategy, see [VISION.md](VISION.md).
