@@ -144,3 +144,13 @@ It automates customer communication, document processing, and AI service workflo
 Community Edition is **free** for cargo companies of any size.
 
 For more on the product strategy, see [VISION.md](VISION.md).
+
+---
+
+## License
+
+**Proprietary. All Rights Reserved.**
+
+This code is publicly visible for reference only. Use, copying, modification,
+distribution, or deployment is **not permitted** without written permission
+from the copyright holder. See [LICENSE](LICENSE).
